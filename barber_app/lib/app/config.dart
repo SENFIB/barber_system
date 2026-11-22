@@ -2,4 +2,4 @@
 /// کاربران پلن‌های عادی، پرو و ویژه نباید آن را وارد کنند.
 /// پلن شخصی می‌تواند از تنظیمات برنامه آن را عوض کند.
 const String kDefaultApiUrl =
-    'اینجا آدرس /exec را بچسبان';
+    'https://script.google.com/macros/s/AKfycbwoyaWsfV20BTi7s_EqO3ph_ztzUtTO7qgq1jNavZ2rSlVyqP7Nv_XYZkVr3vfuuhJE/exec';

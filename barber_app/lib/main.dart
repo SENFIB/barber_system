@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'app/platform.dart';
 import 'app/settings.dart';
 import 'features/customer/customer_home.dart';
 import 'features/manager/manager_entry.dart';
@@ -21,6 +22,10 @@ class BarberApp extends StatelessWidget {
   Widget _home() {
     if (settings.language == null) {
       return LanguagePage(settings: settings);
+    }
+    // ویندوز: مستقیم بخش آرایشگاه
+    if (isWindowsApp) {
+      return ManagerEntry(settings: settings);
     }
     if (settings.role == null) {
       return RolePage(settings: settings);

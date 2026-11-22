@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 
-/// تنظیمات ذخیره‌شده روی دستگاه: زبان، نقش، تم، آدرس سرور و شناسه‌ی دستگاه
+/// تنظیمات ذخیره‌شده روی دستگاه: زبان، نقش، تم، آدرس سرور، شناسه‌ی دستگاه و توکن آرایشگاه
 class AppSettings extends ChangeNotifier {
   AppSettings._(this._p);
 
@@ -47,6 +47,10 @@ class AppSettings extends ChangeNotifier {
     return (v == null || v.trim().isEmpty) ? kDefaultApiUrl : v.trim();
   }
 
+  /// توکن ورود آرایشگاه (null یعنی وارد نشده)
+  String? get shopToken => _p.getString('shop_token');
+  bool get hasShopToken => (shopToken ?? '').isNotEmpty;
+
   Future<void> setLanguage(String v) async {
     await _p.setString('language', v);
     notifyListeners();
@@ -77,6 +81,15 @@ class AppSettings extends ChangeNotifier {
       await _p.remove('api_url');
     } else {
       await _p.setString('api_url', t);
+    }
+    notifyListeners();
+  }
+
+  Future<void> setShopToken(String? v) async {
+    if (v == null || v.isEmpty) {
+      await _p.remove('shop_token');
+    } else {
+      await _p.setString('shop_token', v);
     }
     notifyListeners();
   }

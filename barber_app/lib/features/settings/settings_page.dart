@@ -2,6 +2,7 @@ import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../app/platform.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../onboarding/language_page.dart';
@@ -20,6 +21,10 @@ class _SettingsPageState extends State<SettingsPage> {
       TextEditingController(text: widget.settings.apiUrl);
   String _version = '...';
   bool _testing = false;
+
+  // بخش سرور مخفی است؛ با ۷ بار زدن روی نسخه باز می‌شود (برای پلن شخصی)
+  int _taps = 0;
+  bool _showServer = false;
 
   @override
   void initState() {
@@ -47,6 +52,14 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _onVersionTap() {
+    if (_showServer) return;
+    _taps++;
+    if (_taps >= 7) {
+      setState(() => _showServer = true);
+    }
+  }
+
   Future<void> _test() async {
     final st = widget.settings;
     final s = S(st.lang);
@@ -65,6 +78,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     if (!mounted) return;
+    _url.text = st.apiUrl;
     setState(() => _testing = false);
     messenger.showSnackBar(SnackBar(content: Text(msg)));
   }
@@ -95,15 +109,17 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.swap_horiz),
-                    title: Text(s.t('change_role')),
-                    onTap: () async {
-                      final nav = Navigator.of(context);
-                      await st.setRole(null);
-                      nav.popUntil((r) => r.isFirst);
-                    },
-                  ),
+                  // تغییر نقش فقط در موبایل (ویندوز فقط آرایشگاه است)
+                  if (!isWindowsApp)
+                    ListTile(
+                      leading: const Icon(Icons.swap_horiz),
+                      title: Text(s.t('change_role')),
+                      onTap: () async {
+                        final nav = Navigator.of(context);
+                        await st.setRole(null);
+                        nav.popUntil((r) => r.isFirst);
+                      },
+                    ),
                   const Divider(),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -128,36 +144,45 @@ class _SettingsPageState extends State<SettingsPage> {
                     selected: {st.themeMode},
                     onSelectionChanged: (v) => st.setThemeMode(v.first),
                   ),
-                  const Divider(height: 32),
-                  Text(s.t('server'),
-                      style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _url,
-                    textDirection: TextDirection.ltr,
-                    keyboardType: TextInputType.url,
-                    decoration: InputDecoration(
-                      labelText: s.t('api_url'),
-                      border: const OutlineInputBorder(),
+                  if (_showServer) ...[
+                    const Divider(height: 32),
+                    Text(s.t('server'),
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _url,
+                      textDirection: TextDirection.ltr,
+                      keyboardType: TextInputType.url,
+                      decoration: InputDecoration(
+                        labelText: s.t('api_url'),
+                        border: const OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  FilledButton.icon(
-                    onPressed: _testing ? null : _test,
-                    icon: _testing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.wifi_tethering),
-                    label: Text(s.t('test_connection')),
-                  ),
+                    const SizedBox(height: 8),
+                    FilledButton.icon(
+                      onPressed: _testing ? null : _test,
+                      icon: _testing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.wifi_tethering),
+                      label: Text(s.t('test_connection')),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                   Center(
-                    child: Text(
-                      '${s.t('version')}: $_version',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _onVersionTap,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text(
+                          '${s.t('version')}: $_version',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
                     ),
                   ),
                 ],

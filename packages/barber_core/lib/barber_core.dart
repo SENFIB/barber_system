@@ -1,4 +1,6 @@
 library barber_core;
 
-/// نام پکیج مشترک (فعلاً فقط برای اطمینان از اتصال پکیج به برنامه)
+export 'src/api_client.dart';
+
+/// نام پکیج مشترک
 const String kCoreName = 'barber_core';

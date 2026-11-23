@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
 import 'renew_page.dart';
+import 'services_page.dart';
 import 'shop_api.dart';
 import 'staff_page.dart';
 
@@ -128,7 +128,6 @@ class ManagerHome extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-
             // هشدار پایان اشتراک
             if (sub.expiringSoon)
               Padding(
@@ -151,7 +150,6 @@ class ManagerHome extends StatelessWidget {
                   ),
                 ),
               ),
-
             // اشتراک
             Glass(
               child: Column(
@@ -207,7 +205,6 @@ class ManagerHome extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-
             tile(
               icon: Icons.groups_rounded,
               title: s.t(sess.isOwner ? 'manage_barbers' : 'staff_mine'),
@@ -231,6 +228,8 @@ class ManagerHome extends StatelessWidget {
                 gradient: const LinearGradient(
                   colors: [AppColors.green, AppColors.blue],
                 ),
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => ServicesPage(ctx: ctx))),
               ),
           ],
         ),

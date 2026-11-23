@@ -1,9 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
-
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'config.dart';
+import 'look.dart';
 
 const _kLang = 'language';
 const _kRole = 'role';
@@ -11,6 +13,7 @@ const _kTheme = 'theme_mode';
 const _kDevice = 'device_id';
 const _kApi = 'api_url';
 const _kToken = 'shop_token';
+const _kLook = 'look';
 
 String _newDeviceId() {
   final r = Random.secure();
@@ -19,6 +22,14 @@ String _newDeviceId() {
     b.write(r.nextInt(16).toRadixString(16));
   }
   return b.toString();
+}
+
+Future<void> _deleteFile(String path) async {
+  if (path.isEmpty) return;
+  try {
+    final f = File(path);
+    if (await f.exists()) await f.delete();
+  } catch (_) {}
 }
 
 class AppSettings extends ChangeNotifier {
@@ -65,6 +76,19 @@ class AppSettings extends ChangeNotifier {
   String? get shopToken => _get(_kToken);
   bool get hasShopToken => shopToken != null;
 
+  // ---------- ظاهر ----------
+  String? _lookRaw;
+  AppLook _lookVal = const AppLook();
+
+  AppLook get look {
+    final raw = _get(_kLook);
+    if (raw != _lookRaw) {
+      _lookRaw = raw;
+      _lookVal = AppLook.fromJsonString(raw);
+    }
+    return _lookVal;
+  }
+
   Future<void> _set(String k, String? v) async {
     if (v == null || v.isEmpty) {
       await _p.remove(k);
@@ -80,12 +104,49 @@ class AppSettings extends ChangeNotifier {
   Future<void> setApiUrl(String? v) => _set(_kApi, v?.trim());
   Future<void> setShopToken(String? v) => _set(_kToken, v);
 
+  Future<void> setLook(AppLook l) => _set(_kLook, jsonEncode(l.toJson()));
+
+  /// عکس انتخابی را در حافظه‌ی خصوصی برنامه کپی می‌کند و به‌عنوان پس‌زمینه می‌گذارد
+  Future<void> setBackgroundImage(String sourcePath) async {
+    final dir = await getApplicationSupportDirectory();
+    var ext = sourcePath.contains('.')
+        ? sourcePath.split('.').last.toLowerCase()
+        : 'jpg';
+    if (!RegExp(r'^[a-z0-9]{2,5}$').hasMatch(ext)) ext = 'jpg';
+    final dest =
+        '${dir.path}${Platform.pathSeparator}bg_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await File(sourcePath).copy(dest);
+    final old = look.bgImage;
+    await setLook(look.copyWith(bgMode: 'image', bgImage: dest));
+    if (old != dest) await _deleteFile(old);
+  }
+
+  Future<void> clearBackgroundImage() async {
+    final cur = look;
+    final old = cur.bgImage;
+    await setLook(cur.copyWith(
+      bgImage: '',
+      bgMode: cur.bgMode == 'image' ? 'blobs' : cur.bgMode,
+    ));
+    await _deleteFile(old);
+  }
+
+  /// همه‌ی تنظیمات ظاهر (و عکس پس‌زمینه) را به حالت اول برمی‌گرداند
+  Future<void> resetLook() async {
+    final old = look.bgImage;
+    await _p.remove(_kLook);
+    notifyListeners();
+    await _deleteFile(old);
+  }
+
   /// همه‌ی اطلاعات ذخیره‌شده را پاک می‌کند. شناسه دستگاه به‌صورت پیش‌فرض می‌ماند.
   Future<void> clearAll({bool resetDeviceId = false}) async {
+    final img = look.bgImage;
     for (final k in _p.getKeys().toList()) {
       if (k != _kDevice) await _p.remove(k);
     }
     if (resetDeviceId) await _p.setString(_kDevice, _newDeviceId());
+    await _deleteFile(img);
     notifyListeners();
   }
 }

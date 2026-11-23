@@ -210,7 +210,7 @@ class ManagerHome extends StatelessWidget {
               title: s.t(sess.isOwner ? 'manage_barbers' : 'staff_mine'),
               desc: s.t(sess.isOwner ? 'manage_barbers_desc' : 'staff_mine_desc'),
               onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => StaffPage(ctx: ctx))),
+                  MaterialPageRoute(builder: (_) => StaffPage(ctx))),
             ),
             tile(
               icon: Icons.event_available_rounded,

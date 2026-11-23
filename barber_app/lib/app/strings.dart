@@ -28,7 +28,7 @@ class S {
 final Map<String, Map<String, String>> _m = {
   // ───────────────────────── فارسی ─────────────────────────
   'fa': {
-    'app_name': 'نوبت آرایشگاه',
+    'app_name': 'ESMAIRO',
     'welcome': 'خوش آمدید',
     'who_are_you': 'شما کدام هستید؟',
     'role_shop': 'آرایشگاه',
@@ -210,7 +210,7 @@ final Map<String, Map<String, String>> _m = {
 
   // ───────────────────────── English ─────────────────────────
   'en': {
-    'app_name': 'Barber Booking',
+    'app_name': 'ESMAIRO',
     'welcome': 'Welcome',
     'who_are_you': 'Who are you?',
     'role_shop': 'Barber shop',
@@ -386,7 +386,7 @@ final Map<String, Map<String, String>> _m = {
 
   // ───────────────────────── العربية ─────────────────────────
   'ar': {
-    'app_name': 'حجز الحلاقة',
+    'app_name': 'ESMAIRO',
     'welcome': 'أهلاً بك',
     'who_are_you': 'من أنت؟',
     'role_shop': 'صالون الحلاقة',

@@ -1,63 +1,58 @@
 import 'package:flutter/material.dart';
 
 import '../../app/settings.dart';
+import '../../app/widgets.dart';
 
 class LanguagePage extends StatelessWidget {
-  const LanguagePage({
-    super.key,
-    required this.settings,
-    this.fromSettings = false,
-  });
-
-  final AppSettings settings;
-  final bool fromSettings;
-
-  static const List<(String, String)> _langs = [
-    ('fa', 'فارسی'),
-    ('en', 'English'),
-    ('ar', 'العربية'),
-  ];
+  const LanguagePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('زبان / Language / اللغة')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(24),
-            children: [
-              const Icon(Icons.language, size: 64),
-              const SizedBox(height: 24),
-              for (final l in _langs) ...[
-                SizedBox(
-                  height: 60,
-                  child: FilledButton.tonal(
-                    onPressed: () async {
-                      await settings.setLanguage(l.$1);
-                      if (fromSettings && context.mounted) {
-                        Navigator.of(context).pop();
-                      }
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(l.$2, style: const TextStyle(fontSize: 20)),
-                        if (settings.language == l.$1) ...[
-                          const SizedBox(width: 8),
-                          const Icon(Icons.check_circle),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ],
+    final st = SettingsScope.of(context);
+    final items = const [
+      ['fa', 'فارسی', 'Persian'],
+      ['en', 'English', 'انگلیسی'],
+      ['ar', 'العربية', 'Arabic'],
+    ];
+    return GlassScaffold(
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(22, 40, 22, 32),
+        children: [
+          const Center(child: AppLogo(size: 96)),
+          const SizedBox(height: 22),
+          const Center(
+            child: Text('Barber Booking',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
           ),
-        ),
+          const SizedBox(height: 10),
+          Center(
+            child: Text(
+              'زبان خود را انتخاب کنید\nChoose your language\nاختر لغتك',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: muted(context), height: 1.7),
+            ),
+          ),
+          const SizedBox(height: 30),
+          for (final it in items) ...[
+            Glass(
+              onTap: () => st.setLanguage(it[0]),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+              child: Row(
+                children: [
+                  GradientIcon(Icons.language_rounded, size: 46),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(it[1],
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w700)),
+                  ),
+                  Icon(chevron(context), color: muted(context)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+        ],
       ),
     );
   }

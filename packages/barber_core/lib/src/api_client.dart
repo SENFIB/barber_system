@@ -1,98 +1,95 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
-import 'package:http/http.dart' as http;
-
-/// خطای برگشتی از سرور یا شبکه
 class ApiException implements Exception {
-  ApiException(this.code, this.message);
-
   final String code;
   final String message;
+  ApiException(this.code, [this.message = '']);
 
   @override
-  String toString() => '$code: $message';
+  String toString() => 'ApiException($code): $message';
 }
 
-/// کلاینت API گوگل اپس‌اسکریپت.
-/// گوگل به POST با ریدایرکت ۳۰۲ جواب می‌دهد و پکیج http آن را خودکار دنبال
-/// نمی‌کند، پس اینجا دستی دنبال می‌شود.
 class ApiClient {
-  ApiClient({
-    required this.baseUrl,
-    this.token,
-    this.timeout = const Duration(seconds: 30),
-  });
-
   final String baseUrl;
-  final String? token;
   final Duration timeout;
 
-  /// یک اکشن را صدا می‌زند و فقط بخش data را برمی‌گرداند.
-  /// در صورت خطا ApiException پرتاب می‌شود.
-  Future<dynamic> call(
-    String action, [
-    Map<String, dynamic> params = const {},
-  ]) async {
-    if (baseUrl.trim().isEmpty) {
-      throw ApiException('NO_URL', 'API url is empty');
+  ApiClient(this.baseUrl, {this.timeout = const Duration(seconds: 40)});
+
+  /// یک action رو صدا می‌زنه و `data` رو برمی‌گردونه.
+  /// در صورت خطا ApiException پرتاب می‌کنه.
+  Future<dynamic> call(String action, [Map<String, dynamic>? params]) async {
+    final url = baseUrl.trim();
+    if (url.isEmpty) {
+      throw ApiException('NO_URL', 'server url is empty');
     }
 
-    final payload = <String, dynamic>{
-      'action': action,
-      if (token != null && token!.isNotEmpty) 'token': token,
-      ...params,
-    };
+    final body = jsonEncode(<String, dynamic>{...?params, 'action': action});
+    final client = HttpClient();
+    client.connectionTimeout = timeout;
 
-    final client = http.Client();
+    String text;
     try {
-      final req = http.Request('POST', Uri.parse(baseUrl.trim()))
-        ..followRedirects = false
-        ..headers['Content-Type'] = 'text/plain;charset=utf-8'
-        ..body = jsonEncode(payload);
-
-      var res = await http.Response.fromStream(
-        await client.send(req).timeout(timeout),
-      );
-
-      var hops = 0;
-      while (res.statusCode >= 300 && res.statusCode < 400 && hops < 5) {
-        final loc = res.headers['location'];
-        if (loc == null || loc.isEmpty) break;
-        final next = http.Request('GET', Uri.parse(loc))
-          ..followRedirects = false;
-        res = await http.Response.fromStream(
-          await client.send(next).timeout(timeout),
-        );
-        hops++;
-      }
-
-      dynamic decoded;
-      try {
-        decoded = jsonDecode(utf8.decode(res.bodyBytes));
-      } catch (_) {
-        throw ApiException(
-          'BAD_RESPONSE',
-          'Invalid server response (HTTP ${res.statusCode})',
-        );
-      }
-
-      if (decoded is! Map) {
-        throw ApiException('BAD_RESPONSE', 'Invalid server response');
-      }
-      if (decoded['ok'] == true) {
-        return decoded['data'];
-      }
-      throw ApiException(
-        (decoded['error'] ?? 'ERROR').toString(),
-        (decoded['message'] ?? 'Unknown error').toString(),
-      );
+      text = await _run(client, url, body).timeout(timeout);
     } on ApiException {
       rethrow;
+    } on TimeoutException {
+      throw ApiException('NETWORK', 'timeout');
+    } on SocketException catch (e) {
+      throw ApiException('NETWORK', e.message);
+    } on HandshakeException catch (e) {
+      throw ApiException('NETWORK', e.message);
+    } on HttpException catch (e) {
+      throw ApiException('NETWORK', e.message);
     } catch (e) {
-      throw ApiException('NETWORK', 'Network error: $e');
+      throw ApiException('NETWORK', e.toString());
     } finally {
-      client.close();
+      client.close(force: true);
     }
+
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(text);
+    } catch (_) {
+      throw ApiException('BAD_RESPONSE', 'invalid response');
+    }
+
+    if (decoded is! Map) {
+      throw ApiException('BAD_RESPONSE', 'invalid response');
+    }
+
+    if (decoded['ok'] == true) {
+      return decoded['data'];
+    }
+
+    throw ApiException(
+      (decoded['error'] ?? 'SERVER_ERROR').toString(),
+      (decoded['message'] ?? '').toString(),
+    );
+  }
+
+  Future<String> _run(HttpClient client, String url, String body) async {
+    var uri = Uri.parse(url);
+    final req = await client.postUrl(uri);
+    req.followRedirects = false;
+    req.headers.set(HttpHeaders.contentTypeHeader, 'text/plain; charset=utf-8');
+    req.add(utf8.encode(body));
+    var res = await req.close();
+
+    // گوگل بعد از POST یک ریدایرکت 302 می‌ده؛ باید با GET دنبالش کنیم.
+    var hops = 0;
+    while (res.statusCode >= 300 && res.statusCode < 400 && hops < 5) {
+      final loc = res.headers.value(HttpHeaders.locationHeader);
+      await res.drain<void>();
+      if (loc == null || loc.isEmpty) break;
+      uri = uri.resolve(loc);
+      final r = await client.getUrl(uri);
+      r.followRedirects = false;
+      res = await r.close();
+      hops++;
+    }
+
+    return await res.transform(utf8.decoder).join();
   }
 }

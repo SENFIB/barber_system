@@ -1,6 +1,5 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
-
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/util.dart';
@@ -239,7 +238,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   final _ownerName = TextEditingController();
   final _address = TextEditingController();
   final _city = TextEditingController();
-  final _specialty = TextEditingController();
   final _user = TextEditingController();
   final _pass = TextEditingController();
   bool _barber = true;
@@ -249,8 +247,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   @override
   void dispose() {
     for (final c in [
-      _license, _shop, _phone, _ownerName, _address, _city, _specialty,
-      _user, _pass
+      _license, _shop, _phone, _ownerName, _address, _city, _user, _pass
     ]) {
       c.dispose();
     }
@@ -290,7 +287,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         address: _address.text,
         city: _city.text,
         ownerName: _ownerName.text,
-        specialty: _barber ? _specialty.text : '',
         ownerIsBarber: _barber,
       );
       if (!mounted) return;
@@ -369,12 +365,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                   onChanged: (v) => setState(() => _barber = v),
                   title: Text(s.t('i_am_barber')),
                 ),
-                if (_barber)
-                  GlassField(
-                    controller: _specialty,
-                    label: s.t('specialty'),
-                    icon: Icons.content_cut_rounded,
-                  ),
               ],
             ),
           ),

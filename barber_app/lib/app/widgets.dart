@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'dart:math';
-import 'dart:ui';
-
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
-
-import 'theme.dart';
+import 'look.dart';
 
 bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
+
+/// رنگ‌ها و تنظیمات ظاهریِ فعلی (طرح، پس‌زمینه، شیشه و ...)
+LookExt lk(BuildContext c) =>
+    Theme.of(c).extension<LookExt>() ?? LookExt.fallback(isDark(c));
 
 Color muted(BuildContext c) =>
     Theme.of(c).colorScheme.onSurface.withOpacity(0.62);
@@ -29,6 +32,7 @@ Future<bool> confirmDialog(
   required String cancelLabel,
   bool danger = false,
 }) async {
+  final dangerColor = lk(context).danger;
   final r = await showDialog<bool>(
     context: context,
     builder: (c) => AlertDialog(
@@ -41,7 +45,7 @@ Future<bool> confirmDialog(
         TextButton(
           onPressed: () => Navigator.pop(c, true),
           child: Text(okLabel,
-              style: TextStyle(color: danger ? AppColors.red : null)),
+              style: TextStyle(color: danger ? dangerColor : null)),
         ),
       ],
     ),
@@ -49,11 +53,10 @@ Future<bool> confirmDialog(
   return r == true;
 }
 
-/// پس‌زمینه‌ی گرادیانی با حباب‌های رنگیِ آرام‌متحرک
+/// پس‌زمینه: حباب متحرک، گرادیان، موج، نقطه‌ای، راه‌راه، ساده یا عکس کاربر
 class AppBackground extends StatefulWidget {
   const AppBackground({super.key, required this.child});
   final Widget child;
-
   @override
   State<AppBackground> createState() => _AppBackgroundState();
 }
@@ -63,7 +66,17 @@ class _AppBackgroundState extends State<AppBackground>
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 20),
-  )..repeat(reverse: true);
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (lk(context).bgMode == 'blobs') {
+      if (!_c.isAnimating) _c.repeat(reverse: true);
+    } else {
+      _c.stop();
+    }
+  }
 
   @override
   void dispose() {
@@ -91,50 +104,184 @@ class _AppBackgroundState extends State<AppBackground>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final dark = isDark(context);
-    final colors = dark
-        ? const [Color(0xFF0B1020), Color(0xFF1A1440), Color(0xFF0A1D30)]
-        : const [Color(0xFFEEF1FF), Color(0xFFF7EEFF), Color(0xFFE6F5FF)];
+  Widget _gradientBox(LookExt l) => DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: l.bg,
+          ),
+        ),
+      );
+
+  Widget _imageLayer(LookExt l) {
+    Widget img = Image.file(
+      File(l.bgImage),
+      fit: BoxFit.cover,
+      cacheWidth: 1600,
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => _gradientBox(l),
+    );
+    if (l.bgBlur > 0.5) {
+      img = ImageFiltered(
+        imageFilter: ImageFilter.blur(
+            sigmaX: l.bgBlur, sigmaY: l.bgBlur, tileMode: TileMode.clamp),
+        child: img,
+      );
+    }
     return Stack(
       fit: StackFit.expand,
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: colors,
-            ),
-          ),
+        img,
+        ColoredBox(
+          color: (l.dark ? Colors.black : Colors.white).withOpacity(l.bgDim),
         ),
-        LayoutBuilder(builder: (context, box) {
-          final w = box.maxWidth;
-          final h = box.maxHeight;
-          final base = max(w, h) * 0.75;
-          return AnimatedBuilder(
-            animation: _c,
-            builder: (context, _) {
-              final t = Curves.easeInOut.transform(_c.value);
-              return Stack(children: [
-                _blob(base, AppColors.violet, -0.25 * w + 0.15 * w * t,
-                    -0.15 * h + 0.10 * h * t, dark),
-                _blob(base * 0.9, AppColors.blue, 0.45 * w - 0.12 * w * t,
-                    0.55 * h - 0.10 * h * t, dark),
-                _blob(base * 0.6, AppColors.pink, 0.55 * w - 0.2 * w * t,
-                    -0.10 * h + 0.2 * h * t, dark),
-              ]);
-            },
-          );
-        }),
-        widget.child,
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = lk(context);
+    final dark = l.dark;
+    final layers = <Widget>[];
+
+    switch (l.bgMode) {
+      case 'solid':
+        layers.add(ColoredBox(color: l.bg[0]));
+        break;
+      case 'image':
+        layers.add(l.bgImage.isEmpty ? _gradientBox(l) : _imageLayer(l));
+        break;
+      default:
+        layers.add(_gradientBox(l));
+    }
+
+    if (l.bgMode == 'blobs') {
+      layers.add(LayoutBuilder(builder: (context, box) {
+        final w = box.maxWidth;
+        final h = box.maxHeight;
+        final base = max(w, h) * 0.75;
+        return AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final t = Curves.easeInOut.transform(_c.value);
+            return Stack(children: [
+              _blob(base, l.primary, -0.25 * w + 0.15 * w * t,
+                  -0.15 * h + 0.10 * h * t, dark),
+              _blob(base * 0.9, l.secondary, 0.45 * w - 0.12 * w * t,
+                  0.55 * h - 0.10 * h * t, dark),
+              _blob(base * 0.6, l.accent, 0.55 * w - 0.2 * w * t,
+                  -0.10 * h + 0.2 * h * t, dark),
+            ]);
+          },
+        );
+      }));
+    } else if (l.bgMode == 'waves') {
+      layers.add(CustomPaint(
+        size: Size.infinite,
+        painter: _WavesPainter(l.primary, l.secondary, dark),
+      ));
+    } else if (l.bgMode == 'dots') {
+      layers.add(CustomPaint(
+        size: Size.infinite,
+        painter: _DotsPainter(l.primary, dark),
+      ));
+    } else if (l.bgMode == 'stripes') {
+      layers.add(CustomPaint(
+        size: Size.infinite,
+        painter: _StripesPainter(l.primary, l.secondary, dark),
+      ));
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [...layers, widget.child],
     );
   }
 }
 
-/// اسکافولد استاندارد برنامه: پس‌زمینه‌ی شیشه‌ای + حداکثر عرض برای ویندوز
+class _WavesPainter extends CustomPainter {
+  _WavesPainter(this.a, this.b, this.dark);
+  final Color a;
+  final Color b;
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    for (var i = 0; i < 4; i++) {
+      final path = Path();
+      final baseY = s.height * (0.52 + 0.13 * i);
+      final amp = s.height * (0.03 + 0.006 * i);
+      path.moveTo(0, s.height);
+      path.lineTo(0, baseY);
+      for (double x = 0; x <= s.width; x += 6) {
+        final y = baseY +
+            sin((x / s.width) * 2 * pi * (1.0 + 0.4 * i) + i * 1.3) * amp;
+        path.lineTo(x, y);
+      }
+      path.lineTo(s.width, s.height);
+      path.close();
+      canvas.drawPath(
+        path,
+        Paint()..color = (i.isEven ? a : b).withOpacity(dark ? 0.16 : 0.12),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WavesPainter o) =>
+      o.a != a || o.b != b || o.dark != dark;
+}
+
+class _DotsPainter extends CustomPainter {
+  _DotsPainter(this.c, this.dark);
+  final Color c;
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()..color = c.withOpacity(dark ? 0.18 : 0.16);
+    for (double y = 14; y < s.height; y += 28) {
+      for (double x = 14; x < s.width; x += 28) {
+        canvas.drawCircle(Offset(x, y), 1.6, p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotsPainter o) => o.c != c || o.dark != dark;
+}
+
+class _StripesPainter extends CustomPainter {
+  _StripesPainter(this.a, this.b, this.dark);
+  final Color a;
+  final Color b;
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.save();
+    canvas.translate(s.width / 2, s.height / 2);
+    canvas.rotate(0.62);
+    final d = s.longestSide * 1.5;
+    final colors = [a, Colors.white, b];
+    final p = Paint();
+    var i = 0;
+    for (double x = -d; x < d; x += 34) {
+      p.color = colors[i % 3].withOpacity(dark ? 0.08 : 0.10);
+      canvas.drawRect(Rect.fromLTWH(x, -d, 34, 2 * d), p);
+      i++;
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_StripesPainter o) =>
+      o.a != a || o.b != b || o.dark != dark;
+}
+
+/// اسکافولد استاندارد برنامه: پس‌زمینه + حداکثر عرض برای ویندوز
 class GlassScaffold extends StatelessWidget {
   const GlassScaffold({
     super.key,
@@ -193,33 +340,45 @@ class Glass extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
-    this.radius = 22,
+    this.radius,
     this.onTap,
     this.tint,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
-  final double radius;
+  final double? radius;
   final VoidCallback? onTap;
   final Color? tint;
 
   @override
   Widget build(BuildContext context) {
-    final dark = isDark(context);
-    final fill = tint ??
-        (dark
-            ? Colors.white.withOpacity(0.07)
-            : Colors.white.withOpacity(0.62));
-    final border =
-        dark ? Colors.white.withOpacity(0.14) : Colors.white.withOpacity(0.9);
-    final br = BorderRadius.circular(radius);
+    final l = lk(context);
+    final fill = tint ?? l.cardFill;
+    final br = BorderRadius.circular(radius ?? l.radius);
+
+    final inner = Container(
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: br,
+        border: Border.all(color: l.cardBorder),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: br,
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: br,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(dark ? 0.22 : 0.07),
+            color: Colors.black.withOpacity(l.dark ? 0.22 : 0.07),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -227,24 +386,13 @@ class Glass extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: br,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: br,
-              border: Border.all(color: border),
-            ),
-            child: Material(
-              type: MaterialType.transparency,
-              child: InkWell(
-                onTap: onTap,
-                borderRadius: br,
-                child: Padding(padding: padding, child: child),
-              ),
-            ),
-          ),
-        ),
+        child: l.glassBlur > 0.5
+            ? BackdropFilter(
+                filter: ImageFilter.blur(
+                    sigmaX: l.glassBlur, sigmaY: l.glassBlur),
+                child: inner,
+              )
+            : inner,
       ),
     );
   }
@@ -272,12 +420,13 @@ class GradientButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = lk(context);
     final enabled = onPressed != null && !loading;
-    final br = BorderRadius.circular(16);
+    final br = BorderRadius.circular((l.radius * 0.75).clamp(8.0, 28.0));
     final fg = outlined
         ? Theme.of(context).colorScheme.onSurface
-        : Colors.white;
-    final grad = danger ? AppColors.dangerGradient : AppColors.gradient;
+        : (danger ? Colors.white : l.onPrimary);
+    final grad = danger ? l.dangerGradient : l.gradient;
 
     Widget content;
     if (loading) {
@@ -330,8 +479,7 @@ class GradientButton extends StatelessWidget {
                 ? null
                 : [
                     BoxShadow(
-                      color: (danger ? AppColors.red : AppColors.violet)
-                          .withOpacity(0.35),
+                      color: (danger ? l.danger : l.primary).withOpacity(0.35),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -380,15 +528,19 @@ class GlassField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = isDark(context);
+    final l = lk(context);
+    final dark = l.dark;
     final fill = dark
         ? Colors.white.withOpacity(0.08)
         : Colors.black.withOpacity(0.045);
     final primary = Theme.of(context).colorScheme.primary;
+    final rr = (l.radius * 0.73).clamp(8.0, 26.0);
+
     OutlineInputBorder ob(Color c, [double w = 1]) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(rr),
           borderSide: BorderSide(color: c, width: w),
         );
+
     return TextField(
       controller: controller,
       obscureText: obscure,
@@ -421,21 +573,23 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = lk(context);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: AppColors.gradient,
+        gradient: l.gradient,
         borderRadius: BorderRadius.circular(size * 0.3),
         boxShadow: [
           BoxShadow(
-            color: AppColors.violet.withOpacity(0.45),
+            color: l.primary.withOpacity(0.45),
             blurRadius: 30,
             offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: Icon(Icons.content_cut_rounded, color: Colors.white, size: size * 0.5),
+      child: Icon(Icons.content_cut_rounded,
+          color: l.onPrimary, size: size * 0.5),
     );
   }
 }
@@ -448,14 +602,17 @@ class GradientIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = lk(context);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: gradient ?? AppColors.gradient,
+        gradient: gradient ?? l.gradient,
         borderRadius: BorderRadius.circular(size * 0.32),
       ),
-      child: Icon(icon, color: Colors.white, size: size * 0.52),
+      child: Icon(icon,
+          color: gradient == null ? l.onPrimary : Colors.white,
+          size: size * 0.52),
     );
   }
 }
@@ -517,7 +674,8 @@ class SegmentPicker<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = isDark(context);
+    final l = lk(context);
+    final dark = l.dark;
     return Row(
       children: [
         for (final o in options)
@@ -531,18 +689,19 @@ class SegmentPicker<T> extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    gradient: o.key == value ? AppColors.gradient : null,
+                    gradient: o.key == value ? l.gradient : null,
                     color: o.key == value
                         ? null
                         : (dark
                             ? Colors.white.withOpacity(0.08)
                             : Colors.black.withOpacity(0.05)),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(
+                        (l.radius * 0.64).clamp(8.0, 22.0)),
                   ),
                   child: Text(
                     o.value,
                     style: TextStyle(
-                      color: o.key == value ? Colors.white : null,
+                      color: o.key == value ? l.onPrimary : null,
                       fontWeight:
                           o.key == value ? FontWeight.w800 : FontWeight.w500,
                     ),

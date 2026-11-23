@@ -92,7 +92,11 @@ const kBgModes = <String>[
   'image',
 ];
 
-/// نام خانواده‌ی فونت‌ها در Google Fonts ('' یعنی فونت سیستم)
+/// فونت پیش‌فرض برنامه؛ داخل خود برنامه بسته‌بندی شده (assets/fonts)
+const kDefaultFont = 'Vazirmatn';
+
+/// نام خانواده‌ی فونت‌ها ('' یعنی فونت سیستم).
+/// Vazirmatn از داخل برنامه خوانده می‌شود و بقیه از Google Fonts.
 const kFontFamilies = <String>[
   'Vazirmatn',
   'Noto Sans Arabic',
@@ -198,7 +202,7 @@ class AppLook {
     this.bgImage = '',
     this.bgBlur = 0,
     this.bgDim = 0.25,
-    this.font = '',
+    this.font = kDefaultFont,
     this.fontScale = 1.0,
     this.glassBlur = 18,
     this.glassOpacity = 1.0,
@@ -214,6 +218,8 @@ class AppLook {
   final String bgImage;
   final double bgBlur;
   final double bgDim;
+
+  /// '' = فونت سیستم، وگرنه یکی از kFontFamilies
   final String font;
   final double fontScale;
   final double glassBlur;
@@ -264,6 +270,7 @@ class AppLook {
   }
 
   Map<String, dynamic> toJson() => {
+        'v': 2,
         'preset': preset,
         'colors': colors,
         'bgMode': bgMode,
@@ -296,7 +303,10 @@ class AppLook {
 
       final presetId = '${j['preset'] ?? 'aurora'}';
       final mode = '${j['bgMode'] ?? 'blobs'}';
-      final font = '${j['font'] ?? ''}';
+      final ver = j['v'] is num ? (j['v'] as num).toInt() : 1;
+      var font = '${j['font'] ?? kDefaultFont}';
+      // نسخه‌های قدیمی '' را برای «پیش‌فرض» ذخیره می‌کردند
+      if (ver < 2 && font.isEmpty) font = kDefaultFont;
       return AppLook(
         preset: kPresets.any((p) => p.id == presetId) ? presetId : 'aurora',
         colors: cm,
@@ -304,7 +314,9 @@ class AppLook {
         bgImage: '${j['bgImage'] ?? ''}',
         bgBlur: d('bgBlur', 0, 0, 20),
         bgDim: d('bgDim', 0.25, 0, 0.8),
-        font: (font.isEmpty || kFontFamilies.contains(font)) ? font : '',
+        font: (font.isEmpty || kFontFamilies.contains(font))
+            ? font
+            : kDefaultFont,
         fontScale: d('fontScale', 1.0, 0.8, 1.4),
         glassBlur: d('glassBlur', 18, 0, 30),
         glassOpacity: d('glassOpacity', 1.0, 0.3, 1.6),

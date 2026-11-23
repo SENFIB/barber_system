@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/brand.dart';
 import '../../app/settings.dart';
 import '../../app/widgets.dart';
 
@@ -14,17 +15,13 @@ class LanguagePage extends StatelessWidget {
       ['en', 'English', 'انگلیسی'],
       ['ar', 'العربية', 'Arabic'],
     ];
+
     return GlassScaffold(
       body: ListView(
         padding: const EdgeInsets.fromLTRB(22, 40, 22, 32),
         children: [
-          const Center(child: AppLogo(size: 96)),
-          const SizedBox(height: 22),
-          const Center(
-            child: Text('Barber Booking',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
-          ),
-          const SizedBox(height: 10),
+          const Center(child: EsmairoLogo(size: 104)),
+          const SizedBox(height: 18),
           Center(
             child: Text(
               'زبان خود را انتخاب کنید\nChoose your language\nاختر لغتك',
@@ -39,7 +36,7 @@ class LanguagePage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
               child: Row(
                 children: [
-                  GradientIcon(Icons.language_rounded, size: 46),
+                  const GradientIcon(Icons.language_rounded, size: 46),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Text(it[1],

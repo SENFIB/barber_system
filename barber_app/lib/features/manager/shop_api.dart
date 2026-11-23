@@ -1,5 +1,4 @@
 import 'package:barber_core/barber_core.dart';
-
 import '../../app/settings.dart';
 import '../../app/util.dart';
 
@@ -11,7 +10,6 @@ class ShopCtx {
     required this.reload,
     required this.logout,
   });
-
   final ShopApi api;
   final ManagerSession session;
   final Future<void> Function() reload;
@@ -37,10 +35,22 @@ class ShopApi {
   Map<String, dynamic> _map(dynamic d) =>
       d is Map ? Map<String, dynamic>.from(d) : <String, dynamic>{};
 
+  List<Map<String, dynamic>> _rows(dynamic d, String key) {
+    final raw = d is Map ? d[key] : null;
+    final out = <Map<String, dynamic>>[];
+    if (raw is List) {
+      for (final e in raw) {
+        if (e is Map) out.add(Map<String, dynamic>.from(e));
+      }
+    }
+    return out;
+  }
+
   ManagerSession _session(dynamic d, {String? token}) =>
       ManagerSession.fromJson(_map(d), token: token);
 
-  // ── بدون ورود ──
+  // ───────────── بدون ورود ─────────────
+
   Future<ManagerSession> register({
     required String licenseKey,
     required String shopName,
@@ -87,7 +97,8 @@ class ShopApi {
     }));
   }
 
-  // ── با ورود ──
+  // ───────────── حساب و اشتراک ─────────────
+
   Future<ManagerSession> me() async =>
       _session(await _auth('me'), token: settings.shopToken);
 
@@ -99,6 +110,14 @@ class ShopApi {
     await _auth('logout');
   }
 
+  /// فقط صاحب آرایشگاه. فیلدها: name, phone, address, city, description,
+  /// currency, photo_url, buffer_min, overtime_min, cancel_before_min,
+  /// slot_step_min, calendar, timezone
+  Future<Map<String, dynamic>> shopUpdate(Map<String, dynamic> fields) async =>
+      _map(await _auth('shop_update', fields));
+
+  // ───────────── آرایشگرها ─────────────
+
   Future<Map<String, dynamic>> staffList() async =>
       _map(await _auth('staff_list'));
 
@@ -107,12 +126,43 @@ class ShopApi {
     String specialty = '',
     required String workStart,
     required String workEnd,
+    List<String>? serviceIds,
+    List<int>? daysOff,
   }) async {
     await _auth('staff_add', {
       'name': name.trim(),
       'specialty': specialty.trim(),
       'work_start': workStart,
       'work_end': workEnd,
+      if (serviceIds != null) 'service_ids': serviceIds,
+      if (daysOff != null) 'days_off': daysOff,
+    });
+  }
+
+  /// فقط فیلدهایی که null نیستند ارسال می‌شوند.
+  /// serviceIds خالی = این آرایشگر همه‌ی خدمات را انجام می‌دهد.
+  /// clearOvertime = اضافه‌کار اختصاصی پاک شود و تنظیم آرایشگاه اعمال شود.
+  Future<void> staffUpdate({
+    required String staffId,
+    String? name,
+    String? specialty,
+    List<String>? serviceIds,
+    String? workStart,
+    String? workEnd,
+    List<int>? daysOff,
+    int? overtimeMin,
+    bool clearOvertime = false,
+  }) async {
+    await _auth('staff_update', {
+      'staff_id': staffId,
+      if (name != null) 'name': name.trim(),
+      if (specialty != null) 'specialty': specialty.trim(),
+      if (serviceIds != null) 'service_ids': serviceIds,
+      if (workStart != null) 'work_start': workStart,
+      if (workEnd != null) 'work_end': workEnd,
+      if (daysOff != null) 'days_off': daysOff,
+      if (overtimeMin != null) 'overtime_min': overtimeMin,
+      if (clearOvertime) 'overtime_min': null,
     });
   }
 
@@ -138,5 +188,116 @@ class ShopApi {
 
   Future<void> inviteRevoke(String code) async {
     await _auth('invite_revoke', {'invite_code': code});
+  }
+
+  // ───────────── خدمات ─────────────
+
+  Future<List<Map<String, dynamic>>> serviceList() async =>
+      _rows(await _auth('service_list'), 'services');
+
+  /// serviceId خالی = خدمت جدید. خروجی: شناسه‌ی خدمت
+  Future<String> serviceSave({
+    String? serviceId,
+    required String name,
+    required int durationMin,
+    required int price,
+    List<String> combinableWith = const [],
+  }) async {
+    final d = await _auth('service_save', {
+      if (serviceId != null && serviceId.isNotEmpty) 'service_id': serviceId,
+      'name': name.trim(),
+      'duration_min': durationMin,
+      'price': price,
+      'combinable_with': combinableWith,
+    });
+    return '${_map(d)['service_id'] ?? ''}';
+  }
+
+  Future<void> serviceRemove(String serviceId) async {
+    await _auth('service_remove', {'service_id': serviceId});
+  }
+
+  // ───────────── مرخصی / تعطیلی ─────────────
+
+  Future<List<Map<String, dynamic>>> timeoffList() async =>
+      _rows(await _auth('timeoff_list'), 'blocks');
+
+  /// خروجی: {block_id, conflicts}
+  Future<Map<String, dynamic>> timeoffAdd({
+    String? staffId,
+    required String dateFrom,
+    String? dateTo,
+    String? startTime,
+    String? endTime,
+    String reason = '',
+  }) async =>
+      _map(await _auth('timeoff_add', {
+        if (staffId != null && staffId.isNotEmpty) 'staff_id': staffId,
+        'date_from': dateFrom,
+        if (dateTo != null) 'date_to': dateTo,
+        if (startTime != null) 'start_time': startTime,
+        if (endTime != null) 'end_time': endTime,
+        'reason': reason.trim(),
+      }));
+
+  Future<void> timeoffRemove(String blockId) async {
+    await _auth('timeoff_remove', {'block_id': blockId});
+  }
+
+  // ───────────── نوبت‌ها ─────────────
+
+  /// خروجی: {bookings:[...], now:{date,min}}
+  Future<Map<String, dynamic>> bookingsList({
+    String? dateFrom,
+    String? dateTo,
+    String? staffId,
+  }) async =>
+      _map(await _auth('bookings_list', {
+        if (dateFrom != null) 'date_from': dateFrom,
+        if (dateTo != null) 'date_to': dateTo,
+        if (staffId != null && staffId.isNotEmpty) 'staff_id': staffId,
+      }));
+
+  /// items: [{service_id, staff_id}]
+  Future<Map<String, dynamic>> bookingManual({
+    required List<Map<String, String>> items,
+    required String date,
+    required String startTime,
+    String customerName = '',
+    String customerPhone = '',
+  }) async =>
+      _map(await _auth('booking_manual', {
+        'items': items,
+        'date': date,
+        'start_time': startTime,
+        if (customerName.trim().isNotEmpty)
+          'customer_name': customerName.trim(),
+        if (customerPhone.trim().isNotEmpty)
+          'customer_phone':
+              normalizeDigits(customerPhone).replaceAll(RegExp(r'[^0-9+]'), ''),
+      }));
+
+  Future<void> bookingCancel({String? bookingId, String? groupId}) async {
+    await _auth('booking_cancel', {
+      if (bookingId != null) 'booking_id': bookingId,
+      if (groupId != null) 'group_id': groupId,
+    });
+  }
+
+  Future<void> bookingFinish(String bookingId) async {
+    await _auth('booking_finish', {'booking_id': bookingId});
+  }
+
+  Future<void> bookingNoShow(String bookingId) async {
+    await _auth('booking_noshow', {'booking_id': bookingId});
+  }
+
+  // ───────────── «دلمون تنگ شده» (پلن ویژه) ─────────────
+
+  Future<List<Map<String, dynamic>>> winbackList() async =>
+      _rows(await _auth('winback_list'), 'rules');
+
+  Future<void> winbackSave(List<Map<String, dynamic>> rules) async {
+    await _auth('winback_save', {'rules': rules});
   }
 }

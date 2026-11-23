@@ -11,13 +11,15 @@ class AppSettings extends ChangeNotifier {
 
   final SharedPreferences _p;
 
+  static String _newDeviceId() {
+    final r = Random.secure();
+    return List.generate(24, (_) => r.nextInt(16).toRadixString(16)).join();
+  }
+
   static Future<AppSettings> load() async {
     final p = await SharedPreferences.getInstance();
     if ((p.getString('device_id') ?? '').isEmpty) {
-      final r = Random.secure();
-      final id =
-          List.generate(24, (_) => r.nextInt(16).toRadixString(16)).join();
-      await p.setString('device_id', id);
+      await p.setString('device_id', _newDeviceId());
     }
     return AppSettings._(p);
   }
@@ -41,6 +43,9 @@ class AppSettings extends ChangeNotifier {
   }
 
   String get deviceId => _p.getString('device_id') ?? '';
+
+  /// آیا کاربر آدرس سرور سفارشی (پلن شخصی) گذاشته است؟
+  bool get hasCustomApiUrl => (_p.getString('api_url') ?? '').trim().isNotEmpty;
 
   String get apiUrl {
     final v = _p.getString('api_url');
@@ -91,6 +96,19 @@ class AppSettings extends ChangeNotifier {
     } else {
       await _p.setString('shop_token', v);
     }
+    notifyListeners();
+  }
+
+  /// حذف همه‌ی اطلاعات ذخیره‌شده روی دستگاه.
+  /// اگر resetDeviceId=false باشد، شناسه‌ی دستگاه می‌ماند تا آرایشگرهای
+  /// واردشده با کد دعوت به دستگاه وصل بمانند.
+  Future<void> clearAll({bool resetDeviceId = false}) async {
+    final keepId = resetDeviceId ? null : _p.getString('device_id');
+    await _p.clear();
+    await _p.setString(
+      'device_id',
+      (keepId == null || keepId.isEmpty) ? _newDeviceId() : keepId,
+    );
     notifyListeners();
   }
 }

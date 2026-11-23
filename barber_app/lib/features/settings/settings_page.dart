@@ -1,16 +1,16 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-
 import '../../app/config.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
+import '../../app/strings_ex.dart';
 import '../../app/widgets.dart';
 import '../manager/shop_api.dart';
+import 'appearance_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
-
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -26,7 +26,8 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     PackageInfo.fromPlatform().then((p) {
-      if (mounted) setState(() => _version = '${p.version}+${p.buildNumber}');
+      // فقط شماره‌ی نسخه؛ بدون شماره‌ی build
+      if (mounted) setState(() => _version = p.version);
     });
   }
 
@@ -77,7 +78,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final st = SettingsScope.read(context);
     final s = S(st.lang);
     var resetId = false;
-
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
@@ -114,11 +114,9 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
     if (ok != true) return;
-
     final msg = s.t('data_deleted');
     final messenger = ScaffoldMessenger.of(context);
     final nav = Navigator.of(context);
-
     if (st.hasShopToken) {
       try {
         await ShopApi(st).logout().timeout(const Duration(seconds: 8));
@@ -153,7 +151,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
     final s = S(st.lang);
-
+    final x = X(st.lang);
     final roleText = st.role == 'shop'
         ? s.t('role_shop')
         : st.role == 'customer'
@@ -201,8 +199,34 @@ class _SettingsPageState extends State<SettingsPage> {
               onChanged: st.setThemeKey,
             ),
           ),
+          const SizedBox(height: 18),
+          Glass(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AppearancePage()),
+            ),
+            child: Row(
+              children: [
+                const GradientIcon(Icons.palette_rounded, size: 44),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(x.t('appearance'),
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(x.t('appearance_desc'),
+                          style: TextStyle(
+                              color: muted(context), fontSize: 12.5)),
+                    ],
+                  ),
+                ),
+                Icon(chevron(context), color: muted(context)),
+              ],
+            ),
+          ),
           if (st.role != null) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             Glass(
               onTap: () async {
                 final nav = Navigator.of(context);
@@ -244,6 +268,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 _row(s.t('sd_language'), langText),
                 _row(s.t('sd_role'), roleText),
                 _row(s.t('sd_theme'), themeText),
+                _row(
+                    x.t('sd_look'),
+                    st.look.isCustom
+                        ? x.t('sd_look_custom')
+                        : x.t('sd_look_default')),
                 _row(s.t('sd_device'), devShort, ltr: true),
                 _row(s.t('sd_session'),
                     st.hasShopToken ? s.t('sd_yes') : s.t('sd_no')),
@@ -305,8 +334,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Text(
-                  '${s.t('version')} $_version',
-                  textDirection: TextDirection.ltr,
+                  '${x.t('version')} $_version',
                   style: TextStyle(color: muted(context), fontSize: 13),
                 ),
               ),

@@ -1,20 +1,45 @@
 import 'package:flutter/material.dart';
-
 import '../../app/settings.dart';
 import '../../app/strings.dart';
-import '../../app/theme.dart';
+import '../../app/strings_pro.dart';
+import '../../app/ui_kit.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
+import 'customer_api.dart';
+import 'customer_bookings.dart';
+import 'customer_shops.dart';
 
-class CustomerHome extends StatelessWidget {
+class CustomerHome extends StatefulWidget {
   const CustomerHome({super.key});
+  @override
+  State<CustomerHome> createState() => _CustomerHomeState();
+}
+
+class _CustomerHomeState extends State<CustomerHome> {
+  late final CustomerApi _api;
+  int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = CustomerApi(SettingsScope.read(context));
+  }
 
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
-    final s = S(st.lang);
+    final z = Z(st.lang);
+    Widget tabBtn(int i, IconData icon, String label) => Expanded(
+          child: GradientButton(
+            compact: true,
+            outlined: _tab != i,
+            icon: icon,
+            label: label,
+            onPressed: () => setState(() => _tab = i),
+          ),
+        );
     return GlassScaffold(
-      title: s.t('customer_title'),
+      title: S(st.lang).t('app_name'),
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => st.setRole(null),
@@ -26,42 +51,23 @@ class CustomerHome extends StatelessWidget {
               .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
         ),
       ],
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      body: Column(
         children: [
-          Glass(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          const UpdateBanner(app: 'customer'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
             child: Row(
               children: [
-                Icon(Icons.search_rounded, color: muted(context)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(s.t('search_hint'),
-                      style: TextStyle(color: muted(context))),
-                ),
+                tabBtn(0, Icons.storefront_rounded, z.t('tab_shops')),
+                const SizedBox(width: 10),
+                tabBtn(1, Icons.event_available_rounded, z.t('tab_bookings')),
               ],
             ),
           ),
-          const SizedBox(height: 22),
-          Glass(
-            padding: const EdgeInsets.all(26),
-            child: Column(
-              children: [
-                const GradientIcon(Icons.content_cut_rounded, size: 70),
-                const SizedBox(height: 18),
-                Text(s.t('customer_soon_title'),
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                Text(
-                  s.t('customer_soon_msg'),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: muted(context), height: 1.7),
-                ),
-                const SizedBox(height: 14),
-                const Pill('Beta', color: AppColors.amber),
-              ],
-            ),
+          Expanded(
+            child: _tab == 0
+                ? ShopsTab(api: _api, onBooked: () => setState(() => _tab = 1))
+                : MyBookingsTab(api: _api),
           ),
         ],
       ),

@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 
 import '../../app/settings.dart';
 import '../../app/strings.dart';
+import '../../app/widgets.dart';
 import 'shop_api.dart';
 
-/// وارد کردن لایسنس جدید برای تمدید. در صورت موفقیت true برمی‌گرداند.
+/// با موفقیت که تمام شد `true` برمی‌گرداند.
 class RenewPage extends StatefulWidget {
-  const RenewPage({super.key, required this.settings, required this.api});
-
-  final AppSettings settings;
+  const RenewPage({super.key, required this.api});
   final ShopApi api;
 
   @override
@@ -17,10 +16,8 @@ class RenewPage extends StatefulWidget {
 }
 
 class _RenewPageState extends State<RenewPage> {
-  final _form = GlobalKey<FormState>();
   final _key = TextEditingController();
-  bool _busy = false;
-  String? _error;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -28,96 +25,60 @@ class _RenewPageState extends State<RenewPage> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
-    final s = S(widget.settings.lang);
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+  Future<void> _renew() async {
+    final s = S(SettingsScope.read(context).lang);
+    if (_key.text.trim().isEmpty) {
+      toast(context, s.t('v_required'));
+      return;
+    }
+    setState(() => _loading = true);
     try {
       await widget.api.renew(_key.text);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.t('renew_done'))));
+      toast(context, s.t('renew_ok'));
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = s.error(e);
-      });
+      if (mounted) toast(context, s.error(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final s = S(widget.settings.lang);
-    final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(title: Text(s.t('renew'))),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Form(
-            key: _form,
-            child: ListView(
-              padding: const EdgeInsets.all(24),
+    final s = S(SettingsScope.of(context).lang);
+    return GlassScaffold(
+      title: s.t('renew_title'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        children: [
+          Glass(
+            padding: const EdgeInsets.all(20),
+            child: Column(
               children: [
-                const Icon(Icons.vpn_key, size: 56),
-                const SizedBox(height: 12),
-                Text(
-                  s.t('renew_hint'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
+                const GradientIcon(Icons.vpn_key_rounded, size: 64),
+                const SizedBox(height: 14),
+                Text(s.t('renew_desc'),
+                    style: TextStyle(color: muted(context))),
+                const SizedBox(height: 18),
+                GlassField(
                   controller: _key,
-                  textDirection: TextDirection.ltr,
-                  textAlign: TextAlign.left,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: InputDecoration(
-                    labelText: s.t('license_key'),
-                    helperText: 'XXXX-XXXX-XXXX-XXXX',
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (v) => (v ?? '').trim().isEmpty
-                      ? s.t('required')
-                      : null,
+                  label: s.t('license_key'),
+                  icon: Icons.vpn_key_outlined,
+                  ltr: true,
+                  onSubmitted: (_) => _renew(),
                 ),
-                const SizedBox(height: 12),
-                if (_error != null)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: cs.errorContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _error!,
-                      style: TextStyle(color: cs.onErrorContainer),
-                    ),
-                  ),
-                SizedBox(
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: _busy ? null : _submit,
-                    child: _busy
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(s.t('renew_btn')),
-                  ),
+                const SizedBox(height: 18),
+                GradientButton(
+                  label: s.t('renew_btn'),
+                  icon: Icons.autorenew_rounded,
+                  loading: _loading,
+                  onPressed: _renew,
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

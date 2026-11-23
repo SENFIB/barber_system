@@ -1,61 +1,83 @@
 import 'package:barber_core/barber_core.dart';
-import '../../app/jx.dart';
 import '../../app/settings.dart';
 
+bool cFlag(dynamic v) {
+  if (v is bool) return v;
+  if (v is num) return v != 0;
+  final s = (v?.toString() ?? '').trim().toLowerCase();
+  return s == 'true' || s == '1' || s == 'yes';
+}
+
+double cDouble(dynamic v) {
+  if (v is num) return v.toDouble();
+  return double.tryParse((v?.toString() ?? '').trim()) ?? 0;
+}
+
 class CustomerApi {
-  CustomerApi(this.settings);
-  final AppSettings settings;
+  CustomerApi(this.st);
+  final AppSettings st;
 
-  ApiClient get _c => ApiClient(settings.apiUrl);
-  String get _dev => settings.deviceId;
+  String get deviceId => st.deviceId;
 
-  Future<List<Map<String, dynamic>>> search(String q) async =>
-      listOf(mapOf(await _c.call('shop_search', {'q': q}))['shops']);
+  Future<Map<String, dynamic>> _call(String action,
+      [Map<String, dynamic>? params]) async {
+    final client = ApiClient(st.apiUrl);
+    final dynamic r = await client.call(action, params ?? <String, dynamic>{});
+    if (r is Map) return Map<String, dynamic>.from(r);
+    return <String, dynamic>{};
+  }
 
-  Future<Map<String, dynamic>> detail(String id) async =>
-      mapOf(await _c.call('shop_detail', {'shop_id': id}));
+  Future<Map<String, dynamic>> shopSearch(String q) =>
+      _call('shop_search', <String, dynamic>{'q': q});
 
-  Future<Map<String, dynamic>> slots(String shopId, String date,
-          List<String> services, Map<String, String> choice) async =>
-      mapOf(await _c.call('slots', {
+  Future<Map<String, dynamic>> shopDetail(String shopId) =>
+      _call('shop_detail', <String, dynamic>{'shop_id': shopId});
+
+  Future<Map<String, dynamic>> slots({
+    required String shopId,
+    required String date,
+    required List<String> serviceIds,
+    required Map<String, String> staffChoice,
+  }) =>
+      _call('slots', <String, dynamic>{
         'shop_id': shopId,
         'date': date,
-        'service_ids': services,
-        'staff_choice': choice,
-      }));
+        'service_ids': serviceIds,
+        'staff_choice': staffChoice,
+      });
 
   Future<Map<String, dynamic>> book({
     required String shopId,
     required String name,
     required String phone,
     required String date,
-    required String start,
-    required List<String> services,
-    required Map<String, String> choice,
-  }) async =>
-      mapOf(await _c.call('book', {
+    required String startTime,
+    required List<String> serviceIds,
+    required Map<String, String> staffChoice,
+  }) =>
+      _call('book', <String, dynamic>{
         'shop_id': shopId,
-        'device_id': _dev,
+        'device_id': deviceId,
         'customer_name': name,
         'customer_phone': phone,
         'date': date,
-        'start_time': start,
-        'service_ids': services,
-        'staff_choice': choice,
-      }));
+        'start_time': startTime,
+        'service_ids': serviceIds,
+        'staff_choice': staffChoice,
+      });
 
-  Future<List<Map<String, dynamic>>> myBookings() async => listOf(mapOf(
-      await _c.call('my_bookings', {'device_id': _dev}))['bookings']);
+  Future<Map<String, dynamic>> myBookings() =>
+      _call('my_bookings', <String, dynamic>{'device_id': deviceId});
 
-  Future<void> cancel(String groupId) async {
-    await _c.call('customer_cancel', {'device_id': _dev, 'group_id': groupId});
-  }
+  Future<Map<String, dynamic>> cancel(String groupId) => _call(
+      'customer_cancel',
+      <String, dynamic>{'device_id': deviceId, 'group_id': groupId});
 
-  Future<void> checkin(String groupId) async {
-    await _c.call('customer_checkin', {'device_id': _dev, 'group_id': groupId});
-  }
+  Future<Map<String, dynamic>> checkin(String groupId) => _call(
+      'customer_checkin',
+      <String, dynamic>{'device_id': deviceId, 'group_id': groupId});
 
-  Future<void> rate(List<Map<String, dynamic>> ratings) async {
-    await _c.call('customer_rate', {'device_id': _dev, 'ratings': ratings});
-  }
+  Future<Map<String, dynamic>> rate(List<Map<String, dynamic>> ratings) =>
+      _call('customer_rate',
+          <String, dynamic>{'device_id': deviceId, 'ratings': ratings});
 }

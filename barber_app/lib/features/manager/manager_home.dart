@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
+import '../../app/strings_s3.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
+import 'bookings_page.dart';
 import 'renew_page.dart';
 import 'services_page.dart';
 import 'shop_api.dart';
 import 'staff_page.dart';
+import 'timeoff_page.dart';
 
 class ManagerHome extends StatelessWidget {
   const ManagerHome({super.key, required this.ctx});
@@ -20,7 +23,9 @@ class ManagerHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = S(SettingsScope.of(context).lang);
+    final lang = SettingsScope.of(context).lang;
+    final s = S(lang);
+    final t3 = T3(lang);
     final sess = ctx.session;
     final sub = sess.subscription;
     final shop = sess.shop;
@@ -206,19 +211,21 @@ class ManagerHome extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             tile(
-              icon: Icons.groups_rounded,
-              title: s.t(sess.isOwner ? 'manage_barbers' : 'staff_mine'),
-              desc: s.t(sess.isOwner ? 'manage_barbers_desc' : 'staff_mine_desc'),
-              onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => StaffPage(ctx))),
-            ),
-            tile(
               icon: Icons.event_available_rounded,
               title: s.t('bookings'),
               desc: s.t('bookings_desc'),
               gradient: const LinearGradient(
                 colors: [AppColors.pink, AppColors.amber],
               ),
+              onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => BookingsPage(ctx))),
+            ),
+            tile(
+              icon: Icons.groups_rounded,
+              title: s.t(sess.isOwner ? 'manage_barbers' : 'staff_mine'),
+              desc: s.t(sess.isOwner ? 'manage_barbers_desc' : 'staff_mine_desc'),
+              onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => StaffPage(ctx))),
             ),
             if (sess.isOwner)
               tile(
@@ -230,6 +237,17 @@ class ManagerHome extends StatelessWidget {
                 ),
                 onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => ServicesPage(ctx: ctx))),
+              ),
+            if (sess.isOwner)
+              tile(
+                icon: Icons.event_busy_rounded,
+                title: t3.t('b_timeoff'),
+                desc: t3.t('b_timeoff_desc'),
+                gradient: const LinearGradient(
+                  colors: [AppColors.amber, AppColors.pink],
+                ),
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => TimeOffPage(ctx))),
               ),
           ],
         ),

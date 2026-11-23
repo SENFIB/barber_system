@@ -1,23 +1,28 @@
-String _s(dynamic v) => v == null ? '' : v.toString();
+String _s(dynamic v, [String d = '']) => v == null ? d : v.toString();
 
-int? _i(dynamic v) {
+int _i(dynamic v, [int d = 0]) {
+  if (v == null) return d;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString()) ?? d;
+}
+
+int? _iOrNull(dynamic v) {
   if (v == null) return null;
+  if (v is int) return v;
   if (v is num) return v.toInt();
   return int.tryParse(v.toString());
 }
 
-bool _b(dynamic v) {
-  if (v is bool) return v;
-  if (v is num) return v != 0;
-  final t = _s(v).toLowerCase();
-  return t == 'true' || t == '1' || t == 'yes';
+bool _b(dynamic v) => v == true || v == 'true' || v == 'TRUE' || v == 1;
+
+Map<String, dynamic> _m(dynamic v) {
+  if (v is Map) return Map<String, dynamic>.from(v);
+  return <String, dynamic>{};
 }
 
-Map<String, dynamic> _m(dynamic v) =>
-    v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
-
 class Subscription {
-  final String state;
+  final String state; // active | expired | deactive
   final bool free;
   final String? expiresAt;
   final int? daysLeft;
@@ -25,31 +30,30 @@ class Subscription {
   final int warnDays;
 
   const Subscription({
-    this.state = 'active',
-    this.free = false,
+    required this.state,
+    required this.free,
     this.expiresAt,
     this.daysLeft,
     this.expiringSoon = false,
     this.warnDays = 3,
   });
 
-  factory Subscription.fromJson(dynamic raw) {
-    final j = _m(raw);
+  bool get isActive => state == 'active';
+  bool get isExpired => state == 'expired';
+  bool get isDeactive => state == 'deactive';
+
+  factory Subscription.fromJson(dynamic json) {
+    final j = _m(json);
     final exp = _s(j['expires_at']);
     return Subscription(
-      state: _s(j['state']).isEmpty ? 'active' : _s(j['state']),
+      state: _s(j['state'], 'active'),
       free: _b(j['free']),
       expiresAt: exp.isEmpty ? null : exp,
-      daysLeft: _i(j['days_left']),
+      daysLeft: _iOrNull(j['days_left']),
       expiringSoon: _b(j['expiring_soon']),
-      warnDays: _i(j['warn_days']) ?? 3,
+      warnDays: _i(j['warn_days'], 3),
     );
   }
-
-  bool get isExpired => state == 'expired';
-  bool get isDeactive =>
-      state == 'deactive' || state == 'deactivated' || state == 'revoked';
-  bool get isActive => !isExpired && !isDeactive;
 }
 
 class ShopInfo {
@@ -71,15 +75,15 @@ class ShopInfo {
   final String photoUrl;
 
   const ShopInfo({
-    this.shopId = '',
-    this.name = '',
+    required this.shopId,
+    required this.name,
     this.phone = '',
     this.address = '',
     this.city = '',
-    this.plan = '',
-    this.language = '',
-    this.calendar = '',
-    this.timezone = '',
+    this.plan = 'basic',
+    this.language = 'fa',
+    this.calendar = 'jalali',
+    this.timezone = 'Asia/Tehran',
     this.bufferMin = 0,
     this.slotStepMin = 10,
     this.overtimeMin = 0,
@@ -89,23 +93,23 @@ class ShopInfo {
     this.photoUrl = '',
   });
 
-  factory ShopInfo.fromJson(dynamic raw) {
-    final j = _m(raw);
+  factory ShopInfo.fromJson(dynamic json) {
+    final j = _m(json);
     return ShopInfo(
       shopId: _s(j['shop_id']),
       name: _s(j['name']),
       phone: _s(j['phone']),
       address: _s(j['address']),
       city: _s(j['city']),
-      plan: _s(j['plan']),
-      language: _s(j['language']),
-      calendar: _s(j['calendar']),
-      timezone: _s(j['timezone']),
-      bufferMin: _i(j['buffer_min']) ?? 0,
-      slotStepMin: _i(j['slot_step_min']) ?? 10,
-      overtimeMin: _i(j['overtime_min']) ?? 0,
+      plan: _s(j['plan'], 'basic'),
+      language: _s(j['language'], 'fa'),
+      calendar: _s(j['calendar'], 'jalali'),
+      timezone: _s(j['timezone'], 'Asia/Tehran'),
+      bufferMin: _i(j['buffer_min'], 0),
+      slotStepMin: _i(j['slot_step_min'], 10),
+      overtimeMin: _i(j['overtime_min'], 0),
       currency: _s(j['currency']),
-      cancelBeforeMin: _i(j['cancel_before_min']) ?? 120,
+      cancelBeforeMin: _i(j['cancel_before_min'], 120),
       description: _s(j['description']),
       photoUrl: _s(j['photo_url']),
     );
@@ -115,7 +119,7 @@ class ShopInfo {
 class ManagerSession {
   final String token;
   final String managerId;
-  final String role;
+  final String role; // owner | staff
   final String staffId;
   final String username;
   final ShopInfo shop;
@@ -133,19 +137,21 @@ class ManagerSession {
     required this.maxStaff,
   });
 
-  factory ManagerSession.fromJson(Map<String, dynamic> j, {String? token}) {
-    final t = _s(j['token']);
+  bool get isOwner => role == 'owner';
+
+  /// پاسخ `me` توکن ندارد؛ پس توکن فعلی از بیرون داده می‌شود.
+  factory ManagerSession.fromJson(dynamic json, {String? token}) {
+    final j = _m(json);
+    final limits = _m(j['limits']);
     return ManagerSession(
-      token: t.isNotEmpty ? t : (token ?? ''),
+      token: token ?? _s(j['token']),
       managerId: _s(j['manager_id']),
-      role: _s(j['role']),
+      role: _s(j['role'], 'owner'),
       staffId: _s(j['staff_id']),
       username: _s(j['username']),
       shop: ShopInfo.fromJson(j['shop']),
       subscription: Subscription.fromJson(j['subscription']),
-      maxStaff: _i(_m(j['limits'])['max_staff']) ?? 0,
+      maxStaff: _i(limits['max_staff'], 0),
     );
   }
-
-  bool get isOwner => role == 'owner';
 }

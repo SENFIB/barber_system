@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'app/settings.dart';
 import 'app/strings.dart';
 import 'app/theme.dart';
@@ -20,16 +19,26 @@ class BarberApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
+    final look = st.look;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: S(st.lang).t('app_name'),
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
+      theme: buildTheme(Brightness.light, look),
+      darkTheme: buildTheme(Brightness.dark, look),
       themeMode: st.themeMode,
-      builder: (context, child) => Directionality(
-        textDirection: st.isRtl ? TextDirection.rtl : TextDirection.ltr,
-        child: child ?? const SizedBox(),
-      ),
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler:
+                TextScaler.linear(mq.textScaler.scale(1.0) * look.fontScale),
+          ),
+          child: Directionality(
+            textDirection: st.isRtl ? TextDirection.rtl : TextDirection.ltr,
+            child: child ?? const SizedBox(),
+          ),
+        );
+      },
       home: const _Root(),
     );
   }

@@ -3,586 +3,538 @@ import 'package:flutter/material.dart';
 
 import '../../app/settings.dart';
 import '../../app/strings.dart';
+import '../../app/util.dart';
+import '../../app/widgets.dart';
+import '../settings/settings_page.dart';
 import 'shop_api.dart';
 
-typedef LoggedIn = Future<void> Function(ManagerSession session);
+typedef SessionCallback = Future<void> Function(ManagerSession session);
 
-/// سه گزینه‌ی ورود آرایشگاه
-class ShopAuthOptions extends StatelessWidget {
-  const ShopAuthOptions({
-    super.key,
-    required this.settings,
-    required this.api,
-    required this.onLoggedIn,
-  });
-
-  final AppSettings settings;
+// ───────────────────────── صفحه‌ی ورود (اول) ─────────────────────────
+class ShopAuthPage extends StatefulWidget {
+  const ShopAuthPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
-  final LoggedIn onLoggedIn;
+  final SessionCallback onSession;
 
   @override
-  Widget build(BuildContext context) {
-    final s = S(settings.lang);
-
-    void open(Widget page) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
-    }
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.all(24),
-          children: [
-            const Icon(Icons.storefront, size: 64),
-            const SizedBox(height: 16),
-            Text(
-              s.t('shop_auth_title'),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 24),
-            _OptionCard(
-              icon: Icons.add_business,
-              title: s.t('opt_new_owner'),
-              subtitle: s.t('opt_new_owner_desc'),
-              onTap: () => open(RegisterPage(
-                  settings: settings, api: api, onLoggedIn: onLoggedIn)),
-            ),
-            const SizedBox(height: 12),
-            _OptionCard(
-              icon: Icons.login,
-              title: s.t('opt_login'),
-              subtitle: s.t('opt_login_desc'),
-              onTap: () => open(LoginPage(
-                  settings: settings, api: api, onLoggedIn: onLoggedIn)),
-            ),
-            const SizedBox(height: 12),
-            _OptionCard(
-              icon: Icons.content_cut,
-              title: s.t('opt_staff'),
-              subtitle: s.t('opt_staff_desc'),
-              onTap: () => open(JoinPage(
-                  settings: settings, api: api, onLoggedIn: onLoggedIn)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  State<ShopAuthPage> createState() => _ShopAuthPageState();
 }
 
-class _OptionCard extends StatelessWidget {
-  const _OptionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+class _ShopAuthPageState extends State<ShopAuthPage> {
+  final _user = TextEditingController();
+  final _pass = TextEditingController();
+  bool _hide = true;
+  bool _loading = false;
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
+  @override
+  void dispose() {
+    _user.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    final s = S(SettingsScope.read(context).lang);
+    if (_user.text.trim().isEmpty || _pass.text.isEmpty) {
+      toast(context, s.t('v_required'));
+      return;
+    }
+    if (!usernameOk(_user.text)) {
+      toast(context, s.t('v_username'));
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final sess = await widget.api.login(_user.text, _pass.text);
+      await widget.onSession(sess);
+    } on ApiException catch (e) {
+      if (mounted) toast(context, s.error(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(icon, size: 36),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 4),
-                    Text(subtitle),
-                  ],
+    final st = SettingsScope.of(context);
+    final s = S(st.lang);
+    return GlassScaffold(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_rounded),
+        onPressed: () => st.setRole(null),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.settings_rounded),
+          onPressed: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
+        ),
+      ],
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+        children: [
+          const Center(child: AppLogo()),
+          const SizedBox(height: 18),
+          Center(
+            child: Text(s.t('shop_panel'),
+                style:
+                    const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(height: 6),
+          Center(
+            child: Text(s.t('shop_panel_sub'),
+                style: TextStyle(color: muted(context))),
+          ),
+          const SizedBox(height: 24),
+          Glass(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                GlassField(
+                  controller: _user,
+                  label: s.t('username'),
+                  icon: Icons.person_outline_rounded,
+                  textInputAction: TextInputAction.next,
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(s.t('username_hint'),
+                      style: TextStyle(color: muted(context), fontSize: 12)),
+                ),
+                const SizedBox(height: 12),
+                GlassField(
+                  controller: _pass,
+                  label: s.t('password'),
+                  icon: Icons.lock_outline_rounded,
+                  obscure: _hide,
+                  ltr: true,
+                  onSubmitted: (_) => _login(),
+                  suffix: IconButton(
+                    icon: Icon(_hide
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded),
+                    onPressed: () => setState(() => _hide = !_hide),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                GradientButton(
+                  label: s.t('login_btn'),
+                  icon: Icons.login_rounded,
+                  loading: _loading,
+                  onPressed: _login,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(s.t('no_account'),
+                    style: TextStyle(color: muted(context))),
               ),
-              const Icon(Icons.chevron_right),
+              const Expanded(child: Divider()),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// ابزارهای مشترک فرم‌ها
-// ---------------------------------------------------------------------------
-
-class _FormShell extends StatelessWidget {
-  const _FormShell({
-    required this.title,
-    required this.formKey,
-    required this.children,
-  });
-
-  final String title;
-  final GlobalKey<FormState> formKey;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Form(
-            key: formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(24),
-              children: children,
-            ),
+          const SizedBox(height: 16),
+          GradientButton(
+            outlined: true,
+            icon: Icons.person_add_alt_1_rounded,
+            label: s.t('signup'),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => SignupChoicePage(
+                  api: widget.api, onSession: widget.onSession),
+            )),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-class _Field extends StatelessWidget {
-  const _Field({
-    required this.s,
-    required this.controller,
-    required this.label,
-    this.helper,
-    this.ltr = false,
-    this.obscure = false,
-    this.optional = false,
-    this.keyboard,
-    this.minLen = 0,
-  });
-
-  final S s;
-  final TextEditingController controller;
-  final String label;
-  final String? helper;
-  final bool ltr;
-  final bool obscure;
-  final bool optional;
-  final TextInputType? keyboard;
-  final int minLen;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        controller: controller,
-        obscureText: obscure,
-        keyboardType: keyboard,
-        textDirection: ltr ? TextDirection.ltr : null,
-        textAlign: ltr ? TextAlign.left : TextAlign.start,
-        autocorrect: !ltr && !obscure,
-        enableSuggestions: !ltr && !obscure,
-        decoration: InputDecoration(
-          labelText: label,
-          helperText: helper,
-          border: const OutlineInputBorder(),
-        ),
-        validator: (v) {
-          final t = (v ?? '').trim();
-          if (!optional && t.isEmpty) return s.t('required');
-          if (minLen > 0 && (v ?? '').length < minLen) {
-            return s.t('password_hint');
-          }
-          return null;
-        },
-      ),
-    );
-  }
-}
-
-class _ErrorBox extends StatelessWidget {
-  const _ErrorBox(this.text);
-
-  final String? text;
-
-  @override
-  Widget build(BuildContext context) {
-    if (text == null) return const SizedBox.shrink();
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cs.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(text!, style: TextStyle(color: cs.onErrorContainer)),
-    );
-  }
-}
-
-class _SubmitButton extends StatelessWidget {
-  const _SubmitButton({
-    required this.label,
-    required this.busy,
-    required this.onPressed,
-  });
-
-  final String label;
-  final bool busy;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: FilledButton(
-        onPressed: busy ? null : onPressed,
-        child: busy
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(label),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// ثبت‌نام صاحب آرایشگاه جدید
-// ---------------------------------------------------------------------------
-
-class RegisterPage extends StatefulWidget {
-  const RegisterPage({
-    super.key,
-    required this.settings,
-    required this.api,
-    required this.onLoggedIn,
-  });
-
-  final AppSettings settings;
+// ───────────────────────── انتخاب نوع ثبت‌نام ─────────────────────────
+class SignupChoicePage extends StatelessWidget {
+  const SignupChoicePage(
+      {super.key, required this.api, required this.onSession});
   final ShopApi api;
-  final LoggedIn onLoggedIn;
+  final SessionCallback onSession;
 
   @override
-  State<RegisterPage> createState() => _RegisterPageState();
+  Widget build(BuildContext context) {
+    final s = S(SettingsScope.of(context).lang);
+
+    Widget card(IconData icon, String title, String desc, VoidCallback onTap) {
+      return Glass(
+        onTap: onTap,
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            GradientIcon(icon, size: 58),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text(desc,
+                      style: TextStyle(color: muted(context), height: 1.5)),
+                ],
+              ),
+            ),
+            Icon(chevron(context), color: muted(context)),
+          ],
+        ),
+      );
+    }
+
+    return GlassScaffold(
+      title: s.t('signup_title'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        children: [
+          card(
+            Icons.storefront_rounded,
+            s.t('signup_owner'),
+            s.t('signup_owner_desc'),
+            () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => OwnerSignupPage(api: api, onSession: onSession),
+            )),
+          ),
+          const SizedBox(height: 14),
+          card(
+            Icons.content_cut_rounded,
+            s.t('signup_staff'),
+            s.t('signup_staff_desc'),
+            () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => StaffJoinPage(api: api, onSession: onSession),
+            )),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _RegisterPageState extends State<RegisterPage> {
-  final _form = GlobalKey<FormState>();
+// ───────────────────────── ثبت‌نام صاحب آرایشگاه ─────────────────────────
+class OwnerSignupPage extends StatefulWidget {
+  const OwnerSignupPage(
+      {super.key, required this.api, required this.onSession});
+  final ShopApi api;
+  final SessionCallback onSession;
+
+  @override
+  State<OwnerSignupPage> createState() => _OwnerSignupPageState();
+}
+
+class _OwnerSignupPageState extends State<OwnerSignupPage> {
   final _license = TextEditingController();
-  final _shopName = TextEditingController();
+  final _shop = TextEditingController();
   final _phone = TextEditingController();
-  final _city = TextEditingController();
   final _ownerName = TextEditingController();
-  final _username = TextEditingController();
-  final _password = TextEditingController();
-  bool _isBarber = true;
-  bool _busy = false;
-  String? _error;
+  final _address = TextEditingController();
+  final _city = TextEditingController();
+  final _specialty = TextEditingController();
+  final _user = TextEditingController();
+  final _pass = TextEditingController();
+  bool _barber = true;
+  bool _hide = true;
+  bool _loading = false;
 
   @override
   void dispose() {
-    _license.dispose();
-    _shopName.dispose();
-    _phone.dispose();
-    _city.dispose();
-    _ownerName.dispose();
-    _username.dispose();
-    _password.dispose();
+    for (final c in [
+      _license, _shop, _phone, _ownerName, _address, _city, _specialty,
+      _user, _pass
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
+  String? _validate(S s) {
+    if (_license.text.trim().isEmpty ||
+        _shop.text.trim().isEmpty ||
+        _phone.text.trim().isEmpty ||
+        _user.text.trim().isEmpty ||
+        _pass.text.isEmpty) {
+      return s.t('v_required');
+    }
+    final digits = normalizeDigits(_phone.text).replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length < 8) return s.t('v_phone');
+    if (!usernameOk(_user.text)) return s.t('v_username');
+    if (_pass.text.length < 6) return s.t('v_password');
+    return null;
+  }
+
   Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
-    final s = S(widget.settings.lang);
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    final s = S(SettingsScope.read(context).lang);
+    final err = _validate(s);
+    if (err != null) {
+      toast(context, err);
+      return;
+    }
+    setState(() => _loading = true);
     try {
-      final session = await widget.api.register(
+      final sess = await widget.api.register(
         licenseKey: _license.text,
-        shopName: _shopName.text,
+        shopName: _shop.text,
         phone: _phone.text,
-        username: _username.text,
-        password: _password.text,
+        username: _user.text,
+        password: _pass.text,
+        address: _address.text,
         city: _city.text,
         ownerName: _ownerName.text,
-        ownerIsBarber: _isBarber,
+        specialty: _barber ? _specialty.text : '',
+        ownerIsBarber: _barber,
       );
       if (!mounted) return;
-      final nav = Navigator.of(context);
-      await widget.onLoggedIn(session);
-      nav.popUntil((r) => r.isFirst);
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      await widget.onSession(sess);
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = s.error(e);
-      });
+      if (mounted) toast(context, s.error(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
+  Widget _gap() => const SizedBox(height: 12);
+
   @override
   Widget build(BuildContext context) {
-    final s = S(widget.settings.lang);
-    return _FormShell(
-      title: s.t('opt_new_owner'),
-      formKey: _form,
-      children: [
-        _Field(
-          s: s,
-          controller: _license,
-          label: s.t('license_key'),
-          helper: 'XXXX-XXXX-XXXX-XXXX',
-          ltr: true,
-        ),
-        _Field(s: s, controller: _shopName, label: s.t('shop_name')),
-        _Field(
-          s: s,
-          controller: _phone,
-          label: s.t('phone'),
-          ltr: true,
-          keyboard: TextInputType.phone,
-        ),
-        _Field(s: s, controller: _city, label: s.t('city'), optional: true),
-        _Field(
-          s: s,
-          controller: _ownerName,
-          label: s.t('owner_name'),
-          optional: true,
-        ),
-        _Field(
-          s: s,
-          controller: _username,
-          label: s.t('username'),
-          helper: s.t('username_hint'),
-          ltr: true,
-        ),
-        _Field(
-          s: s,
-          controller: _password,
-          label: s.t('password'),
-          helper: s.t('password_hint'),
-          ltr: true,
-          obscure: true,
-          minLen: 6,
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(s.t('owner_is_barber')),
-          value: _isBarber,
-          onChanged: (v) => setState(() => _isBarber = v),
-        ),
-        const SizedBox(height: 8),
-        _ErrorBox(_error),
-        _SubmitButton(
-          label: s.t('register_btn'),
-          busy: _busy,
-          onPressed: _submit,
-        ),
-      ],
+    final s = S(SettingsScope.of(context).lang);
+    return GlassScaffold(
+      title: s.t('signup_owner'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        children: [
+          Glass(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                GlassField(
+                  controller: _license,
+                  label: s.t('license_key'),
+                  icon: Icons.vpn_key_rounded,
+                  ltr: true,
+                ),
+                _gap(),
+                GlassField(
+                  controller: _shop,
+                  label: s.t('shop_name'),
+                  icon: Icons.storefront_rounded,
+                ),
+                _gap(),
+                GlassField(
+                  controller: _phone,
+                  label: s.t('phone'),
+                  icon: Icons.phone_rounded,
+                  keyboard: TextInputType.phone,
+                  ltr: true,
+                ),
+                _gap(),
+                GlassField(
+                  controller: _city,
+                  label: s.t('city'),
+                  icon: Icons.location_city_rounded,
+                ),
+                _gap(),
+                GlassField(
+                  controller: _address,
+                  label: s.t('address'),
+                  icon: Icons.place_outlined,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Glass(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                GlassField(
+                  controller: _ownerName,
+                  label: s.t('owner_name'),
+                  icon: Icons.badge_outlined,
+                ),
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _barber,
+                  onChanged: (v) => setState(() => _barber = v),
+                  title: Text(s.t('i_am_barber')),
+                ),
+                if (_barber)
+                  GlassField(
+                    controller: _specialty,
+                    label: s.t('specialty'),
+                    icon: Icons.content_cut_rounded,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Glass(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                GlassField(
+                  controller: _user,
+                  label: s.t('username'),
+                  icon: Icons.person_outline_rounded,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(s.t('username_hint'),
+                      style: TextStyle(color: muted(context), fontSize: 12)),
+                ),
+                _gap(),
+                GlassField(
+                  controller: _pass,
+                  label: s.t('password'),
+                  icon: Icons.lock_outline_rounded,
+                  obscure: _hide,
+                  ltr: true,
+                  suffix: IconButton(
+                    icon: Icon(_hide
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded),
+                    onPressed: () => setState(() => _hide = !_hide),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          GradientButton(
+            label: s.t('create_shop'),
+            icon: Icons.check_circle_outline_rounded,
+            loading: _loading,
+            onPressed: _submit,
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// ورود با نام کاربری و رمز
-// ---------------------------------------------------------------------------
-
-class LoginPage extends StatefulWidget {
-  const LoginPage({
-    super.key,
-    required this.settings,
-    required this.api,
-    required this.onLoggedIn,
-  });
-
-  final AppSettings settings;
+// ───────────────────────── ورود آرایشگر با کد دعوت ─────────────────────────
+class StaffJoinPage extends StatefulWidget {
+  const StaffJoinPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
-  final LoggedIn onLoggedIn;
+  final SessionCallback onSession;
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<StaffJoinPage> createState() => _StaffJoinPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final _form = GlobalKey<FormState>();
-  final _username = TextEditingController();
-  final _password = TextEditingController();
-  bool _busy = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _username.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
-    final s = S(widget.settings.lang);
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final session = await widget.api.login(_username.text, _password.text);
-      if (!mounted) return;
-      final nav = Navigator.of(context);
-      await widget.onLoggedIn(session);
-      nav.popUntil((r) => r.isFirst);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = s.error(e);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S(widget.settings.lang);
-    return _FormShell(
-      title: s.t('opt_login'),
-      formKey: _form,
-      children: [
-        _Field(
-          s: s,
-          controller: _username,
-          label: s.t('username'),
-          ltr: true,
-        ),
-        _Field(
-          s: s,
-          controller: _password,
-          label: s.t('password'),
-          ltr: true,
-          obscure: true,
-        ),
-        const SizedBox(height: 8),
-        _ErrorBox(_error),
-        _SubmitButton(
-          label: s.t('login_btn'),
-          busy: _busy,
-          onPressed: _submit,
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// پیوستن آرایشگر با کد دعوت
-// ---------------------------------------------------------------------------
-
-class JoinPage extends StatefulWidget {
-  const JoinPage({
-    super.key,
-    required this.settings,
-    required this.api,
-    required this.onLoggedIn,
-  });
-
-  final AppSettings settings;
-  final ShopApi api;
-  final LoggedIn onLoggedIn;
-
-  @override
-  State<JoinPage> createState() => _JoinPageState();
-}
-
-class _JoinPageState extends State<JoinPage> {
-  final _form = GlobalKey<FormState>();
+class _StaffJoinPageState extends State<StaffJoinPage> {
   final _code = TextEditingController();
-  final _username = TextEditingController();
-  final _password = TextEditingController();
-  bool _busy = false;
-  String? _error;
+  final _user = TextEditingController();
+  final _pass = TextEditingController();
+  bool _hide = true;
+  bool _loading = false;
 
   @override
   void dispose() {
     _code.dispose();
-    _username.dispose();
-    _password.dispose();
+    _user.dispose();
+    _pass.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
-    final s = S(widget.settings.lang);
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    final s = S(SettingsScope.read(context).lang);
+    if (_code.text.trim().isEmpty ||
+        _user.text.trim().isEmpty ||
+        _pass.text.isEmpty) {
+      toast(context, s.t('v_required'));
+      return;
+    }
+    if (!usernameOk(_user.text)) {
+      toast(context, s.t('v_username'));
+      return;
+    }
+    if (_pass.text.length < 6) {
+      toast(context, s.t('v_password'));
+      return;
+    }
+    setState(() => _loading = true);
     try {
-      final session = await widget.api.join(
-        inviteCode: _code.text,
-        username: _username.text,
-        password: _password.text,
-      );
+      final sess = await widget.api.join(_code.text, _user.text, _pass.text);
       if (!mounted) return;
-      final nav = Navigator.of(context);
-      await widget.onLoggedIn(session);
-      nav.popUntil((r) => r.isFirst);
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      await widget.onSession(sess);
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = s.error(e);
-      });
+      if (mounted) toast(context, s.error(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final s = S(widget.settings.lang);
-    return _FormShell(
-      title: s.t('opt_staff'),
-      formKey: _form,
-      children: [
-        _Field(
-          s: s,
-          controller: _code,
-          label: s.t('invite_code'),
-          helper: 'XXXX-XXXX',
-          ltr: true,
-        ),
-        _Field(
-          s: s,
-          controller: _username,
-          label: s.t('username'),
-          helper: s.t('username_hint'),
-          ltr: true,
-        ),
-        _Field(
-          s: s,
-          controller: _password,
-          label: s.t('password'),
-          helper: s.t('password_hint'),
-          ltr: true,
-          obscure: true,
-          minLen: 6,
-        ),
-        const SizedBox(height: 8),
-        _ErrorBox(_error),
-        _SubmitButton(
-          label: s.t('join_btn'),
-          busy: _busy,
-          onPressed: _submit,
-        ),
-      ],
+    final s = S(SettingsScope.of(context).lang);
+    return GlassScaffold(
+      title: s.t('join_title'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        children: [
+          Glass(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                GlassField(
+                  controller: _code,
+                  label: s.t('invite_code'),
+                  icon: Icons.confirmation_number_outlined,
+                  ltr: true,
+                ),
+                const SizedBox(height: 12),
+                GlassField(
+                  controller: _user,
+                  label: s.t('username'),
+                  icon: Icons.person_outline_rounded,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(s.t('username_hint'),
+                      style: TextStyle(color: muted(context), fontSize: 12)),
+                ),
+                const SizedBox(height: 12),
+                GlassField(
+                  controller: _pass,
+                  label: s.t('password'),
+                  icon: Icons.lock_outline_rounded,
+                  obscure: _hide,
+                  ltr: true,
+                  onSubmitted: (_) => _submit(),
+                  suffix: IconButton(
+                    icon: Icon(_hide
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded),
+                    onPressed: () => setState(() => _hide = !_hide),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                GradientButton(
+                  label: s.t('join_btn'),
+                  icon: Icons.login_rounded,
+                  loading: _loading,
+                  onPressed: _submit,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
-

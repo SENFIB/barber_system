@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../app/platform.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
+import '../manager/shop_api.dart';
 import '../onboarding/language_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -21,6 +22,7 @@ class _SettingsPageState extends State<SettingsPage> {
       TextEditingController(text: widget.settings.apiUrl);
   String _version = '...';
   bool _testing = false;
+  bool _deleting = false;
 
   // بخش سرور مخفی است؛ با ۷ بار زدن روی نسخه باز می‌شود (برای پلن شخصی)
   int _taps = 0;
@@ -81,6 +83,143 @@ class _SettingsPageState extends State<SettingsPage> {
     _url.text = st.apiUrl;
     setState(() => _testing = false);
     messenger.showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _deleteData() async {
+    final st = widget.settings;
+    final s = S(st.lang);
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+
+    var alsoDevice = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text(s.t('delete_data_title')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.t('delete_data_body')),
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: alsoDevice,
+                  onChanged: (v) => setD(() => alsoDevice = v ?? false),
+                  title: Text(s.t('delete_device_id')),
+                  subtitle: Text(s.t('delete_device_id_hint')),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(s.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(s.t('delete')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    // اگر آرایشگاه وارد شده، توکن روی سرور هم باطل شود (بدون اینترنت هم ادامه می‌دهیم)
+    if (st.hasShopToken) {
+      try {
+        await ShopApi(st).logout();
+      } catch (_) {}
+    }
+    await st.clearAll(resetDeviceId: alsoDevice);
+
+    nav.popUntil((r) => r.isFirst);
+    messenger.showSnackBar(SnackBar(content: Text(s.t('data_deleted'))));
+  }
+
+  Widget _kv(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _savedDataCard(AppSettings st, S s) {
+    final theme = Theme.of(context);
+    final roleText = st.role == 'customer'
+        ? s.t('customer')
+        : st.role == 'shop'
+            ? s.t('shop')
+            : s.t('sd_not_set');
+    final themeText = st.themeMode == ThemeMode.light
+        ? s.t('theme_light')
+        : st.themeMode == ThemeMode.dark
+            ? s.t('theme_dark')
+            : s.t('theme_system');
+    final id = st.deviceId;
+    final idShort = id.length > 8 ? '${id.substring(0, 8)}…' : id;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.t('saved_data'), style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(s.t('saved_data_desc'), style: theme.textTheme.bodySmall),
+            const SizedBox(height: 12),
+            _kv(s.t('language'), _langName(st.lang)),
+            _kv(s.t('role'), roleText),
+            _kv(s.t('theme'), themeText),
+            _kv(
+              s.t('sd_login'),
+              st.hasShopToken ? s.t('sd_logged_in') : s.t('sd_logged_out'),
+            ),
+            _kv(s.t('sd_device_id'), idShort),
+            if (st.hasCustomApiUrl)
+              _kv(s.t('sd_custom_server'), s.t('sd_yes')),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _deleting ? null : _deleteData,
+                icon: _deleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline),
+                label: Text(s.t('delete_data')),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -144,6 +283,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     selected: {st.themeMode},
                     onSelectionChanged: (v) => st.setThemeMode(v.first),
                   ),
+                  const Divider(height: 32),
+                  _savedDataCard(st, s),
                   if (_showServer) ...[
                     const Divider(height: 32),
                     Text(s.t('server'),

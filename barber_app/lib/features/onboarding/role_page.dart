@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/brand.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/theme.dart';
@@ -58,12 +59,12 @@ class RolePage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(22, 10, 22, 32),
         children: [
-          const Center(child: AppLogo()),
-          const SizedBox(height: 20),
+          const Center(child: EsmairoLogo(size: 92)),
+          const SizedBox(height: 22),
           Center(
             child: Text(s.t('welcome'),
                 style:
-                    const TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
+                    const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(height: 6),
           Center(
@@ -71,6 +72,7 @@ class RolePage extends StatelessWidget {
                 style: TextStyle(color: muted(context), fontSize: 16)),
           ),
           const SizedBox(height: 30),
+
           // اول آرایشگاه
           card(
             icon: Icons.storefront_rounded,
@@ -80,6 +82,7 @@ class RolePage extends StatelessWidget {
             onTap: () => st.setRole('shop'),
           ),
           const SizedBox(height: 16),
+
           // زیرش مشتری
           card(
             icon: Icons.person_rounded,

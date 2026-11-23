@@ -10,11 +10,13 @@ class AppColors {
   static const green = Color(0xFF2ECC71);
   static const amber = Color(0xFFFFB84D);
   static const red = Color(0xFFFF5252);
+
   static const gradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [violet, blue],
   );
+
   static const dangerGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
@@ -44,19 +46,35 @@ ThemeData buildTheme(Brightness b, [AppLook? look]) {
 
   final tmp = ThemeData(useMaterial3: true, brightness: b, colorScheme: scheme);
   var tt = tmp.textTheme;
-  if (lookV.font.isNotEmpty) {
+
+  final f = lookV.font;
+  String? family;
+  // اگر فونتِ انتخابی حروف فارسی نداشته باشد، وزیرمتن جایگزین می‌شود
+  final fallback = f.isEmpty
+      ? const ['Segoe UI', 'Tahoma']
+      : const [kDefaultFont, 'Segoe UI', 'Tahoma'];
+
+  if (f == kDefaultFont) {
+    family = kDefaultFont;
+    tt = tt.apply(fontFamily: kDefaultFont);
+  } else if (f.isNotEmpty) {
     try {
-      tt = GoogleFonts.getTextTheme(lookV.font, tt);
-    } catch (_) {}
+      tt = GoogleFonts.getTextTheme(f, tt);
+    } catch (_) {
+      family = kDefaultFont;
+      tt = tt.apply(fontFamily: kDefaultFont);
+    }
   }
+  tt = tt.apply(fontFamilyFallback: fallback);
 
   return ThemeData(
     useMaterial3: true,
     brightness: b,
     colorScheme: scheme,
     textTheme: tt,
+    fontFamily: family,
+    fontFamilyFallback: fallback,
     scaffoldBackgroundColor: lk.bg[0],
-    fontFamilyFallback: const ['Segoe UI', 'Tahoma'],
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,

@@ -1,137 +1,237 @@
-import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/settings.dart';
 import '../../app/strings.dart';
+import '../../app/theme.dart';
+import '../../app/widgets.dart';
+import '../settings/settings_page.dart';
+import 'renew_page.dart';
+import 'shop_api.dart';
+import 'staff_page.dart';
 
-/// صفحه‌ی اصلی آرایشگاه (فعلاً: اطلاعات و وضعیت اشتراک)
 class ManagerHome extends StatelessWidget {
-  const ManagerHome({
-    super.key,
-    required this.settings,
-    required this.session,
-    required this.onRenew,
-    required this.onLogout,
-  });
+  const ManagerHome({super.key, required this.ctx});
+  final ShopCtx ctx;
 
-  final AppSettings settings;
-  final ManagerSession session;
-  final VoidCallback onRenew;
-  final VoidCallback onLogout;
-
-  static String dateOnly(String iso) =>
-      iso.length >= 10 ? iso.substring(0, 10) : iso;
+  String _date(String? d) {
+    if (d == null || d.isEmpty) return '—';
+    return d.length >= 10 ? d.substring(0, 10) : d;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final s = S(settings.lang);
-    final theme = Theme.of(context);
-    final sub = session.subscription;
-    final planKey = 'plan_${session.shop.plan}';
-    final planName = s.has(planKey) ? s.t(planKey) : session.shop.plan;
+    final s = S(SettingsScope.of(context).lang);
+    final sess = ctx.session;
+    final sub = sess.subscription;
+    final shop = sess.shop;
+    final planKey = 'plan_${shop.plan}';
 
-    Widget row(String label, String value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+    Widget tile({
+      required IconData icon,
+      required String title,
+      required String desc,
+      VoidCallback? onTap,
+      Gradient? gradient,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Glass(
+          onTap: onTap,
           child: Row(
             children: [
-              Expanded(child: Text(label)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+              GradientIcon(icon, size: 50, gradient: gradient),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 16.5, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(desc,
+                        style:
+                            TextStyle(color: muted(context), fontSize: 12.5)),
+                  ],
+                ),
+              ),
+              if (onTap == null)
+                Pill(s.t('soon'), color: AppColors.amber)
+              else
+                Icon(chevron(context), color: muted(context)),
             ],
           ),
-        );
+        ),
+      );
+    }
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+    return GlassScaffold(
+      title: s.t('app_name'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.settings_rounded),
+          onPressed: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout_rounded),
+          onPressed: () async {
+            final ok = await confirmDialog(
+              context,
+              title: s.t('logout'),
+              message: s.t('logout_confirm'),
+              okLabel: s.t('logout'),
+              cancelLabel: s.t('cancel'),
+              danger: true,
+            );
+            if (ok) await ctx.logout();
+          },
+        ),
+      ],
+      body: RefreshIndicator(
+        onRefresh: ctx.reload,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
           children: [
-            Text(session.shop.name, style: theme.textTheme.headlineSmall),
-            const SizedBox(height: 4),
-            Text(
-              '${s.t(session.isOwner ? 'role_owner' : 'role_staff')}  ·  ${session.username}',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            if (sub.expiringSoon && sub.daysLeft != null)
-              Card(
-                color: theme.colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.warning_amber_rounded,
-                              color: theme.colorScheme.onErrorContainer),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              s.tn('expiring_warning', sub.daysLeft!),
-                              style: TextStyle(
-                                color: theme.colorScheme.onErrorContainer,
-                                fontWeight: FontWeight.w600,
+            // سربرگ
+            Glass(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  const GradientIcon(Icons.storefront_rounded, size: 62),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(shop.name,
+                            style: const TextStyle(
+                                fontSize: 21, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            Pill(s.t(sess.isOwner ? 'role_owner' : 'role_staff')),
+                            if (shop.plan.isNotEmpty)
+                              Pill(
+                                s.has(planKey) ? s.t(planKey) : shop.plan,
+                                color: AppColors.blue,
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (session.isOwner)
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: TextButton(
-                            onPressed: onRenew,
-                            child: Text(s.t('renew')),
-                          ),
+                          ],
                         ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // هشدار پایان اشتراک
+            if (sub.expiringSoon)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Glass(
+                  tint: AppColors.amber.withOpacity(0.18),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: AppColors.amber),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          s.t('expiring_warn',
+                              {'n': '${sub.daysLeft ?? sub.warnDays}'}),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(s.t('subscription'),
-                        style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    row(s.t('plan'), planName),
-                    if (sub.free)
-                      row(s.t('subscription'), s.t('sub_free'))
-                    else ...[
-                      row(s.t('subscription'), s.t('sub_active')),
-                      if (sub.daysLeft != null)
-                        row(s.t('days_left'), '${sub.daysLeft}'),
-                      row(s.t('expires_at'), dateOnly(sub.expiresAt)),
+
+            // اشتراک
+            Glass(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.verified_rounded,
+                          color: AppColors.green),
+                      const SizedBox(width: 8),
+                      Text(s.t('subscription'),
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w800)),
+                      const Spacer(),
+                      if (sub.free) Pill(s.t('sub_free'), color: AppColors.green),
                     ],
-                    if (session.isOwner && !sub.free)
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: TextButton.icon(
-                          onPressed: onRenew,
-                          icon: const Icon(Icons.vpn_key),
-                          label: Text(s.t('renew')),
-                        ),
+                  ),
+                  if (!sub.free) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text('${s.t('sub_expires')}: ',
+                            style: TextStyle(color: muted(context))),
+                        Text(_date(sub.expiresAt),
+                            textDirection: TextDirection.ltr,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                    if (sub.daysLeft != null) ...[
+                      const SizedBox(height: 4),
+                      Text('${sub.daysLeft} ${s.t('sub_days_left')}',
+                          style: TextStyle(color: muted(context))),
+                    ],
+                    if (sess.isOwner) ...[
+                      const SizedBox(height: 14),
+                      GradientButton(
+                        compact: true,
+                        outlined: true,
+                        icon: Icons.autorenew_rounded,
+                        label: s.t('renew'),
+                        onPressed: () async {
+                          final ok = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                                builder: (_) => RenewPage(api: ctx.api)),
+                          );
+                          if (ok == true) await ctx.reload();
+                        },
                       ),
+                    ],
                   ],
-                ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              s.t('manager_soon'),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
+            const SizedBox(height: 18),
+
+            tile(
+              icon: Icons.groups_rounded,
+              title: s.t(sess.isOwner ? 'manage_barbers' : 'staff_mine'),
+              desc: s.t(sess.isOwner ? 'manage_barbers_desc' : 'staff_mine_desc'),
+              onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => StaffPage(ctx: ctx))),
             ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: onLogout,
-              icon: const Icon(Icons.logout),
-              label: Text(s.t('logout')),
+            tile(
+              icon: Icons.event_available_rounded,
+              title: s.t('bookings'),
+              desc: s.t('bookings_desc'),
+              gradient: const LinearGradient(
+                colors: [AppColors.pink, AppColors.amber],
+              ),
             ),
+            if (sess.isOwner)
+              tile(
+                icon: Icons.design_services_rounded,
+                title: s.t('services'),
+                desc: s.t('services_desc'),
+                gradient: const LinearGradient(
+                  colors: [AppColors.green, AppColors.blue],
+                ),
+              ),
           ],
         ),
       ),

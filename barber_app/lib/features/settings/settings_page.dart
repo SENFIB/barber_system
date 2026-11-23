@@ -1,6 +1,8 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+
+import '../../app/brand.dart';
 import '../../app/config.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
@@ -11,6 +13,7 @@ import 'appearance_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -114,15 +117,18 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
     if (ok != true) return;
+
     final msg = s.t('data_deleted');
     final messenger = ScaffoldMessenger.of(context);
     final nav = Navigator.of(context);
+
     if (st.hasShopToken) {
       try {
         await ShopApi(st).logout().timeout(const Duration(seconds: 8));
       } catch (_) {}
     }
     await st.clearAll(resetDeviceId: resetId);
+
     nav.popUntil((r) => r.isFirst);
     messenger.showSnackBar(SnackBar(content: Text(msg)));
   }
@@ -152,6 +158,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final st = SettingsScope.of(context);
     final s = S(st.lang);
     final x = X(st.lang);
+
     final roleText = st.role == 'shop'
         ? s.t('role_shop')
         : st.role == 'customer'
@@ -327,6 +334,25 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
           const SizedBox(height: 28),
+
+          // توسعه‌دهنده: پایین همه‌چیز و بالای خط نسخه
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const EsmairoMark(size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  developerLine(st.lang),
+                  style: TextStyle(
+                    color: muted(context),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
           Center(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,

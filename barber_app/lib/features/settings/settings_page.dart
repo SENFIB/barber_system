@@ -2,159 +2,145 @@ import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../app/platform.dart';
+import '../../app/config.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
+import '../../app/widgets.dart';
 import '../manager/shop_api.dart';
-import '../onboarding/language_page.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.settings});
-
-  final AppSettings settings;
+  const SettingsPage({super.key});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  late final TextEditingController _url =
-      TextEditingController(text: widget.settings.apiUrl);
-  String _version = '...';
-  bool _testing = false;
-  bool _deleting = false;
-
-  // بخش سرور مخفی است؛ با ۷ بار زدن روی نسخه باز می‌شود (برای پلن شخصی)
+  String _version = '';
   int _taps = 0;
   bool _showServer = false;
+  bool _testing = false;
+  final _urlC = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    PackageInfo.fromPlatform().then((info) {
-      if (!mounted) return;
-      setState(() => _version = '${info.version}+${info.buildNumber}');
+    PackageInfo.fromPlatform().then((p) {
+      if (mounted) setState(() => _version = '${p.version}+${p.buildNumber}');
     });
   }
 
   @override
   void dispose() {
-    _url.dispose();
+    _urlC.dispose();
     super.dispose();
   }
 
-  String _langName(String code) {
-    switch (code) {
-      case 'en':
-        return 'English';
-      case 'ar':
-        return 'العربية';
-      default:
-        return 'فارسی';
+  void _tapVersion() {
+    _taps++;
+    if (_taps >= 7 && !_showServer) {
+      final st = SettingsScope.read(context);
+      setState(() {
+        _showServer = true;
+        _urlC.text = st.hasCustomApiUrl ? st.apiUrl : '';
+      });
     }
   }
 
-  void _onVersionTap() {
-    if (_showServer) return;
-    _taps++;
-    if (_taps >= 7) {
-      setState(() => _showServer = true);
-    }
+  Future<void> _saveUrl() async {
+    final st = SettingsScope.read(context);
+    final s = S(st.lang);
+    final newUrl = _urlC.text.trim();
+    final changed = newUrl != (st.hasCustomApiUrl ? st.apiUrl : '');
+    await st.setApiUrl(newUrl.isEmpty ? null : newUrl);
+    if (changed) await st.setShopToken(null); // توکن مال سرور قبلی بود
+    if (mounted) toast(context, s.t('saved'));
   }
 
   Future<void> _test() async {
-    final st = widget.settings;
+    final st = SettingsScope.read(context);
     final s = S(st.lang);
-    final messenger = ScaffoldMessenger.of(context);
+    final url = _urlC.text.trim().isEmpty ? kDefaultApiUrl : _urlC.text.trim();
     setState(() => _testing = true);
-    await st.setApiUrl(_url.text);
-
-    String msg;
     try {
-      final data = await ApiClient(baseUrl: st.apiUrl).call('app_version');
-      final latest = data is Map ? (data['latest'] ?? '') : '';
-      msg = '${s.t('connection_ok')}  $latest';
+      await ApiClient(url, timeout: const Duration(seconds: 25))
+          .call('app_version', {'app': 'manager', 'version': '1.0.0'});
+      if (mounted) toast(context, s.t('conn_ok'));
     } on ApiException catch (e) {
-      final m = e.code == 'NO_URL' ? s.t('no_url') : '${e.code}: ${e.message}';
-      msg = '${s.t('connection_fail')}\n$m';
+      if (mounted) toast(context, '${s.t('conn_fail')}: ${s.error(e)}');
+    } finally {
+      if (mounted) setState(() => _testing = false);
     }
-
-    if (!mounted) return;
-    _url.text = st.apiUrl;
-    setState(() => _testing = false);
-    messenger.showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> _deleteData() async {
-    final st = widget.settings;
+    final st = SettingsScope.read(context);
     final s = S(st.lang);
-    final messenger = ScaffoldMessenger.of(context);
-    final nav = Navigator.of(context);
+    var resetId = false;
 
-    var alsoDevice = false;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
+      builder: (c) => StatefulBuilder(
+        builder: (c, setD) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
           title: Text(s.t('delete_data_title')),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(s.t('delete_data_body')),
-                const SizedBox(height: 12),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: alsoDevice,
-                  onChanged: (v) => setD(() => alsoDevice = v ?? false),
-                  title: Text(s.t('delete_device_id')),
-                  subtitle: Text(s.t('delete_device_id_hint')),
-                ),
-              ],
-            ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(s.t('delete_data_msg')),
+              const SizedBox(height: 10),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: resetId,
+                onChanged: (v) => setD(() => resetId = v ?? false),
+                title: Text(s.t('delete_device_id')),
+                subtitle: Text(s.t('delete_device_id_desc')),
+              ),
+            ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(s.t('cancel')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(s.t('delete')),
+                onPressed: () => Navigator.pop(c, false),
+                child: Text(s.t('cancel'))),
+            TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(s.t('delete'),
+                  style: const TextStyle(color: Colors.redAccent)),
             ),
           ],
         ),
       ),
     );
-    if (ok != true || !mounted) return;
+    if (ok != true) return;
 
-    setState(() => _deleting = true);
-    // اگر آرایشگاه وارد شده، توکن روی سرور هم باطل شود (بدون اینترنت هم ادامه می‌دهیم)
+    final msg = s.t('data_deleted');
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+
     if (st.hasShopToken) {
       try {
-        await ShopApi(st).logout();
+        await ShopApi(st).logout().timeout(const Duration(seconds: 8));
       } catch (_) {}
     }
-    await st.clearAll(resetDeviceId: alsoDevice);
-
+    await st.clearAll(resetDeviceId: resetId);
     nav.popUntil((r) => r.isFirst);
-    messenger.showSnackBar(SnackBar(content: Text(s.t('data_deleted'))));
+    messenger.showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Widget _kv(String label, String value) {
+  Widget _row(String k, String v, {bool ltr = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Expanded(child: Text(label)),
+          Text(k, style: TextStyle(color: muted(context))),
           const SizedBox(width: 12),
-          Flexible(
+          Expanded(
             child: Text(
-              value,
-              textDirection: TextDirection.ltr,
+              v,
               textAlign: TextAlign.end,
+              textDirection: ltr ? TextDirection.ltr : null,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
@@ -163,175 +149,171 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _savedDataCard(AppSettings st, S s) {
-    final theme = Theme.of(context);
-    final roleText = st.role == 'customer'
-        ? s.t('customer')
-        : st.role == 'shop'
-            ? s.t('shop')
-            : s.t('sd_not_set');
-    final themeText = st.themeMode == ThemeMode.light
+  @override
+  Widget build(BuildContext context) {
+    final st = SettingsScope.of(context);
+    final s = S(st.lang);
+
+    final roleText = st.role == 'shop'
+        ? s.t('role_shop')
+        : st.role == 'customer'
+            ? s.t('role_customer')
+            : s.t('sd_none');
+    final themeText = st.themeKey == 'light'
         ? s.t('theme_light')
-        : st.themeMode == ThemeMode.dark
+        : st.themeKey == 'dark'
             ? s.t('theme_dark')
             : s.t('theme_system');
-    final id = st.deviceId;
-    final idShort = id.length > 8 ? '${id.substring(0, 8)}…' : id;
+    final langText = st.lang == 'fa'
+        ? 'فارسی'
+        : st.lang == 'ar'
+            ? 'العربية'
+            : 'English';
+    final dev = st.deviceId;
+    final devShort = dev.length > 8 ? '${dev.substring(0, 8)}…' : dev;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(s.t('saved_data'), style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(s.t('saved_data_desc'), style: theme.textTheme.bodySmall),
-            const SizedBox(height: 12),
-            _kv(s.t('language'), _langName(st.lang)),
-            _kv(s.t('role'), roleText),
-            _kv(s.t('theme'), themeText),
-            _kv(
-              s.t('sd_login'),
-              st.hasShopToken ? s.t('sd_logged_in') : s.t('sd_logged_out'),
+    return GlassScaffold(
+      title: s.t('settings'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+        children: [
+          SectionLabel(s.t('language')),
+          Glass(
+            child: SegmentPicker<String>(
+              options: [
+                MapEntry('fa', 'فارسی'),
+                MapEntry('en', 'English'),
+                MapEntry('ar', 'العربية'),
+              ],
+              value: st.lang,
+              onChanged: st.setLanguage,
             ),
-            _kv(s.t('sd_device_id'), idShort),
-            if (st.hasCustomApiUrl)
-              _kv(s.t('sd_custom_server'), s.t('sd_yes')),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _deleting ? null : _deleteData,
-                icon: _deleting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.delete_outline),
-                label: Text(s.t('delete_data')),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: theme.colorScheme.error,
-                ),
+          ),
+          SectionLabel(s.t('theme')),
+          Glass(
+            child: SegmentPicker<String>(
+              options: [
+                MapEntry('system', s.t('theme_system')),
+                MapEntry('light', s.t('theme_light')),
+                MapEntry('dark', s.t('theme_dark')),
+              ],
+              value: st.themeKey,
+              onChanged: st.setThemeKey,
+            ),
+          ),
+          if (st.role != null) ...[
+            const SizedBox(height: 18),
+            Glass(
+              onTap: () async {
+                final nav = Navigator.of(context);
+                await st.setRole(null);
+                nav.popUntil((r) => r.isFirst);
+              },
+              child: Row(
+                children: [
+                  const GradientIcon(Icons.swap_horiz_rounded, size: 44),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s.t('change_role'),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text(s.t('change_role_desc'),
+                            style: TextStyle(
+                                color: muted(context), fontSize: 12.5)),
+                      ],
+                    ),
+                  ),
+                  Icon(chevron(context), color: muted(context)),
+                ],
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final st = widget.settings;
-    return ListenableBuilder(
-      listenable: st,
-      builder: (context, _) {
-        final s = S(st.lang);
-        return Scaffold(
-          appBar: AppBar(title: Text(s.t('settings'))),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: ListView(
-                padding: const EdgeInsets.all(16),
+          SectionLabel(s.t('saved_data')),
+          Glass(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.t('saved_data_desc'),
+                    style: TextStyle(
+                        color: muted(context), fontSize: 12.5, height: 1.6)),
+                const SizedBox(height: 10),
+                _row(s.t('sd_language'), langText),
+                _row(s.t('sd_role'), roleText),
+                _row(s.t('sd_theme'), themeText),
+                _row(s.t('sd_device'), devShort, ltr: true),
+                _row(s.t('sd_session'),
+                    st.hasShopToken ? s.t('sd_yes') : s.t('sd_no')),
+                _row(s.t('sd_server'),
+                    st.hasCustomApiUrl ? s.t('sd_custom') : s.t('sd_builtin')),
+                const SizedBox(height: 14),
+                GradientButton(
+                  danger: true,
+                  icon: Icons.delete_outline_rounded,
+                  label: s.t('delete_data'),
+                  onPressed: _deleteData,
+                ),
+              ],
+            ),
+          ),
+          if (_showServer) ...[
+            SectionLabel(s.t('server_section')),
+            Glass(
+              child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.language),
-                    title: Text(s.t('language')),
-                    subtitle: Text(_langName(st.lang)),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            LanguagePage(settings: st, fromSettings: true),
-                      ),
-                    ),
+                  GlassField(
+                    controller: _urlC,
+                    label: s.t('server_url'),
+                    icon: Icons.link_rounded,
+                    ltr: true,
+                    keyboard: TextInputType.url,
                   ),
-                  // تغییر نقش فقط در موبایل (ویندوز فقط آرایشگاه است)
-                  if (!isWindowsApp)
-                    ListTile(
-                      leading: const Icon(Icons.swap_horiz),
-                      title: Text(s.t('change_role')),
-                      onTap: () async {
-                        final nav = Navigator.of(context);
-                        await st.setRole(null);
-                        nav.popUntil((r) => r.isFirst);
-                      },
-                    ),
-                  const Divider(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(s.t('theme'),
-                        style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(s.t('server_hint'),
+                        style:
+                            TextStyle(color: muted(context), fontSize: 12.5)),
                   ),
-                  SegmentedButton<ThemeMode>(
-                    segments: [
-                      ButtonSegment(
-                        value: ThemeMode.system,
-                        label: Text(s.t('theme_system')),
-                      ),
-                      ButtonSegment(
-                        value: ThemeMode.light,
-                        label: Text(s.t('theme_light')),
-                      ),
-                      ButtonSegment(
-                        value: ThemeMode.dark,
-                        label: Text(s.t('theme_dark')),
-                      ),
-                    ],
-                    selected: {st.themeMode},
-                    onSelectionChanged: (v) => st.setThemeMode(v.first),
-                  ),
-                  const Divider(height: 32),
-                  _savedDataCard(st, s),
-                  if (_showServer) ...[
-                    const Divider(height: 32),
-                    Text(s.t('server'),
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _url,
-                      textDirection: TextDirection.ltr,
-                      keyboardType: TextInputType.url,
-                      decoration: InputDecoration(
-                        labelText: s.t('api_url'),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    FilledButton.icon(
-                      onPressed: _testing ? null : _test,
-                      icon: _testing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.wifi_tethering),
-                      label: Text(s.t('test_connection')),
-                    ),
-                  ],
-                  const SizedBox(height: 32),
-                  Center(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _onVersionTap,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(
-                          '${s.t('version')}: $_version',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                    ),
+                  const SizedBox(height: 14),
+                  GradientButton(
+                      label: s.t('save'),
+                      icon: Icons.save_rounded,
+                      compact: true,
+                      onPressed: _saveUrl),
+                  const SizedBox(height: 10),
+                  GradientButton(
+                    label: s.t('test_conn'),
+                    icon: Icons.wifi_tethering_rounded,
+                    outlined: true,
+                    compact: true,
+                    loading: _testing,
+                    onPressed: _test,
                   ),
                 ],
               ),
             ),
+          ],
+          const SizedBox(height: 28),
+          Center(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _tapVersion,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  '${s.t('version')} $_version',
+                  textDirection: TextDirection.ltr,
+                  style: TextStyle(color: muted(context), fontSize: 13),
+                ),
+              ),
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

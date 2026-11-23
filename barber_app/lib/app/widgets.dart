@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
+
+import 'brand.dart';
 import 'look.dart';
 
 bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
@@ -57,6 +60,7 @@ Future<bool> confirmDialog(
 class AppBackground extends StatefulWidget {
   const AppBackground({super.key, required this.child});
   final Widget child;
+
   @override
   State<AppBackground> createState() => _AppBackgroundState();
 }
@@ -535,12 +539,10 @@ class GlassField extends StatelessWidget {
         : Colors.black.withOpacity(0.045);
     final primary = Theme.of(context).colorScheme.primary;
     final rr = (l.radius * 0.73).clamp(8.0, 26.0);
-
     OutlineInputBorder ob(Color c, [double w = 1]) => OutlineInputBorder(
           borderRadius: BorderRadius.circular(rr),
           borderSide: BorderSide(color: c, width: w),
         );
-
     return TextField(
       controller: controller,
       obscureText: obscure,
@@ -567,29 +569,27 @@ class GlassField extends StatelessWidget {
   }
 }
 
+/// لوگوی ESMAIRO (همان آیکن برنامه) با سایه‌ی نرم
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 84});
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final l = lk(context);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: l.gradient,
-        borderRadius: BorderRadius.circular(size * 0.3),
+        borderRadius: BorderRadius.circular(size * 0.22),
         boxShadow: [
           BoxShadow(
-            color: l.primary.withOpacity(0.45),
+            color: kBrandViolet.withOpacity(0.45),
             blurRadius: 30,
             offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: Icon(Icons.content_cut_rounded,
-          color: l.onPrimary, size: size * 0.5),
+      child: EsmairoMark(size: size),
     );
   }
 }

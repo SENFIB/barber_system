@@ -5,34 +5,49 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 
-/// تنظیمات ذخیره‌شده روی دستگاه: زبان، نقش، تم، آدرس سرور، شناسه‌ی دستگاه و توکن آرایشگاه
+const _kLang = 'language';
+const _kRole = 'role';
+const _kTheme = 'theme_mode';
+const _kDevice = 'device_id';
+const _kApi = 'api_url';
+const _kToken = 'shop_token';
+
+String _newDeviceId() {
+  final r = Random.secure();
+  final b = StringBuffer();
+  for (var i = 0; i < 24; i++) {
+    b.write(r.nextInt(16).toRadixString(16));
+  }
+  return b.toString();
+}
+
 class AppSettings extends ChangeNotifier {
   AppSettings._(this._p);
-
   final SharedPreferences _p;
-
-  static String _newDeviceId() {
-    final r = Random.secure();
-    return List.generate(24, (_) => r.nextInt(16).toRadixString(16)).join();
-  }
 
   static Future<AppSettings> load() async {
     final p = await SharedPreferences.getInstance();
-    if ((p.getString('device_id') ?? '').isEmpty) {
-      await p.setString('device_id', _newDeviceId());
+    if ((p.getString(_kDevice) ?? '').isEmpty) {
+      await p.setString(_kDevice, _newDeviceId());
     }
     return AppSettings._(p);
   }
 
-  /// null یعنی هنوز زبان انتخاب نشده
-  String? get language => _p.getString('language');
+  String? _get(String k) {
+    final v = _p.getString(k);
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  String? get language => _get(_kLang);
   String get lang => language ?? 'fa';
+  bool get isRtl => lang == 'fa' || lang == 'ar';
 
-  /// null | 'customer' | 'shop'
-  String? get role => _p.getString('role');
+  /// 'customer' | 'shop' | null
+  String? get role => _get(_kRole);
 
+  String get themeKey => _get(_kTheme) ?? 'system';
   ThemeMode get themeMode {
-    switch (_p.getString('theme')) {
+    switch (themeKey) {
       case 'light':
         return ThemeMode.light;
       case 'dark':
@@ -42,73 +57,51 @@ class AppSettings extends ChangeNotifier {
     }
   }
 
-  String get deviceId => _p.getString('device_id') ?? '';
+  String get deviceId => _p.getString(_kDevice) ?? '';
 
-  /// آیا کاربر آدرس سرور سفارشی (پلن شخصی) گذاشته است؟
-  bool get hasCustomApiUrl => (_p.getString('api_url') ?? '').trim().isNotEmpty;
+  bool get hasCustomApiUrl => (_get(_kApi) ?? '').trim().isNotEmpty;
+  String get apiUrl => hasCustomApiUrl ? _get(_kApi)!.trim() : kDefaultApiUrl;
 
-  String get apiUrl {
-    final v = _p.getString('api_url');
-    return (v == null || v.trim().isEmpty) ? kDefaultApiUrl : v.trim();
-  }
+  String? get shopToken => _get(_kToken);
+  bool get hasShopToken => shopToken != null;
 
-  /// توکن ورود آرایشگاه (null یعنی وارد نشده)
-  String? get shopToken => _p.getString('shop_token');
-  bool get hasShopToken => (shopToken ?? '').isNotEmpty;
-
-  Future<void> setLanguage(String v) async {
-    await _p.setString('language', v);
-    notifyListeners();
-  }
-
-  Future<void> setRole(String? v) async {
-    if (v == null) {
-      await _p.remove('role');
-    } else {
-      await _p.setString('role', v);
-    }
-    notifyListeners();
-  }
-
-  Future<void> setThemeMode(ThemeMode m) async {
-    final v = m == ThemeMode.light
-        ? 'light'
-        : m == ThemeMode.dark
-            ? 'dark'
-            : 'system';
-    await _p.setString('theme', v);
-    notifyListeners();
-  }
-
-  Future<void> setApiUrl(String v) async {
-    final t = v.trim();
-    if (t.isEmpty) {
-      await _p.remove('api_url');
-    } else {
-      await _p.setString('api_url', t);
-    }
-    notifyListeners();
-  }
-
-  Future<void> setShopToken(String? v) async {
+  Future<void> _set(String k, String? v) async {
     if (v == null || v.isEmpty) {
-      await _p.remove('shop_token');
+      await _p.remove(k);
     } else {
-      await _p.setString('shop_token', v);
+      await _p.setString(k, v);
     }
     notifyListeners();
   }
 
-  /// حذف همه‌ی اطلاعات ذخیره‌شده روی دستگاه.
-  /// اگر resetDeviceId=false باشد، شناسه‌ی دستگاه می‌ماند تا آرایشگرهای
-  /// واردشده با کد دعوت به دستگاه وصل بمانند.
+  Future<void> setLanguage(String v) => _set(_kLang, v);
+  Future<void> setRole(String? v) => _set(_kRole, v);
+  Future<void> setThemeKey(String v) => _set(_kTheme, v);
+  Future<void> setApiUrl(String? v) => _set(_kApi, v?.trim());
+  Future<void> setShopToken(String? v) => _set(_kToken, v);
+
+  /// همه‌ی اطلاعات ذخیره‌شده را پاک می‌کند. شناسه دستگاه به‌صورت پیش‌فرض می‌ماند.
   Future<void> clearAll({bool resetDeviceId = false}) async {
-    final keepId = resetDeviceId ? null : _p.getString('device_id');
-    await _p.clear();
-    await _p.setString(
-      'device_id',
-      (keepId == null || keepId.isEmpty) ? _newDeviceId() : keepId,
-    );
+    for (final k in _p.getKeys().toList()) {
+      if (k != _kDevice) await _p.remove(k);
+    }
+    if (resetDeviceId) await _p.setString(_kDevice, _newDeviceId());
     notifyListeners();
   }
+}
+
+class SettingsScope extends InheritedNotifier<AppSettings> {
+  const SettingsScope({
+    super.key,
+    required AppSettings settings,
+    required super.child,
+  }) : super(notifier: settings);
+
+  /// با گوش دادن به تغییرات (برای build)
+  static AppSettings of(BuildContext c) =>
+      c.dependOnInheritedWidgetOfExactType<SettingsScope>()!.notifier!;
+
+  /// بدون گوش دادن (برای initState و دکمه‌ها)
+  static AppSettings read(BuildContext c) =>
+      c.getInheritedWidgetOfExactType<SettingsScope>()!.notifier!;
 }

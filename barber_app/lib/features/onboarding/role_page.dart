@@ -2,105 +2,97 @@ import 'package:flutter/material.dart';
 
 import '../../app/settings.dart';
 import '../../app/strings.dart';
-import 'language_page.dart';
+import '../../app/theme.dart';
+import '../../app/widgets.dart';
+import '../settings/settings_page.dart';
 
 class RolePage extends StatelessWidget {
-  const RolePage({super.key, required this.settings});
-
-  final AppSettings settings;
+  const RolePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final s = S(settings.lang);
-    return Scaffold(
-      appBar: AppBar(title: Text(s.t('app_name'))),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(24),
-            children: [
-              const Icon(Icons.content_cut, size: 64),
-              const SizedBox(height: 16),
-              Text(
-                s.t('who_are_you'),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 24),
-              _RoleCard(
-                icon: Icons.person_search,
-                title: s.t('customer'),
-                subtitle: s.t('customer_desc'),
-                onTap: () => settings.setRole('customer'),
-              ),
-              const SizedBox(height: 12),
-              _RoleCard(
-                icon: Icons.storefront,
-                title: s.t('shop'),
-                subtitle: s.t('shop_desc'),
-                onTap: () => settings.setRole('shop'),
-              ),
-              const SizedBox(height: 16),
-              TextButton.icon(
-                icon: const Icon(Icons.language),
-                label: Text(s.t('change_language')),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        LanguagePage(settings: settings, fromSettings: true),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+    final st = SettingsScope.of(context);
+    final s = S(st.lang);
 
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
+    Widget card({
+      required IconData icon,
+      required Gradient gradient,
+      required String title,
+      required String desc,
+      required VoidCallback onTap,
+    }) {
+      return Glass(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(icon, size: 40),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 4),
-                    Text(subtitle),
-                  ],
-                ),
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            GradientIcon(icon, size: 64, gradient: gradient),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Text(desc,
+                      style: TextStyle(color: muted(context), height: 1.5)),
+                ],
               ),
-              const Icon(Icons.chevron_right),
-            ],
-          ),
+            ),
+            Icon(chevron(context), color: muted(context)),
+          ],
         ),
+      );
+    }
+
+    return GlassScaffold(
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.settings_rounded),
+          onPressed: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
+        ),
+      ],
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 32),
+        children: [
+          const Center(child: AppLogo()),
+          const SizedBox(height: 20),
+          Center(
+            child: Text(s.t('welcome'),
+                style:
+                    const TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(height: 6),
+          Center(
+            child: Text(s.t('who_are_you'),
+                style: TextStyle(color: muted(context), fontSize: 16)),
+          ),
+          const SizedBox(height: 30),
+          // اول آرایشگاه
+          card(
+            icon: Icons.storefront_rounded,
+            gradient: AppColors.gradient,
+            title: s.t('role_shop'),
+            desc: s.t('role_shop_desc'),
+            onTap: () => st.setRole('shop'),
+          ),
+          const SizedBox(height: 16),
+          // زیرش مشتری
+          card(
+            icon: Icons.person_rounded,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.pink, AppColors.amber],
+            ),
+            title: s.t('role_customer'),
+            desc: s.t('role_customer_desc'),
+            onTap: () => st.setRole('customer'),
+          ),
+        ],
       ),
     );
   }

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/settings.dart';
 import '../../app/strings.dart';
+import '../../app/theme.dart';
+import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
 import 'manager_home.dart';
 import 'renew_page.dart';
@@ -11,40 +13,38 @@ import 'shop_auth.dart';
 
 enum _Phase { loading, auth, error, ready }
 
-/// ورودی بخش آرایشگاه: بررسی توکن ذخیره‌شده، ورود، صفحه‌ی اصلی یا صفحه‌ی قفل
 class ManagerEntry extends StatefulWidget {
-  const ManagerEntry({super.key, required this.settings});
-
-  final AppSettings settings;
+  const ManagerEntry({super.key});
 
   @override
   State<ManagerEntry> createState() => _ManagerEntryState();
 }
 
 class _ManagerEntryState extends State<ManagerEntry> {
-  late final ShopApi _api = ShopApi(widget.settings);
+  late final ShopApi _api;
   _Phase _phase = _Phase.loading;
   ManagerSession? _session;
-  String _error = '';
+  String _errMsg = '';
 
   @override
   void initState() {
     super.initState();
-    _boot();
+    _api = ShopApi(SettingsScope.read(context));
+    _load();
   }
 
-  Future<void> _boot() async {
-    final st = widget.settings;
+  Future<void> _load() async {
+    final st = SettingsScope.read(context);
     if (!st.hasShopToken) {
       setState(() => _phase = _Phase.auth);
       return;
     }
-    setState(() => _phase = _Phase.loading);
+    if (_session == null) setState(() => _phase = _Phase.loading);
     try {
-      final session = await _api.me();
+      final sess = await _api.me();
       if (!mounted) return;
       setState(() {
-        _session = session;
+        _session = sess;
         _phase = _Phase.ready;
       });
     } on ApiException catch (e) {
@@ -56,37 +56,30 @@ class _ManagerEntryState extends State<ManagerEntry> {
           _session = null;
           _phase = _Phase.auth;
         });
-      } else {
-        setState(() {
-          _error = S(st.lang).error(e);
-          _phase = _Phase.error;
-        });
+        return;
       }
-    } catch (e) {
-      if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _errMsg = S(st.lang).error(e);
         _phase = _Phase.error;
       });
     }
   }
 
-  Future<void> _onLoggedIn(ManagerSession session) async {
-    await widget.settings.setShopToken(session.token);
+  Future<void> _onSession(ManagerSession sess) async {
+    await SettingsScope.read(context).setShopToken(sess.token);
     if (!mounted) return;
     setState(() {
-      _session = session;
+      _session = sess;
       _phase = _Phase.ready;
     });
   }
 
   Future<void> _logout() async {
+    final st = SettingsScope.read(context);
     try {
-      await _api.logout();
-    } catch (_) {
-      // خروج حتی بدون اینترنت انجام می‌شود
-    }
-    await widget.settings.setShopToken(null);
+      await _api.logout().timeout(const Duration(seconds: 8));
+    } catch (_) {}
+    await st.setShopToken(null);
     if (!mounted) return;
     setState(() {
       _session = null;
@@ -94,151 +87,150 @@ class _ManagerEntryState extends State<ManagerEntry> {
     });
   }
 
-  Future<void> _openRenew() async {
-    final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => RenewPage(settings: widget.settings, api: _api),
-      ),
-    );
-    if (ok == true) _boot();
-  }
+  @override
+  Widget build(BuildContext context) {
+    final st = SettingsScope.of(context);
+    final s = S(st.lang);
 
-  Widget _body(S s) {
     switch (_phase) {
       case _Phase.loading:
-        return const Center(child: CircularProgressIndicator());
+        return const GlassScaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+
+      case _Phase.auth:
+        return ShopAuthPage(api: _api, onSession: _onSession);
+
       case _Phase.error:
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.cloud_off, size: 56),
-                const SizedBox(height: 12),
-                Text(_error, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _boot,
-                  child: Text(s.t('retry')),
+        return GlassScaffold(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => st.setRole(null),
+          ),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Glass(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_rounded,
+                        size: 54, color: AppColors.amber),
+                    const SizedBox(height: 14),
+                    Text(_errMsg, textAlign: TextAlign.center),
+                    const SizedBox(height: 20),
+                    GradientButton(
+                      label: s.t('retry'),
+                      icon: Icons.refresh_rounded,
+                      onPressed: _load,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
-      case _Phase.auth:
-        return ShopAuthOptions(
-          settings: widget.settings,
-          api: _api,
-          onLoggedIn: _onLoggedIn,
-        );
+
       case _Phase.ready:
-        final session = _session!;
-        if (!session.subscription.isActive) {
+        final sess = _session!;
+        final sub = sess.subscription;
+        if (sub.isExpired || sub.isDeactive) {
           return _BlockedView(
-            s: s,
-            session: session,
-            onRenew: _openRenew,
+            session: sess,
+            api: _api,
+            onRenewed: _load,
             onLogout: _logout,
           );
         }
         return ManagerHome(
-          settings: widget.settings,
-          session: session,
-          onRenew: _openRenew,
-          onLogout: _logout,
+          ctx: ShopCtx(
+            api: _api,
+            session: sess,
+            reload: _load,
+            logout: _logout,
+          ),
         );
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S(widget.settings.lang);
-    final name = _session?.shop.name ?? '';
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_phase == _Phase.ready && name.isNotEmpty
-            ? name
-            : s.t('shop')),
-        actions: [
-          if (_phase == _Phase.ready)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: s.t('refresh'),
-              onPressed: _boot,
-            ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: s.t('settings'),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => SettingsPage(settings: widget.settings),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: _body(s),
-    );
-  }
 }
 
-/// صفحه‌ی قفل: اشتراک تمام شده یا غیرفعال است
 class _BlockedView extends StatelessWidget {
   const _BlockedView({
-    required this.s,
     required this.session,
-    required this.onRenew,
+    required this.api,
+    required this.onRenewed,
     required this.onLogout,
   });
 
-  final S s;
   final ManagerSession session;
-  final VoidCallback onRenew;
-  final VoidCallback onLogout;
+  final ShopApi api;
+  final Future<void> Function() onRenewed;
+  final Future<void> Function() onLogout;
 
   @override
   Widget build(BuildContext context) {
-    final expired = session.subscription.isExpired;
-    final theme = Theme.of(context);
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: ListView(
-          shrinkWrap: true,
+    final s = S(SettingsScope.of(context).lang);
+    final deactive = session.subscription.isDeactive;
+    return GlassScaffold(
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.settings_rounded),
+          onPressed: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
+        ),
+      ],
+      body: Center(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          children: [
-            const Icon(Icons.lock_clock, size: 72),
-            const SizedBox(height: 16),
-            Text(
-              s.t(expired ? 'expired_title' : 'deactive_title'),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall,
+          child: Glass(
+            padding: const EdgeInsets.all(26),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GradientIcon(
+                  deactive ? Icons.block_rounded : Icons.lock_clock_rounded,
+                  size: 70,
+                  gradient: AppColors.dangerGradient,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  s.t(deactive ? 'deactive_title' : 'expired_title'),
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  deactive
+                      ? s.t('deactive_msg')
+                      : s.t(session.isOwner ? 'expired_owner' : 'expired_staff'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: muted(context), height: 1.6),
+                ),
+                const SizedBox(height: 22),
+                if (!deactive && session.isOwner) ...[
+                  GradientButton(
+                    label: s.t('renew'),
+                    icon: Icons.autorenew_rounded,
+                    onPressed: () async {
+                      final ok = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                            builder: (_) => RenewPage(api: api)),
+                      );
+                      if (ok == true) await onRenewed();
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                GradientButton(
+                  outlined: true,
+                  label: s.t('logout'),
+                  icon: Icons.logout_rounded,
+                  onPressed: onLogout,
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              s.t(expired
-                  ? (session.isOwner
-                      ? 'expired_owner_desc'
-                      : 'expired_staff_desc')
-                  : 'deactive_desc'),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            if (expired && session.isOwner) ...[
-              FilledButton.icon(
-                onPressed: onRenew,
-                icon: const Icon(Icons.vpn_key),
-                label: Text(s.t('renew')),
-              ),
-              const SizedBox(height: 12),
-            ],
-            OutlinedButton.icon(
-              onPressed: onLogout,
-              icon: const Icon(Icons.logout),
-              label: Text(s.t('logout')),
-            ),
-          ],
+          ),
         ),
       ),
     );

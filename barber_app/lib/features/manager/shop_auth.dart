@@ -1,6 +1,5 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
-
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
@@ -270,15 +269,24 @@ String _planPrice(String lang, PlanDef p) {
 List<String> _planFeatures(String lang, PlanDef p) {
   final booking = _x(lang, 'رزرو آنلاین مشتری', 'Online customer booking',
       'حجز العملاء عبر الإنترنت');
-  final photo = _x(lang, 'عکس آرایشگاه', 'Shop photo', 'صورة الصالون');
-  final winback = _x(lang, 'پیام «دلمون تنگ شده» برای مشتریان',
-      '"We miss you" messages to customers', 'رسائل «اشتقنا لك» للعملاء');
+  final photo = _x(
+      lang,
+      'قرار دادن عکس آرایشگاه در صفحهٔ آرایشگاه‌ها',
+      'Your shop photo on the shops page',
+      'وضع صورة صالونك في صفحة الصالونات');
+  final winback = _x(
+      lang,
+      'پیام «دلمون تنگ شده» با متن خودتان، انتخاب آرایشگر و زمان‌بندی',
+      '"We miss you" messages with your own text, barber choice and timing',
+      'رسائل «اشتقنا لك» بنصّك الخاص مع اختيار الحلاق والتوقيت');
   final n = fmtNum(p.maxBarbers, lang);
   final sh = fmtNum(p.maxShifts, lang);
-  final barbers = p.maxBarbers > 0
-      ? _x(lang, 'تا $n آرایشگر', 'Up to $n barbers', 'حتى $n حلاق')
-      : _x(lang, 'آرایشگر نامحدود', 'Unlimited barbers',
-          'عدد غير محدود من الحلاقين');
+  final barbers = p.maxBarbers == 1
+      ? _x(lang, 'یک آرایشگر', 'One barber', 'حلاق واحد')
+      : p.maxBarbers > 0
+          ? _x(lang, 'تا $n آرایشگر', 'Up to $n barbers', 'حتى $n حلاق')
+          : _x(lang, 'آرایشگر نامحدود', 'Unlimited barbers',
+              'عدد غير محدود من الحلاقين');
   final shifts = _x(
       lang,
       'تا $sh شیفت کاری در روز برای هر آرایشگر',
@@ -309,8 +317,12 @@ List<String> _planFeatures(String lang, PlanDef p) {
         booking,
         photo,
         winback,
-        _x(lang, 'شیت اختصاصی و پشتیبان‌گیری', 'Dedicated sheet and backup',
-            'جدول خاص ونسخ احتياطي'),
+        _x(lang, 'فضای اختصاصی برای آرایشگاه شما و پشتیبان‌گیری',
+            'Dedicated space for your shop, plus backups',
+            'مساحة خاصة لصالونك ونسخ احتياطي'),
+        _x(lang, 'فعال‌سازی و راه‌اندازی با کد لایسنس',
+            'Activation and setup with a license code',
+            'التفعيل والإعداد عبر كود الترخيص'),
       ];
     default:
       return [

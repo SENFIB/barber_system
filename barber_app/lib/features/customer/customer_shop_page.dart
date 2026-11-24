@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
-import '../../app/strings_s4.dart';
+import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../manager/booking_common.dart';
@@ -52,7 +52,6 @@ class ShopPage extends StatefulWidget {
   const ShopPage({super.key, required this.api, required this.card});
   final CustomerApi api;
   final Map<String, dynamic> card;
-
   @override
   State<ShopPage> createState() => _ShopPageState();
 }
@@ -76,7 +75,7 @@ class _ShopPageState extends State<ShopPage> {
   final _phone = TextEditingController();
 
   String get _shopId => bStr(widget.card['shop_id']);
-  T4 _tr() => T4(SettingsScope.read(context).lang);
+  T6 _tr() => T6(SettingsScope.read(context).lang);
 
   @override
   void initState() {
@@ -163,7 +162,8 @@ class _ShopPageState extends State<ShopPage> {
       return;
     }
     if (_picked.length >= _maxServices) {
-      bSnack(context, _tr().t('m_max', {'n': fmtNum(_maxServices)}));
+      final t = _tr();
+      bSnack(context, t.t('m_max', {'n': fmtNum(_maxServices, t.lang)}));
       return;
     }
     setState(() {
@@ -264,11 +264,11 @@ class _ShopPageState extends State<ShopPage> {
     }
   }
 
-  String _policy(T4 t) {
+  String _policy(T6 t) {
     final m = bInt(_shop['cancel_before_min'], 120);
     final txt = (m >= 60 && m % 60 == 0)
-        ? t.t('cu_h', {'n': fmtNum(m ~/ 60)})
-        : t.t('cu_m', {'n': fmtNum(m)});
+        ? t.t('cu_h', {'n': fmtNum(m ~/ 60, t.lang)})
+        : t.t('cu_m', {'n': fmtNum(m, t.lang)});
     return t.t('cu_policy', {'t': txt});
   }
 
@@ -280,7 +280,7 @@ class _ShopPageState extends State<ShopPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = T4(SettingsScope.of(context).lang);
+    final t = T6(SettingsScope.of(context).lang);
     Widget body;
     if (_loading) {
       body = const Center(child: CircularProgressIndicator());
@@ -316,13 +316,14 @@ class _ShopPageState extends State<ShopPage> {
     );
   }
 
-  Widget _header(T4 t) {
+  Widget _header(T6 t) {
     final avg = cDouble(_shop['rating_avg']);
     final count = bInt(_shop['rating_count']);
     final phone = bStr(_shop['phone']);
+    final sep = t.lang == 'en' ? ', ' : '، ';
     final address = [bStr(_shop['city']), bStr(_shop['address'])]
         .where((e) => e.isNotEmpty)
-        .join('، ');
+        .join(sep);
     final desc = bStr(_shop['description']);
     return Glass(
       padding: EdgeInsets.zero,
@@ -352,10 +353,10 @@ class _ShopPageState extends State<ShopPage> {
                       const Icon(Icons.star_rounded,
                           size: 20, color: AppColors.amber),
                       const SizedBox(width: 3),
-                      Text(avg.toStringAsFixed(1),
+                      Text(localDigits(avg.toStringAsFixed(1), t.lang),
                           style: const TextStyle(fontWeight: FontWeight.w800)),
                       const SizedBox(width: 4),
-                      Text('(${fmtNum(count)})',
+                      Text('(${fmtNum(count, t.lang)})',
                           style: TextStyle(color: muted(context))),
                     ] else
                       Pill(t.t('cu_new')),
@@ -369,7 +370,7 @@ class _ShopPageState extends State<ShopPage> {
                       Icon(Icons.place_rounded,
                           size: 18, color: muted(context)),
                       const SizedBox(width: 6),
-                      Expanded(child: Text(address)),
+                      Expanded(child: Text(localDigits(address, t.lang))),
                     ],
                   ),
                 ],
@@ -389,7 +390,8 @@ class _ShopPageState extends State<ShopPage> {
                           Icon(Icons.phone_rounded,
                               size: 18, color: muted(context)),
                           const SizedBox(width: 6),
-                          Text(phone, textDirection: TextDirection.ltr),
+                          Text(localDigits(phone, t.lang),
+                              textDirection: TextDirection.ltr),
                           const SizedBox(width: 6),
                           Icon(Icons.copy_rounded,
                               size: 14, color: muted(context)),
@@ -413,7 +415,7 @@ class _ShopPageState extends State<ShopPage> {
     );
   }
 
-  Widget _content(T4 t) {
+  Widget _content(T6 t) {
     final cur = bStr(_shop['currency']);
     var total = 0;
     var totalDur = 0;
@@ -423,12 +425,11 @@ class _ShopPageState extends State<ShopPage> {
       totalDur += bInt(s['duration_min']);
     }
     final slots = _slots;
+    final now = DateTime.now();
     final days = <DateTime>[
       for (var i = 0; i <= _maxAdvance; i++)
-        DateTime(DateTime.now().year, DateTime.now().month,
-            DateTime.now().day + i),
+        DateTime(now.year, now.month, now.day + i),
     ];
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
       children: [
@@ -451,9 +452,9 @@ class _ShopPageState extends State<ShopPage> {
                 FilterChip(
                   label: Text([
                     bStr(s['name']),
-                    '${fmtNum(bInt(s['duration_min']))} ${t.t('b_min')}',
+                    '${fmtNum(bInt(s['duration_min']), t.lang)} ${t.t('b_min')}',
                     if (bInt(s['price']) > 0)
-                      '${fmtNum(bInt(s['price']))} $cur'.trim(),
+                      '${fmtNum(bInt(s['price']), t.lang)} $cur'.trim(),
                   ].join(' · ')),
                   selected: _picked.contains(bStr(s['service_id'])),
                   onSelected: (_) => _toggle(bStr(s['service_id'])),
@@ -461,7 +462,7 @@ class _ShopPageState extends State<ShopPage> {
             ],
           ),
           const SizedBox(height: 6),
-          Text(t.t('m_max', {'n': fmtNum(_maxServices)}),
+          Text(t.t('m_max', {'n': fmtNum(_maxServices, t.lang)}),
               style: TextStyle(color: muted(context), fontSize: 12)),
         ],
         if (_picked.isNotEmpty) ...[
@@ -476,10 +477,10 @@ class _ShopPageState extends State<ShopPage> {
             children: [
               Text('${t.t('cu_total')}: ',
                   style: TextStyle(color: muted(context))),
-              Text('${fmtNum(total)} $cur'.trim(),
+              Text('${fmtNum(total, t.lang)} $cur'.trim(),
                   style: const TextStyle(fontWeight: FontWeight.w800)),
               const SizedBox(width: 12),
-              Text('· ${fmtNum(totalDur)} ${t.t('b_min')}',
+              Text('· ${fmtNum(totalDur, t.lang)} ${t.t('b_min')}',
                   style: TextStyle(color: muted(context))),
             ],
           ),
@@ -494,7 +495,7 @@ class _ShopPageState extends State<ShopPage> {
                   padding: const EdgeInsetsDirectional.only(end: 8),
                   child: ChoiceChip(
                     label: Text(
-                        '${t.t('d_${d.weekday % 7}')} ${fmtNum(d.day)}'),
+                        '${t.t('d_${d.weekday % 7}')} ${fmtNum(d.day, t.lang)}'),
                     selected: bIso(d) == bIso(_day),
                     onSelected: (_) => _setDay(d),
                   ),
@@ -503,7 +504,7 @@ class _ShopPageState extends State<ShopPage> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(bIso(_day),
+        Text(localDigits(bIso(_day), t.lang),
             textDirection: TextDirection.ltr,
             style: TextStyle(color: muted(context), fontSize: 12)),
         const SizedBox(height: 12),
@@ -530,7 +531,7 @@ class _ShopPageState extends State<ShopPage> {
               children: [
                 for (var i = 0; i < slots.length; i++)
                   ChoiceChip(
-                    label: Text(bStr(slots[i]['start']),
+                    label: Text(localDigits(bStr(slots[i]['start']), t.lang),
                         textDirection: TextDirection.ltr),
                     selected: i == _slotIdx,
                     onSelected: (_) => setState(() => _slotIdx = i),
@@ -555,7 +556,10 @@ class _ShopPageState extends State<ShopPage> {
                               style: const TextStyle(
                                   fontWeight: FontWeight.w600)),
                         ),
-                        Text('${bStr(a['start'])} – ${bStr(a['end'])}',
+                        Text(
+                            localDigits(
+                                '${bStr(a['start'])} – ${bStr(a['end'])}',
+                                t.lang),
                             textDirection: TextDirection.ltr,
                             style: TextStyle(color: muted(context))),
                       ],
@@ -595,7 +599,7 @@ class _ShopPageState extends State<ShopPage> {
     );
   }
 
-  Widget _choiceRow(String sid, T4 t) {
+  Widget _choiceRow(String sid, T6 t) {
     final svc = _svc(sid);
     final el = _eligible(sid);
     return Glass(
@@ -625,7 +629,7 @@ class _ShopPageState extends State<ShopPage> {
                   ChoiceChip(
                     label: Text(
                       bInt(s['rating_count']) > 0
-                          ? '${bStr(s['name'])} ★ ${cDouble(s['rating_avg']).toStringAsFixed(1)}'
+                          ? '${bStr(s['name'])} ★ ${localDigits(cDouble(s['rating_avg']).toStringAsFixed(1), t.lang)}'
                           : bStr(s['name']),
                     ),
                     selected: _choice[sid] == bStr(s['staff_id']),

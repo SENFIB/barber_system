@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'brand.dart';
 import 'settings.dart';
 import 'strings.dart';
@@ -9,10 +8,19 @@ import 'widgets.dart';
 /// از context خودِ Navigator استفاده می‌کند.
 final GlobalKey<NavigatorState> kNavKey = GlobalKey<NavigatorState>();
 
+/// وقتی پنجره‌ی انتخابِ هدر باز است true می‌شود.
+final ValueNotifier<bool> _pickerOpen = ValueNotifier<bool>(false);
+
+void _closePicker() {
+  if (_pickerOpen.value) {
+    kNavKey.currentState?.pop();
+  }
+}
+
 String _tr(String lang, String fa, String en, String ar) =>
     lang == 'fa' ? fa : (lang == 'ar' ? ar : en);
 
-/// هدر ثابت برنامه: نام، زبان، ساعت (مغازه/گوشی) و تقویم
+/// هدر ثابت برنامه: نام، زبان، ساعت (مغازه/دستگاه) و تقویم
 class AppHeader extends StatelessWidget {
   const AppHeader({super.key});
 
@@ -24,12 +32,9 @@ class AppHeader extends StatelessWidget {
     final compact = mq.size.width < 420;
     final lang = st.lang;
     final onSurface = Theme.of(context).colorScheme.onSurface;
-
     final base = Color.alphaBlend(
         l.primary.withOpacity(l.dark ? 0.12 : 0.08), l.bg[0]);
-
     final langCode = lang == 'fa' ? 'فا' : (lang == 'ar' ? 'ع' : 'EN');
-
     final calName = () {
       switch (st.calendar) {
         case 'jalali':
@@ -41,7 +46,7 @@ class AppHeader extends StatelessWidget {
       }
     }();
 
-    return Material(
+    final bar = Material(
       color: base,
       child: Container(
         padding: EdgeInsets.only(top: mq.padding.top),
@@ -85,12 +90,12 @@ class AppHeader extends StatelessWidget {
                     _HBtn(
                       semantic: _tr(lang, 'ساعت', 'Time', 'الوقت'),
                       icon: st.usePhoneTime
-                          ? Icons.phone_android_rounded
+                          ? Icons.devices_rounded
                           : Icons.storefront_rounded,
                       label: compact
                           ? null
                           : (st.usePhoneTime
-                              ? _tr(lang, 'گوشی', 'Phone', 'الهاتف')
+                              ? _tr(lang, 'دستگاه', 'Device', 'الجهاز')
                               : _tr(lang, 'مغازه', 'Shop', 'المحل')),
                       active: st.usePhoneTime,
                       onTap: () => _timeSheet(st),
@@ -110,6 +115,28 @@ class AppHeader extends StatelessWidget {
         ),
       ),
     );
+
+    // وقتی پنجره‌ی انتخاب باز است، یک لایه‌ی نامرئی روی هدر می‌افتد
+    // تا ضربه روی هدر هم پنجره را ببندد.
+    return ValueListenableBuilder<bool>(
+      valueListenable: _pickerOpen,
+      child: bar,
+      builder: (context, open, child) {
+        return Stack(
+          children: [
+            child!,
+            if (open)
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _closePicker,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -121,6 +148,7 @@ class _HBtn extends StatelessWidget {
     this.label,
     this.active = false,
   });
+
   final IconData icon;
   final String? label;
   final String semantic;
@@ -191,76 +219,87 @@ Future<void> _pick({
 }) async {
   final ctx = kNavKey.currentContext;
   if (ctx == null) return;
-  await showModalBottomSheet<void>(
-    context: ctx,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (c) {
-      final theme = Theme.of(c);
-      final l = lk(c);
-      return Align(
-        alignment: Alignment.bottomCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(26)),
-              border: Border.all(color: l.cardBorder),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurface.withOpacity(0.25),
-                          borderRadius: BorderRadius.circular(4),
+  if (_pickerOpen.value) return; // هم‌زمان فقط یک پنجره
+  _pickerOpen.value = true;
+  try {
+    await showModalBottomSheet<void>(
+      context: ctx,
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+      builder: (c) {
+        final theme = Theme.of(c);
+        final l = lk(c);
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(26)),
+                border: Border.all(color: l.cardBorder),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 8),
-                    for (final o in options)
-                      ListTile(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        selected: o.value == current,
-                        selectedTileColor: l.primary.withOpacity(0.12),
-                        title: Text(o.title,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w700)),
-                        subtitle: o.subtitle == null ? null : Text(o.subtitle!),
-                        trailing: o.value == current
-                            ? Icon(Icons.check_circle_rounded, color: l.primary)
-                            : null,
-                        onTap: () async {
-                          Navigator.of(c).pop();
-                          await onPick(o.value);
-                        },
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w800),
                       ),
-                  ],
+                      const SizedBox(height: 8),
+                      for (final o in options)
+                        ListTile(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          selected: o.value == current,
+                          selectedTileColor: l.primary.withOpacity(0.12),
+                          title: Text(o.title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          subtitle:
+                              o.subtitle == null ? null : Text(o.subtitle!),
+                          trailing: o.value == current
+                              ? Icon(Icons.check_circle_rounded,
+                                  color: l.primary)
+                              : null,
+                          onTap: () async {
+                            Navigator.of(c).pop();
+                            await onPick(o.value);
+                          },
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
+  } finally {
+    _pickerOpen.value = false;
+  }
 }
 
 Future<void> _langSheet(AppSettings st) {
@@ -291,7 +330,7 @@ Future<void> _timeSheet(AppSettings st) {
       ),
       _Opt(
         'phone',
-        _tr(lang, 'ساعت گوشی', 'Phone time', 'وقت الهاتف'),
+        _tr(lang, 'ساعت دستگاه', 'Device time', 'وقت الجهاز'),
         _tr(lang, 'ساعت و تاریخ بر اساس ساعت همین دستگاه',
             'Based on this device clock', 'حسب ساعة هذا الجهاز'),
       ),
@@ -313,9 +352,11 @@ Future<void> _calSheet(AppSettings st) {
             'Persian: Jalali • English: Gregorian • Arabic: Hijri',
             'الفارسية: شمسي • الإنجليزية: ميلادي • العربية: هجري'),
       ),
-      _Opt('jalali', _tr(lang, 'شمسی (جلالی)', 'Jalali (Persian)', 'الشمسي (الجلالي)')),
+      _Opt('jalali',
+          _tr(lang, 'شمسی (جلالی)', 'Jalali (Persian)', 'الشمسي (الجلالي)')),
       _Opt('gregorian', _tr(lang, 'میلادی', 'Gregorian', 'الميلادي')),
-      _Opt('hijri', _tr(lang, 'قمری (هجری)', 'Hijri (Islamic)', 'الهجري (القمري)')),
+      _Opt('hijri',
+          _tr(lang, 'قمری (هجری)', 'Hijri (Islamic)', 'الهجري (القمري)')),
     ],
     onPick: st.setCalendarKey,
   );

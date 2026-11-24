@@ -1,28 +1,50 @@
 // متن حریم خصوصی و شرایط استفاده در سه زبان.
 // نسخه را وقتی بالا ببری که متن تغییر مهم کرد؛ آن‌وقت از همه دوباره تأیید گرفته می‌شود.
 const int kLegalVersion = 1;
+
 /// شماره یا ایمیل تماس (اختیاری). اگر پر باشد، آخر متن حریم خصوصی نمایش داده می‌شود.
 const String kLegalContact = 'efmfib.1373@gmail.com';
+
 class LegalSection {
   final String h;
   final String b;
   const LegalSection(this.h, this.b);
 }
+
 class LegalGroup {
   final String title;
   final List<LegalSection> sections;
   const LegalGroup(this.title, this.sections);
 }
+
+/// جملهٔ پایانی که زیر همهٔ قوانین نمایش داده می‌شود.
+LegalSection _closing(String lang) {
+  if (lang == 'ar') {
+    return const LegalSection(
+        'مع تمنياتي بالتوفيق', 'التوفيق لكم — إسماعيل');
+  }
+  if (lang == 'en') {
+    return const LegalSection('Wishing you success', 'Success to you — Esmaeil');
+  }
+  return const LegalSection('با آرزوی موفقیت', 'موفقیت برای شما — اسماعیل');
+}
+
 List<LegalSection> appPolicy(String lang) {
   final base = lang == 'ar' ? _arP : (lang == 'en' ? _enP : _faP);
-  if (kLegalContact.trim().isEmpty) return base;
   final list = List<LegalSection>.of(base);
-  final last = list.removeLast();
-  list.add(LegalSection(last.h, '${last.b}\n${kLegalContact.trim()}'));
+  if (kLegalContact.trim().isNotEmpty) {
+    final last = list.removeLast();
+    list.add(LegalSection(last.h, '${last.b}\n${kLegalContact.trim()}'));
+  }
+  list.add(_closing(lang));
   return list;
 }
-List<LegalSection> appTerms(String lang) =>
-    lang == 'ar' ? _arT : (lang == 'en' ? _enT : _faT);
+
+List<LegalSection> appTerms(String lang) {
+  final base = lang == 'ar' ? _arT : (lang == 'en' ? _enT : _faT);
+  return <LegalSection>[...base, _closing(lang)];
+}
+
 // =========================================================== فارسی
 const List<LegalSection> _faP = [
   LegalSection('۱. معرفی',
@@ -36,9 +58,9 @@ const List<LegalSection> _faP = [
   LegalSection('۵. چه کسی اطلاعات را می‌بیند',
       '• آرایشگاهی که در آن نوبت گرفته‌اید، نام، شماره تلفن و جزئیات نوبت شما را می‌بیند. آرایشگر عادی فقط نوبت‌های خودش را می‌بیند.\n• امتیازها ناشناس هستند و آرایشگاه نمی‌داند چه کسی امتیاز داده است.\n• مشتریان از اطلاعات یکدیگر چیزی نمی‌بینند.\n• توسعه‌دهنده فقط برای پشتیبانی و رفع مشکل فنی ممکن است به پایگاه داده دسترسی داشته باشد و از آن برای هدف دیگری استفاده نمی‌کند.\n• اگر مرجع قانونی یا قضایی صالح رسماً درخواست کند، ممکن است ملزم به ارائهٔ اطلاعات شویم.'),
   LegalSection('۶. محل نگهداری و امنیت',
-      'اطلاعات روی سرویس‌های ابری گوگل (Google Apps Script، Sheets و Drive) نگهداری می‌شود و ممکن است سرورهای آن خارج از کشور باشد. ارتباط برنامه با سرور رمزنگاری‌شده (HTTPS) است، رمزها به‌صورت رمزنگاری‌شدهٔ یک‌طرفه نگهداری می‌شوند و ورود آرایشگاه‌ها با توکن امن انجام می‌شود. با این حال هیچ سیستم آنلاینی صددرصد امن نیست و نمی‌توانیم امنیت مطلق را تضمین کنیم. اگر فونت اضافی انتخاب کنید، فایل آن فونت از سرورهای گوگل دریافت می‌شود.'),
+      'اطلاعات روی سرویس‌های ابری گوگل نگهداری می‌شود و ممکن است سرورهای آن خارج از کشور باشد. ارتباط برنامه با سرور رمزنگاری‌شده (HTTPS) است، رمزها به‌صورت رمزنگاری‌شدهٔ یک‌طرفه نگهداری می‌شوند و ورود آرایشگاه‌ها با توکن امن انجام می‌شود. با این حال هیچ سیستم آنلاینی صددرصد امن نیست و نمی‌توانیم امنیت مطلق را تضمین کنیم. اگر فونت اضافی انتخاب کنید، فایل آن فونت از سرورهای گوگل دریافت می‌شود.'),
   LegalSection('۷. مدت نگهداری',
-      '• نوبت‌های گذشته به‌طور خودکار پاک می‌شوند: حدود ۷ روز بعد در پلن عادی، ۱۴ روز در پرو و ۳۰ روز در ویژه (از تاریخ نوبت).\n• نوبت‌های آینده تا زمان برگزاری یا لغو نگه داشته می‌شوند.\n• اطلاعات آرایشگاه تا زمانی که فعال است نگهداری می‌شود.\n• نام و شماره‌ای که روی دستگاه خودتان ذخیره شده تا وقتی حذف نکنید باقی می‌ماند.'),
+      '• نوبت‌های گذشته به‌طور خودکار پاک می‌شوند: حدود ۷ روز بعد در پلن پایه، ۱۴ روز در پرو و ۳۰ روز در ویژه (از تاریخ نوبت).\n• نوبت‌های آینده تا زمان برگزاری یا لغو نگه داشته می‌شوند.\n• اطلاعات آرایشگاه تا زمانی که فعال است نگهداری می‌شود.\n• نام و شماره‌ای که روی دستگاه خودتان ذخیره شده تا وقتی حذف نکنید باقی می‌ماند.'),
   LegalSection('۸. یادآوری‌ها و پیام‌ها',
       'یادآوری نوبت، هشدار پایان اشتراک و پیام‌های آرایشگاه برای مشتریانش روی خود دستگاه زمان‌بندی و نمایش داده می‌شود؛ پیامک یا پیام‌رسان بیرونی استفاده نمی‌شود. هر زمان از تنظیمات دستگاه می‌توانید اعلان‌ها را خاموش کنید. پیام‌های آرایشگاه فقط برای کسانی نمایش داده می‌شود که از طریق برنامه نوبت گرفته‌اند.'),
   LegalSection('۹. حقوق شما',
@@ -48,8 +70,9 @@ const List<LegalSection> _faP = [
   LegalSection('۱۱. تغییر این متن',
       'ممکن است این متن به‌روز شود. در تغییرهای مهم، پیش از ادامهٔ استفاده دوباره از شما تأیید گرفته می‌شود.'),
   LegalSection('۱۲. ارتباط',
-      'برای سؤال، شکایت یا درخواست حذف اطلاعات با توسعه‌دهنده (اسماعیل) تماس بگیرید.'),
+      'برای سؤال، شکایت یا درخواست حذف اطلاعات با توسعه‌دهنده تماس بگیرید.'),
 ];
+
 const List<LegalSection> _faT = [
   LegalSection('۱. ماهیت برنامه',
       'ESMAIRO فقط ابزار نوبت‌دهی است. خدمتی که انجام می‌شود توافق بین آرایشگاه و مشتری است. توسعه‌دهنده در قبال کیفیت خدمت، قیمت‌ها، ساعت کاری، تأخیر یا حاضر نشدن هیچ‌یک از طرفین مسئولیتی ندارد.'),
@@ -68,6 +91,7 @@ const List<LegalSection> _faT = [
   LegalSection('۸. تغییر و پایان استفاده',
       'شرایط ممکن است تغییر کند و در تغییرهای مهم دوباره تأیید می‌گیریم. در صورت نقض شرایط، دسترسی شما می‌تواند محدود شود.'),
 ];
+
 // =========================================================== English
 const List<LegalSection> _enP = [
   LegalSection('1. Introduction',
@@ -81,7 +105,7 @@ const List<LegalSection> _enP = [
   LegalSection('5. Who can see your information',
       '• The shop where you booked can see your name, phone number and booking details. A regular barber sees only their own bookings.\n• Ratings are anonymous; the shop does not know who gave them.\n• Customers cannot see each other\'s information.\n• The developer may access the database only for support and fixing technical problems, and does not use it for any other purpose.\n• We may be required to disclose information if a competent legal or judicial authority officially requests it.'),
   LegalSection('6. Storage and security',
-      'Data is stored on Google cloud services (Google Apps Script, Sheets and Drive), whose servers may be located outside your country. Communication between the app and the server is encrypted (HTTPS), passwords are stored in one-way encrypted form, and shops sign in using secure tokens. Even so, no online system is 100% secure and we cannot guarantee absolute security. If you choose an extra font, its file is downloaded from Google servers.'),
+      'Data is stored on Google cloud services, whose servers may be located outside your country. Communication between the app and the server is encrypted (HTTPS), passwords are stored in one-way encrypted form, and shops sign in using secure tokens. Even so, no online system is 100% secure and we cannot guarantee absolute security. If you choose an extra font, its file is downloaded from Google servers.'),
   LegalSection('7. Retention',
       '• Past bookings are deleted automatically: about 7 days after the booking date on the Basic plan, 14 days on Pro and 30 days on Special.\n• Upcoming bookings are kept until they take place or are cancelled.\n• Shop information is kept while the shop is active.\n• The name and number saved on your own device stay until you delete them.'),
   LegalSection('8. Reminders and messages',
@@ -93,8 +117,9 @@ const List<LegalSection> _enP = [
   LegalSection('11. Changes to this text',
       'This text may be updated. For important changes, we will ask for your acceptance again before you continue using the app.'),
   LegalSection('12. Contact',
-      'For questions, complaints or data-deletion requests, contact the developer (Esmaeil).'),
+      'For questions, complaints or data-deletion requests, contact the developer.'),
 ];
+
 const List<LegalSection> _enT = [
   LegalSection('1. Nature of the app',
       'ESMAIRO is only a booking tool. The service itself is an agreement between the shop and the customer. The developer is not responsible for the quality of service, prices, working hours, or lateness or absence of either party.'),
@@ -113,6 +138,7 @@ const List<LegalSection> _enT = [
   LegalSection('8. Changes and termination',
       'These terms may change and we will ask for acceptance again for important changes. If the terms are breached, your access may be restricted.'),
 ];
+
 // =========================================================== العربية
 const List<LegalSection> _arP = [
   LegalSection('١. مقدمة',
@@ -126,9 +152,9 @@ const List<LegalSection> _arP = [
   LegalSection('٥. من يرى المعلومات',
       '• الصالون الذي حجزت لديه يرى اسمك ورقم هاتفك وتفاصيل موعدك. أما الحلّاق العادي فيرى مواعيده هو فقط.\n• التقييمات مجهولة الهوية ولا يعرف الصالون من قام بها.\n• لا يرى الزبائن معلومات بعضهم.\n• قد يطّلع المطوّر على قاعدة البيانات لأغراض الدعم وإصلاح الأعطال فقط، ولا يستخدمها لغرض آخر.\n• قد نُلزم بتقديم المعلومات إذا طلبت ذلك رسميًّا جهة قانونية أو قضائية مختصة.'),
   LegalSection('٦. مكان التخزين والأمان',
-      'تُخزَّن المعلومات على خدمات Google السحابية (Google Apps Script وSheets وDrive)، وقد تكون خوادمها خارج البلد. الاتصال بين التطبيق والخادم مشفّر (HTTPS)، وكلمات المرور تُحفظ بشكل مشفّر أحادي الاتجاه، ويتم دخول الصالونات برمز أمان (توكن). ومع ذلك لا يوجد نظام إلكتروني آمن بنسبة ١٠٠٪ ولا يمكننا ضمان أمان مطلق. وإذا اخترت خطًّا إضافيًّا فسيُنزَّل ملفه من خوادم Google.'),
+      'تُخزَّن المعلومات على خدمات Google السحابية، وقد تكون خوادمها خارج البلد. الاتصال بين التطبيق والخادم مشفّر (HTTPS)، وكلمات المرور تُحفظ بشكل مشفّر أحادي الاتجاه، ويتم دخول الصالونات برمز أمان (توكن). ومع ذلك لا يوجد نظام إلكتروني آمن بنسبة ١٠٠٪ ولا يمكننا ضمان أمان مطلق. وإذا اخترت خطًّا إضافيًّا فسيُنزَّل ملفه من خوادم Google.'),
   LegalSection('٧. مدة الاحتفاظ',
-      '• تُحذف المواعيد السابقة تلقائيًّا: بعد نحو ٧ أيام في الخطة العادية، و١٤ يومًا في الاحترافية، و٣٠ يومًا في المميّزة (من تاريخ الموعد).\n• تُحفظ المواعيد القادمة حتى موعدها أو إلغائها.\n• تُحفظ معلومات الصالون ما دام نشطًا.\n• يبقى الاسم والرقم المخزّنان على جهازك إلى أن تحذفهما.'),
+      '• تُحذف المواعيد السابقة تلقائيًّا: بعد نحو ٧ أيام في الخطة الأساسية، و١٤ يومًا في الاحترافية، و٣٠ يومًا في المميّزة (من تاريخ الموعد).\n• تُحفظ المواعيد القادمة حتى موعدها أو إلغائها.\n• تُحفظ معلومات الصالون ما دام نشطًا.\n• يبقى الاسم والرقم المخزّنان على جهازك إلى أن تحذفهما.'),
   LegalSection('٨. التذكيرات والرسائل',
       'تُجدوَل التذكيرات (موعدك، قرب انتهاء الاشتراك، ورسائل الصالون لزبائنه) وتُعرض على الجهاز نفسه؛ ولا تُستخدم رسائل SMS أو تطبيقات مراسلة خارجية. يمكنك إيقاف الإشعارات في أي وقت من إعدادات الجهاز. تُعرض رسائل الصالون فقط لمن حجزوا عبر التطبيق.'),
   LegalSection('٩. حقوقك',
@@ -138,8 +164,9 @@ const List<LegalSection> _arP = [
   LegalSection('١١. تعديل هذا النص',
       'قد يُحدَّث هذا النص. عند التغييرات المهمة سنطلب موافقتك مجددًا قبل متابعة الاستخدام.'),
   LegalSection('١٢. التواصل',
-      'للأسئلة أو الشكاوى أو طلب حذف البيانات تواصل مع المطوّر (إسماعيل).'),
+      'للأسئلة أو الشكاوى أو طلب حذف البيانات تواصل مع المطوّر.'),
 ];
+
 const List<LegalSection> _arT = [
   LegalSection('١. طبيعة التطبيق',
       'ESMAIRO أداة لحجز المواعيد فقط. الخدمة المقدَّمة اتفاق بين الصالون والزبون، ولا يتحمل المطوّر أي مسؤولية عن جودة الخدمة أو الأسعار أو ساعات العمل أو تأخّر أي طرف أو عدم حضوره.'),

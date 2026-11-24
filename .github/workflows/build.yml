@@ -7,19 +7,17 @@ on:
       target:
         description: 'کدام بیلد؟'
         type: choice
-        default: android
+        default: both
         options:
+          - both
           - android
           - windows
-          - both
-
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   android:
-    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.target == 'android' || inputs.target == 'both')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[build]') || contains(github.event.head_commit.message, '[android]'))) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'android' || inputs.target == 'both' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -80,9 +78,8 @@ jobs:
         with:
           name: android-apk
           path: barber_app/build/app/outputs/flutter-apk/app-release.apk
-
   windows:
-    if: ${{ (github.event_name == 'workflow_dispatch' && (inputs.target == 'windows' || inputs.target == 'both')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[build]') || contains(github.event.head_commit.message, '[windows]'))) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'windows' || inputs.target == 'both' }}
     runs-on: windows-2022
     defaults:
       run:

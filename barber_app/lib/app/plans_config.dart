@@ -12,13 +12,13 @@ class PlanDef {
     required this.features,
   });
 
-  /// basic | pro | special | personal   (personal = «خرید برنامه»، دیگر نمایش داده نمی‌شود)
+  /// basic | pro | special | personal   (personal = پلن شخصی / خرید کامل برنامه)
   final String key;
 
   /// قیمت یک ماه (۰ یعنی رایگان)
   final int monthly;
 
-  /// قیمت خرید یک‌باره (فقط «خرید برنامه»)؛ اگر ۰ باشد ماهانه حساب می‌شود
+  /// قیمت خرید یک‌باره (فقط پلن شخصی)؛ اگر ۰ باشد ماهانه حساب می‌شود
   final int oneTime;
 
   /// سقف آرایشگر (۰ یعنی نامحدود)
@@ -77,7 +77,7 @@ const PlanDef _special = PlanDef(
   ],
 );
 
-// فقط برای آرایشگاه‌هایی که از قبل این پلن را دارند (نمایش داده نمی‌شود)
+// پلن شخصی (خرید کامل برنامه): آخرِ فهرست نمایش داده می‌شود
 const PlanDef _personal = PlanDef(
   key: 'personal',
   monthly: 0,
@@ -90,13 +90,14 @@ const PlanDef _personal = PlanDef(
     'pl_f_photo',
     'pl_f_winback',
     'pl_f_ownserver',
+    'pl_f_selfhost',
   ],
 );
 
-/// پلن‌هایی که به کاربر نشان داده می‌شود (۳ پلن)
-const List<PlanDef> kPlans = <PlanDef>[_basic, _pro, _special];
+/// پلن‌هایی که به کاربر نشان داده می‌شود (پلن شخصی همیشه آخر است)
+const List<PlanDef> kPlans = <PlanDef>[_basic, _pro, _special, _personal];
 
-/// همه‌ی پلن‌ها (شامل «خرید برنامه» برای آرایشگاه‌های قدیمی)
+/// همه‌ی پلن‌ها
 const List<PlanDef> kAllPlans = <PlanDef>[_basic, _pro, _special, _personal];
 
 /// سقف شیفتِ یک پلن (برای ویرایشگر شیفت‌ها)

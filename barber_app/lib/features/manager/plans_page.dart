@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
-import '../../app/strings_s5.dart';
+import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import 'renew_page.dart';
@@ -20,27 +22,6 @@ class _PlansPageState extends State<PlansPage> {
   String _sel = '';
   int _months = 1;
 
-  String _digits(String s, String lang) {
-    if (lang != 'fa' && lang != 'ar') return s;
-    final d = lang == 'fa' ? '۰۱۲۳۴۵۶۷۸۹' : '٠١٢٣٤٥٦٧٨٩';
-    final sb = StringBuffer();
-    for (final ch in s.split('')) {
-      final i = '0123456789'.indexOf(ch);
-      sb.write(i >= 0 ? d[i] : ch);
-    }
-    return sb.toString();
-  }
-
-  String _money(int v, String lang) {
-    final s = v.toString();
-    final b = StringBuffer();
-    for (var i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
-      b.write(s[i]);
-    }
-    return _digits(b.toString(), lang);
-  }
-
   IconData _icon(String key) {
     switch (key) {
       case 'pro':
@@ -53,13 +34,13 @@ class _PlansPageState extends State<PlansPage> {
     return Icons.content_cut_rounded;
   }
 
-  String _priceLine(PlanDef p, T5 t, String lang) {
+  String _priceLine(PlanDef p, T6 t, String lang) {
     final c = t.t('pl_toman');
     if (p.oneTime > 0) {
-      return t.t('pl_one_time', {'p': _money(p.oneTime, lang), 'c': c});
+      return t.t('pl_one_time', {'p': fmtNum(p.oneTime, lang), 'c': c});
     }
     if (p.monthly == 0) return t.t('pl_free_now');
-    return t.t('pl_per_month', {'p': _money(p.monthly, lang), 'c': c});
+    return t.t('pl_per_month', {'p': fmtNum(p.monthly, lang), 'c': c});
   }
 
   int _total(PlanDef p) {
@@ -67,21 +48,21 @@ class _PlansPageState extends State<PlansPage> {
     return planTotal(p, _months);
   }
 
-  String _summary(PlanDef p, T5 t, String lang) {
+  String _summary(PlanDef p, T6 t, String lang) {
     final c = t.t('pl_toman');
     final months = p.oneTime > 0
         ? t.t('pl_months_one_time')
-        : t.t('pl_months', {'n': _digits('$_months', lang)});
+        : t.t('pl_months', {'n': _months});
     return t.t('pl_order', {
       'plan': t.t('pl_name_${p.key}'),
       'months': months,
-      'total': _money(_total(p), lang),
+      'total': fmtNum(_total(p), lang),
       'c': c,
       'shop': widget.ctx.session.shop.name,
     });
   }
 
-  Future<void> _buy(PlanDef p, T5 t, String lang) async {
+  Future<void> _buy(PlanDef p, T6 t, String lang) async {
     final text = _summary(p, t, lang);
     await showDialog<void>(
       context: context,
@@ -134,7 +115,7 @@ class _PlansPageState extends State<PlansPage> {
   @override
   Widget build(BuildContext context) {
     final lang = SettingsScope.of(context).lang;
-    final t = T5(lang);
+    final t = T6(lang);
     final cur = widget.ctx.session.shop.plan;
     return GlassScaffold(
       title: t.t('pl_title'),
@@ -153,9 +134,9 @@ class _PlansPageState extends State<PlansPage> {
     );
   }
 
-  Widget _card(PlanDef p, T5 t, String lang, bool current) {
+  Widget _card(PlanDef p, T6 t, String lang, bool current) {
     final sel = _sel == p.key;
-    final nArgs = <String, String>{'n': _digits('${p.maxBarbers}', lang)};
+    final nArgs = <String, Object?>{'n': p.maxBarbers, 's': p.maxShifts};
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Glass(
@@ -211,7 +192,7 @@ class _PlansPageState extends State<PlansPage> {
     );
   }
 
-  Widget _panel(PlanDef p, T5 t, String lang) {
+  Widget _panel(PlanDef p, T6 t, String lang) {
     final c = t.t('pl_toman');
     final paid = p.oneTime > 0 || p.monthly > 0;
     final monthly = p.oneTime == 0 && p.monthly > 0;
@@ -230,8 +211,8 @@ class _PlansPageState extends State<PlansPage> {
                 ChoiceChip(
                   label: Text(
                     (kDiscountPercent[m] ?? 0) > 0
-                        ? '${t.t('pl_months', {'n': _digits('$m', lang)})} · ${t.t('pl_off', {'n': _digits('${kDiscountPercent[m]}', lang)})}'
-                        : t.t('pl_months', {'n': _digits('$m', lang)}),
+                        ? '${t.t('pl_months', {'n': m})} · ${t.t('pl_off', {'n': kDiscountPercent[m]})}'
+                        : t.t('pl_months', {'n': m}),
                   ),
                   selected: _months == m,
                   onSelected: (_) => setState(() => _months = m),
@@ -244,7 +225,7 @@ class _PlansPageState extends State<PlansPage> {
             children: [
               Text('${t.t('pl_total')}: ',
                   style: TextStyle(color: muted(context))),
-              Text('${_money(total, lang)} $c',
+              Text('${fmtNum(total, lang)} $c',
                   style: const TextStyle(
                       fontSize: 17, fontWeight: FontWeight.w800)),
             ],
@@ -253,7 +234,7 @@ class _PlansPageState extends State<PlansPage> {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                t.t('pl_save', {'p': _money(saved, lang), 'c': c}),
+                t.t('pl_save', {'p': fmtNum(saved, lang), 'c': c}),
                 style: const TextStyle(color: AppColors.green),
               ),
             ),

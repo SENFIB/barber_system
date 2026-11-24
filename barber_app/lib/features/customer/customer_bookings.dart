@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../app/cal_conv.dart';
 import '../../app/fmt.dart';
+import '../../app/reminders.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
@@ -13,6 +15,7 @@ class MyBookingsTab extends StatefulWidget {
   const MyBookingsTab({super.key, required this.api, this.refresh});
   final CustomerApi api;
   final ValueListenable<int>? refresh;
+
   @override
   State<MyBookingsTab> createState() => _MyBookingsTabState();
 }
@@ -52,6 +55,43 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   String _key(List<Map<String, dynamic>> g) =>
       '${bStr(g.first['date'])} ${bStr(g.first['start_time'])}';
 
+  String _d10(String d) => d.length >= 10 ? d.substring(0, 10) : d;
+
+  /// شناسه‌ی یادآوری: همان فرمولی که هنگام ثبت نوبت استفاده می‌شود
+  String _rid(List<Map<String, dynamic>> g) {
+    final f = g.first;
+    return '${bStr(f['shop_name'])}|${_d10(bStr(f['date']))}|${bStr(f['start_time'])}';
+  }
+
+  /// نوبت‌های فعال یادآوری می‌گیرند؛ لغوشده/تمام‌شده‌ها یادآوری‌شان پاک می‌شود
+  Future<void> _sync(List<List<Map<String, dynamic>>> groups) async {
+    try {
+      final lang = SettingsScope.read(context).lang;
+      var asked = false;
+      var past = 0;
+      for (final g in groups) {
+        final f = g.first;
+        if (_isActive(g)) {
+          if (!asked) {
+            asked = true;
+            await Reminders.ask();
+          }
+          await Reminders.booking(
+            id: _rid(g),
+            shop: bStr(f['shop_name']),
+            date: _d10(bStr(f['date'])),
+            time: bStr(f['start_time']),
+            tz: bStr(f['shop_timezone']),
+            lang: lang,
+          );
+        } else if (past < 30) {
+          past++;
+          await Reminders.cancelBooking(_rid(g));
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -77,10 +117,12 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
         ..sort((a, b) => _key(a).compareTo(_key(b)));
       final past = groups.where((g) => !_isActive(g)).toList()
         ..sort((a, b) => _key(b).compareTo(_key(a)));
+      final all = <List<Map<String, dynamic>>>[...active, ...past];
       setState(() {
-        _groups = <List<Map<String, dynamic>>>[...active, ...past];
+        _groups = all;
         _loading = false;
       });
+      _sync(all);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -122,8 +164,10 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       danger: true,
     );
     if (ok != true || !mounted) return;
+    final rid = _rid(g);
     await _run(() async {
       await widget.api.cancel(_gid(g));
+      await Reminders.cancelBooking(rid);
     }, okMsg: t.t('b_saved'));
   }
 
@@ -278,6 +322,18 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     final address = bStr(first['shop_address']);
     final dt = bParse(bStr(first['date']));
     final wd = dt == null ? '' : t.t('d_${dt.weekday % 7}');
+
+    // تاریخ با تقویم آرایشگاه (اگر کاربر تقویم دلخواه نزده باشد)
+    final st = SettingsScope.read(context);
+    var kind = kCalKind;
+    final sc = bStr(first['shop_calendar']);
+    if (st.calendarKey == 'auto' && sc.isNotEmpty) {
+      kind = CalConv.kindOf(sc, t.lang);
+    }
+    final dateText = dt == null
+        ? localDigits(bStr(first['date']), t.lang)
+        : CalConv.numeric(_d10(bStr(first['date'])), kind, t.lang);
+
     final card = Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,7 +356,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                   Text(wd,
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(width: 6),
-                  Text(localDigits(bStr(first['date']), t.lang),
+                  Text(dateText,
                       textDirection: TextDirection.ltr,
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                 ],
@@ -446,6 +502,7 @@ class _RateDialog extends StatefulWidget {
   const _RateDialog({required this.rows, required this.t});
   final List<Map<String, dynamic>> rows;
   final T6 t;
+
   @override
   State<_RateDialog> createState() => _RateDialogState();
 }

@@ -1,5 +1,6 @@
 import 'package:barber_core/barber_core.dart';
-
+import '../../app/config.dart';
+import '../../app/servers.dart';
 import '../../app/settings.dart';
 import '../../app/util.dart';
 
@@ -11,7 +12,6 @@ class ShopCtx {
     required this.reload,
     required this.logout,
   });
-
   final ShopApi api;
   final ManagerSession session;
   final Future<void> Function() reload;
@@ -24,8 +24,9 @@ class ShopApi {
 
   ApiClient get _client => ApiClient(settings.apiUrl);
 
-  Future<dynamic> _open(String action, Map<String, dynamic> p) =>
-      _client.call(action, p);
+  Future<dynamic> _open(String action, Map<String, dynamic> p,
+          {String? url}) =>
+      ApiClient(url ?? settings.apiUrl).call(action, p);
 
   Future<dynamic> _auth(String action, [Map<String, dynamic>? p]) =>
       _client.call(action, {
@@ -51,10 +52,78 @@ class ShopApi {
   ManagerSession _session(dynamic d, {String? token}) =>
       ManagerSession.fromJson(_map(d), token: token);
 
+  // ───────────── مسیریابی بین سرورها ─────────────
+
+  /// سروری که ثبت‌نام باید روی آن انجام شود
+  String _urlForPlan(String plan) {
+    if (plan == 'basic') return kDefaultApiUrl;
+    if (plan == 'pro' && kProApiUrl.isNotEmpty) return kProApiUrl;
+    return settings.apiUrl; // ویژه / شخصی: سروری که با کد ذخیره شده
+  }
+
+  /// سرور موفق را ذخیره می‌کند تا بقیه‌ی درخواست‌ها به همان بروند
+  Future<void> _remember(String url) async {
+    if (url == settings.apiUrl) return;
+    await settings.setApiUrl(url == kDefaultApiUrl ? null : url);
+  }
+
+  List<String> _candidates() {
+    final out = <String>[];
+    void add(String u) {
+      if (u.isNotEmpty && !out.contains(u)) out.add(u);
+    }
+
+    add(settings.apiUrl);
+    add(kDefaultApiUrl);
+    add(kProApiUrl);
+    return out;
+  }
+
+  // خطاهایی که یعنی «حساب همین‌جاست و مشکل دیگری دارد»؛ جستجو متوقف می‌شود
+  static const Set<String> _final = {
+    'SUBSCRIPTION_EXPIRED',
+    'SHOP_DEACTIVATED',
+    'DEVICE_MISMATCH',
+    'TOO_MANY',
+    'BAD_USERNAME',
+    'BAD_PASSWORD',
+    'BAD_REQUEST',
+    'BAD_DEVICE',
+    'INVITE_LIMIT',
+    'FORBIDDEN',
+    'UNAUTHORIZED',
+  };
+
+  /// عمل را روی سرورها به ترتیب امتحان می‌کند. [notHere] = کدهای «اینجا نیست»
+  Future<ManagerSession> _tryServers(
+      String action, Map<String, dynamic> p, Set<String> notHere) async {
+    ApiException? notFound;
+    Object? netErr;
+    for (final url in _candidates()) {
+      try {
+        final d = await _open(action, p, url: url);
+        final sess = _session(d);
+        await _remember(url);
+        return sess;
+      } on ApiException catch (e) {
+        if (notHere.contains(e.code)) {
+          notFound ??= e;
+          continue;
+        }
+        if (_final.contains(e.code)) rethrow;
+        netErr ??= e;
+      } catch (e) {
+        netErr ??= e;
+      }
+    }
+    throw netErr ?? notFound ?? StateError('no server');
+  }
+
   // ───────────── بدون ورود ─────────────
 
   /// plan = اشتراکی که مالک خودش انتخاب کرده (basic | pro | special | personal).
-  /// سرور چک می‌کند کد لایسنس با همین اشتراک بخواند.
+  /// serverUrl = آدرس سرور اختصاصی (برای ویژه/شخصی)؛ اگر خالی باشد از روی پلن
+  /// تشخیص داده می‌شود.
   /// shifts = «09:00-13:00|16:00-22:00» و daysOff = روزهای تعطیل (0 = یکشنبه)
   /// برای مالکی که خودش هم آرایشگر است.
   Future<ManagerSession> register({
@@ -71,6 +140,7 @@ class ShopApi {
     String plan = '',
     String shifts = '',
     List<int>? daysOff,
+    String? serverUrl,
   }) async {
     final p = <String, dynamic>{
       'license_key': licenseKey.trim().toUpperCase(),
@@ -99,29 +169,41 @@ class ShopApi {
         p['days_off'] = d.join('|');
       }
     }
-    return _session(await _open('register_shop', p));
+    final url = (serverUrl != null && serverUrl.isNotEmpty)
+        ? serverUrl
+        : _urlForPlan(plan);
+    final sess = _session(await _open('register_shop', p, url: url));
+    await _remember(url);
+    return sess;
   }
 
-  Future<ManagerSession> login(String username, String password) async {
-    return _session(await _open('login', {
-      'username': encodeUsername(username),
-      'password': password,
-      'device_id': settings.deviceId,
-    }));
+  Future<ManagerSession> login(String username, String password) {
+    return _tryServers(
+      'login',
+      {
+        'username': encodeUsername(username),
+        'password': password,
+        'device_id': settings.deviceId,
+      },
+      {'BAD_CREDENTIALS'},
+    );
   }
 
   Future<ManagerSession> join(
-      String inviteCode, String username, String password) async {
-    return _session(await _open('join_with_invite', {
-      'invite_code': inviteCode.trim().toUpperCase(),
-      'username': encodeUsername(username),
-      'password': password,
-      'device_id': settings.deviceId,
-    }));
+      String inviteCode, String username, String password) {
+    return _tryServers(
+      'join_with_invite',
+      {
+        'invite_code': inviteCode.trim().toUpperCase(),
+        'username': encodeUsername(username),
+        'password': password,
+        'device_id': settings.deviceId,
+      },
+      {'INVITE_INVALID'},
+    );
   }
 
   // ───────────── حساب و اشتراک ─────────────
-
   Future<ManagerSession> me() async =>
       _session(await _auth('me'), token: settings.shopToken);
 
@@ -140,7 +222,6 @@ class ShopApi {
       _map(await _auth('shop_update', fields));
 
   // ───────────── آرایشگرها ─────────────
-
   Future<Map<String, dynamic>> staffList() async =>
       _map(await _auth('staff_list'));
 
@@ -218,7 +299,6 @@ class ShopApi {
   }
 
   // ───────────── خدمات ─────────────
-
   Future<List<Map<String, dynamic>>> serviceList() async =>
       _rows(await _auth('service_list'), 'services');
 
@@ -245,7 +325,6 @@ class ShopApi {
   }
 
   // ───────────── مرخصی / تعطیلی ─────────────
-
   Future<List<Map<String, dynamic>>> timeoffList() async =>
       _rows(await _auth('timeoff_list'), 'blocks');
 
@@ -272,7 +351,6 @@ class ShopApi {
   }
 
   // ───────────── نوبت‌ها ─────────────
-
   /// خروجی: {bookings:[...], now:{date,min}}
   Future<Map<String, dynamic>> bookingsList({
     String? dateFrom,
@@ -319,8 +397,7 @@ class ShopApi {
     await _auth('booking_noshow', {'booking_id': bookingId});
   }
 
-  // ───────────── «دلمون تنگ شده» (پلن ویژه) ─────────────
-
+  // ───────────── پیام اختصاصی آرایشگاه (ویژه/شخصی) ─────────────
   Future<List<Map<String, dynamic>>> winbackList() async =>
       _rows(await _auth('winback_list'), 'rules');
 

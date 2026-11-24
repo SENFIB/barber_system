@@ -1,5 +1,6 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
@@ -21,6 +22,7 @@ class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
+
   @override
   State<ShopAuthPage> createState() => _ShopAuthPageState();
 }
@@ -170,6 +172,7 @@ class SignupChoicePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = T6(SettingsScope.of(context).lang);
+
     Widget card(IconData icon, String title, String desc, VoidCallback onTap) {
       return Glass(
         onTap: onTap,
@@ -235,7 +238,7 @@ String _planName(String lang, String key) {
     case 'special':
       return _x(lang, 'ویژه', 'Special', 'مميزة');
     default:
-      return _x(lang, 'شخصی', 'Personal', 'شخصية');
+      return _x(lang, 'خرید برنامه', 'App purchase', 'شراء التطبيق');
   }
 }
 
@@ -271,14 +274,21 @@ List<String> _planFeatures(String lang, PlanDef p) {
   final winback = _x(lang, 'پیام «دلمون تنگ شده» برای مشتریان',
       '"We miss you" messages to customers', 'رسائل «اشتقنا لك» للعملاء');
   final n = fmtNum(p.maxBarbers, lang);
+  final sh = fmtNum(p.maxShifts, lang);
   final barbers = p.maxBarbers > 0
       ? _x(lang, 'تا $n آرایشگر', 'Up to $n barbers', 'حتى $n حلاق')
       : _x(lang, 'آرایشگر نامحدود', 'Unlimited barbers',
           'عدد غير محدود من الحلاقين');
+  final shifts = _x(
+      lang,
+      'تا $sh شیفت کاری در روز برای هر آرایشگر',
+      'Up to $sh work shifts a day per barber',
+      'حتى $sh فترات عمل يوميًا لكل حلاق');
   switch (p.key) {
     case 'basic':
       return [
         barbers,
+        shifts,
         booking,
         _x(lang, 'پاکسازی هفتگی نوبت‌های گذشته',
             'Past bookings cleaned weekly', 'تنظيف الحجوزات القديمة أسبوعياً'),
@@ -286,6 +296,7 @@ List<String> _planFeatures(String lang, PlanDef p) {
     case 'pro':
       return [
         barbers,
+        shifts,
         booking,
         _x(lang, 'پاکسازی نوبت‌های گذشته هر دو هفته',
             'Past bookings cleaned every 2 weeks',
@@ -294,6 +305,7 @@ List<String> _planFeatures(String lang, PlanDef p) {
     case 'special':
       return [
         barbers,
+        shifts,
         booking,
         photo,
         winback,
@@ -306,7 +318,8 @@ List<String> _planFeatures(String lang, PlanDef p) {
         booking,
         photo,
         winback,
-        _x(lang, 'سرور اختصاصی خودتان', 'Your own server', 'خادم خاص بك'),
+        _x(lang, 'برنامه و سرور مخصوص خودتان', 'The app with your own server',
+            'التطبيق مع خادمك الخاص'),
       ];
   }
 }
@@ -421,6 +434,7 @@ class OwnerSignupPage extends StatefulWidget {
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
+
   @override
   State<OwnerSignupPage> createState() => _OwnerSignupPageState();
 }
@@ -444,6 +458,9 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   void initState() {
     super.initState();
     _shifts = parseShifts('09:00-13:00|16:00-20:00');
+    // اگر سقف پلن کمتر از شیفت‌های پیش‌فرض است، کوتاهشان کن
+    final cap = widget.plan.maxShifts;
+    if (_shifts.length > cap) _shifts = _shifts.sublist(0, cap);
   }
 
   @override
@@ -636,18 +653,10 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                           'ساعات عملك'),
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 4),
-                  Text(
-                      _x(
-                          lang,
-                          'تا ۳ شیفت در روز می‌توانید تعیین کنید. مشتری فقط داخل همین ساعت‌ها نوبت می‌گیرد.',
-                          'You can set up to 3 shifts a day. Customers can only book inside these hours.',
-                          'يمكنك تحديد حتى 3 فترات يومياً. يحجز العملاء داخل هذه الساعات فقط.'),
-                      style: TextStyle(
-                          color: muted(context), fontSize: 12, height: 1.5)),
                   const SizedBox(height: 12),
                   ShiftsEditor(
                     shifts: _shifts,
+                    max: widget.plan.maxShifts,
                     onChanged: (v) => setState(() => _shifts = v),
                   ),
                   const SizedBox(height: 18),
@@ -733,6 +742,7 @@ class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
+
   @override
   State<StaffJoinPage> createState() => _StaffJoinPageState();
 }

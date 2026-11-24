@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
-import '../../app/strings_s4.dart';
+import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../manager/booking_common.dart';
@@ -13,7 +13,6 @@ class ShopsTab extends StatefulWidget {
   const ShopsTab({super.key, required this.api, required this.onBooked});
   final CustomerApi api;
   final VoidCallback onBooked;
-
   @override
   State<ShopsTab> createState() => _ShopsTabState();
 }
@@ -87,7 +86,7 @@ class _ShopsTabState extends State<ShopsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final t = T4(SettingsScope.of(context).lang);
+    final t = T6(SettingsScope.of(context).lang);
     final children = <Widget>[
       GlassField(
         controller: _q,
@@ -147,7 +146,6 @@ class _ShopsTabState extends State<ShopsTab> {
       }
     }
     children.add(const SizedBox(height: 30));
-
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -158,12 +156,13 @@ class _ShopsTabState extends State<ShopsTab> {
     );
   }
 
-  Widget _card(Map<String, dynamic> s, T4 t) {
+  Widget _card(Map<String, dynamic> s, T6 t) {
     final avg = cDouble(s['rating_avg']);
     final count = bInt(s['rating_count']);
+    final sep = t.lang == 'en' ? ', ' : '، ';
     final place = [bStr(s['city']), bStr(s['address'])]
         .where((e) => e.isNotEmpty)
-        .join('، ');
+        .join(sep);
     return Glass(
       onTap: () => _open(s),
       child: Row(
@@ -193,10 +192,10 @@ class _ShopsTabState extends State<ShopsTab> {
                       const Icon(Icons.star_rounded,
                           size: 18, color: AppColors.amber),
                       const SizedBox(width: 3),
-                      Text(avg.toStringAsFixed(1),
+                      Text(localDigits(avg.toStringAsFixed(1), t.lang),
                           style: const TextStyle(fontWeight: FontWeight.w800)),
                       const SizedBox(width: 6),
-                      Text(t.t('cu_reviews', {'n': fmtNum(count)}),
+                      Text(t.t('cu_reviews', {'n': fmtNum(count, t.lang)}),
                           style: TextStyle(
                               color: muted(context), fontSize: 12)),
                     ],

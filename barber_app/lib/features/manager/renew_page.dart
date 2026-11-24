@@ -1,16 +1,21 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
-
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/widgets.dart';
+import 'plan_move.dart';
 import 'shop_api.dart';
+
+const Map<String, String> _changePlanLabel = {
+  'fa': 'تغییر پلن',
+  'en': 'Change plan',
+  'ar': 'تغيير الخطة',
+};
 
 /// با موفقیت که تمام شد `true` برمی‌گرداند.
 class RenewPage extends StatefulWidget {
   const RenewPage({super.key, required this.api});
   final ShopApi api;
-
   @override
   State<RenewPage> createState() => _RenewPageState();
 }
@@ -44,9 +49,17 @@ class _RenewPageState extends State<RenewPage> {
     }
   }
 
+  void _openMove() {
+    final st = SettingsScope.read(context);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => PlanMovePage(settings: st)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final s = S(SettingsScope.of(context).lang);
+    final lang = SettingsScope.of(context).lang;
+    final s = S(lang);
     return GlassScaffold(
       title: s.t('renew_title'),
       body: ListView(
@@ -74,6 +87,13 @@ class _RenewPageState extends State<RenewPage> {
                   icon: Icons.autorenew_rounded,
                   loading: _loading,
                   onPressed: _renew,
+                ),
+                const SizedBox(height: 12),
+                GradientButton(
+                  label: _changePlanLabel[lang] ?? _changePlanLabel['fa']!,
+                  icon: Icons.swap_horiz_rounded,
+                  outlined: true,
+                  onPressed: _loading ? null : _openMove,
                 ),
               ],
             ),

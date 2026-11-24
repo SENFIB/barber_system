@@ -255,11 +255,13 @@ IconData _planIcon(String key) {
 String _planPrice(String lang, PlanDef p) {
   final toman = _x(lang, 'تومان', 'Toman', 'تومان');
   if (p.key == 'personal' || p.oneTime > 0) {
-    return '${_x(lang, 'خرید یک‌باره', 'One-time purchase', 'شراء لمرة واحدة')}: '
-        '${fmtNum(p.oneTime, lang)} $toman';
+    final once =
+        _x(lang, 'خرید یک‌باره', 'One-time purchase', 'شراء لمرة واحدة');
+    return '$once: ${fmtNum(p.oneTime, lang)} $toman';
   }
   if (p.monthly <= 0) return _x(lang, 'رایگان', 'Free', 'مجاني');
-  return '${fmtNum(p.monthly, lang)} $toman ${_x(lang, '/ ماه', '/ month', '/ شهر')}';
+  final perMonth = _x(lang, '/ ماه', '/ month', '/ شهر');
+  return '${fmtNum(p.monthly, lang)} $toman $perMonth';
 }
 
 List<String> _planFeatures(String lang, PlanDef p) {
@@ -268,13 +270,11 @@ List<String> _planFeatures(String lang, PlanDef p) {
   final photo = _x(lang, 'عکس آرایشگاه', 'Shop photo', 'صورة الصالون');
   final winback = _x(lang, 'پیام «دلمون تنگ شده» برای مشتریان',
       '"We miss you" messages to customers', 'رسائل «اشتقنا لك» للعملاء');
+  final n = fmtNum(p.maxBarbers, lang);
   final barbers = p.maxBarbers > 0
-      ? _x(
-          lang,
-          'تا ${fmtNum(p.maxBarbers, lang)} آرایشگر',
-          'Up to ${fmtNum(p.maxBarbers, lang)} barbers',
-          'حتى ${fmtNum(p.maxBarbers, lang)} حلاق')
-      : _x(lang, 'آرایشگر نامحدود', 'Unlimited barbers', 'عدد غير محدود من الحلاقين');
+      ? _x(lang, 'تا $n آرایشگر', 'Up to $n barbers', 'حتى $n حلاق')
+      : _x(lang, 'آرایشگر نامحدود', 'Unlimited barbers',
+          'عدد غير محدود من الحلاقين');
   switch (p.key) {
     case 'basic':
       return [
@@ -297,8 +297,8 @@ List<String> _planFeatures(String lang, PlanDef p) {
         booking,
         photo,
         winback,
-        _x(lang, 'شیت اختصاصی و پشتیبان‌گیری',
-            'Dedicated sheet and backup', 'جدول خاص ونسخ احتياطي'),
+        _x(lang, 'شیت اختصاصی و پشتیبان‌گیری', 'Dedicated sheet and backup',
+            'جدول خاص ونسخ احتياطي'),
       ];
     default:
       return [
@@ -496,8 +496,8 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         ownerName: _ownerName.text,
         ownerIsBarber: _barber,
         plan: widget.plan.key,
-        shifts: _shifts,
-        daysOff: _daysOff,
+        shifts: _barber ? shiftsToString(_shifts) : '',
+        daysOff: _barber ? _daysOff : null,
       );
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
@@ -631,7 +631,8 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_x(lang, 'ساعت کاری شما', 'Your working hours',
+                  Text(
+                      _x(lang, 'ساعت کاری شما', 'Your working hours',
                           'ساعات عملك'),
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w800)),

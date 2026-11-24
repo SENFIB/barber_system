@@ -1,6 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../../app/fmt.dart';
+import '../../app/registry.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
@@ -11,8 +14,10 @@ import 'customer_shop_page.dart';
 
 class ShopsTab extends StatefulWidget {
   const ShopsTab({super.key, required this.api, required this.onBooked});
+
   final CustomerApi api;
   final VoidCallback onBooked;
+
   @override
   State<ShopsTab> createState() => _ShopsTabState();
 }
@@ -76,12 +81,20 @@ class _ShopsTabState extends State<ShopsTab> {
   }
 
   Future<void> _open(Map<String, dynamic> shop) async {
+    // آرایشگاه‌های سرورهای دیگر با سرور خودشان کار می‌کنند
+    final server = bStr(shop['_server']);
+    final api = server.isEmpty
+        ? widget.api
+        : CustomerApi(widget.api.st, baseUrl: server);
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => ShopPage(api: widget.api, card: shop),
+        builder: (_) => ShopPage(api: api, card: shop),
       ),
     );
-    if (ok == true && mounted) widget.onBooked();
+    if (ok == true && mounted) {
+      if (server.isNotEmpty) await ServerRegistry.remember(server);
+      if (mounted) widget.onBooked();
+    }
   }
 
   @override
@@ -95,6 +108,7 @@ class _ShopsTabState extends State<ShopsTab> {
       ),
       const SizedBox(height: 14),
     ];
+
     if (_loading && _shops.isEmpty) {
       children.add(const Padding(
         padding: EdgeInsets.only(top: 50),
@@ -146,6 +160,7 @@ class _ShopsTabState extends State<ShopsTab> {
       }
     }
     children.add(const SizedBox(height: 30));
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(

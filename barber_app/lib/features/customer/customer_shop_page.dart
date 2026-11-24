@@ -1,14 +1,20 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../app/cal_conv.dart';
 import '../../app/fmt.dart';
+import '../../app/reminders.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
+import '../legal/privacy_gate.dart';
 import '../manager/booking_common.dart';
 import 'customer_api.dart';
 import 'customer_store.dart';
+
+String _x(String l, String fa, String en, String ar) =>
+    l == 'fa' ? fa : (l == 'ar' ? ar : en);
 
 class ShopPhoto extends StatelessWidget {
   const ShopPhoto({
@@ -52,6 +58,7 @@ class ShopPage extends StatefulWidget {
   const ShopPage({super.key, required this.api, required this.card});
   final CustomerApi api;
   final Map<String, dynamic> card;
+
   @override
   State<ShopPage> createState() => _ShopPageState();
 }
@@ -64,6 +71,7 @@ class _ShopPageState extends State<ShopPage> {
   late Map<String, dynamic> _shop;
   List<Map<String, dynamic>> _services = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _staff = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _winback = <Map<String, dynamic>>[];
   int _maxServices = 3;
   int _maxAdvance = 30;
   final List<String> _picked = <String>[];
@@ -73,6 +81,7 @@ class _ShopPageState extends State<ShopPage> {
   int _slotIdx = -1;
   final _name = TextEditingController();
   final _phone = TextEditingController();
+  AppSettings? _stRef;
 
   String get _shopId => bStr(widget.card['shop_id']);
   T6 _tr() => T6(SettingsScope.read(context).lang);
@@ -92,7 +101,18 @@ class _ShopPageState extends State<ShopPage> {
   void dispose() {
     _name.dispose();
     _phone.dispose();
+    // تقویمِ این آرایشگاه فقط تا وقتی در این صفحه‌ایم اعمال می‌شود
+    final s = _stRef;
+    if (s != null) kCalKind = CalConv.kindOf(s.calendarKey, s.lang);
     super.dispose();
+  }
+
+  /// اگر کاربر تقویم دلخواه نزده باشد، تاریخ‌ها با تقویم همین آرایشگاه نمایش داده می‌شوند
+  void _applyShopCal(AppSettings st) {
+    _stRef = st;
+    if (st.calendarKey != 'auto') return;
+    final c = bStr(_shop['calendar']);
+    if (c.isNotEmpty) kCalKind = CalConv.kindOf(c, st.lang);
   }
 
   Future<void> _load() async {
@@ -111,6 +131,7 @@ class _ShopPageState extends State<ShopPage> {
         }
         _services = bRows(r['services']);
         _staff = bRows(r['staff']);
+        _winback = bRows(r['winback']);
         final ms = bInt(r['max_services'], 3);
         _maxServices = ms < 1 ? 1 : ms;
         final ma = bInt(r['max_advance_days'], 30);
@@ -212,6 +233,40 @@ class _ShopPageState extends State<ShopPage> {
     }
   }
 
+  /// یادآوری‌های محلی (۲ ساعت و ۱۰ دقیقه قبل) + پیام «دلمون تنگ شده»
+  Future<void> _remind(Map<String, dynamic> slot, Map<String, String> choice,
+      String lang) async {
+    try {
+      final date = bIso(_day);
+      final start = bStr(slot['start']);
+      final name = bStr(_shop['name']);
+      final tz = bStr(_shop['timezone']);
+      await Reminders.ask();
+      await Reminders.booking(
+          id: '$name|$date|$start',
+          shop: name,
+          date: date,
+          time: start,
+          tz: tz,
+          lang: lang);
+      final used = choice.values.where((e) => e.isNotEmpty).toSet();
+      for (final w in _winback) {
+        final ids = bIds(w['staff_ids']);
+        if (ids.isNotEmpty && !ids.any(used.contains)) continue;
+        final days = bInt(w['days_after']);
+        final msg = bStr(w['message']).trim();
+        if (days < 1 || msg.isEmpty) continue;
+        await Reminders.winback(
+            key: 'wb|$_shopId|${bStr(w['rule_id'])}',
+            date: date,
+            tz: tz,
+            days: days,
+            title: name,
+            body: msg);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _book() async {
     final t = _tr();
     if (_picked.isEmpty) {
@@ -250,6 +305,7 @@ class _ShopPageState extends State<ShopPage> {
         staffChoice: choice,
       );
       await CustomerStore.save(name, phone);
+      await _remind(slot, choice, t.lang);
       if (!mounted) return;
       bSnack(context, t.t('cu_booked_ok'));
       Navigator.of(context).pop(true);
@@ -272,6 +328,18 @@ class _ShopPageState extends State<ShopPage> {
     return t.t('cu_policy', {'t': txt});
   }
 
+  void _openRules(String lang) {
+    openShopRules(context, lang, bStr(_shop['name']), bStr(_shop['rules']));
+  }
+
+  /// برچسب روز: «نام روز + روز/ماه» در تقویم انتخاب‌شده
+  String _dayLabel(DateTime d, T6 t) {
+    final n = CalConv.numeric(bIso(d), kCalKind, t.lang);
+    final p = n.split('/');
+    final dm = p.length == 3 ? '${p[1]}/${p[2]}' : n;
+    return '${t.t('d_${d.weekday % 7}')} $dm';
+  }
+
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(top: 18, bottom: 8),
         child: Text(text,
@@ -280,7 +348,9 @@ class _ShopPageState extends State<ShopPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = T6(SettingsScope.of(context).lang);
+    final st0 = SettingsScope.of(context);
+    _applyShopCal(st0);
+    final t = T6(st0.lang);
     Widget body;
     if (_loading) {
       body = const Center(child: CircularProgressIndicator());
@@ -325,6 +395,7 @@ class _ShopPageState extends State<ShopPage> {
         .where((e) => e.isNotEmpty)
         .join(sep);
     final desc = bStr(_shop['description']);
+    final hasRules = bStr(_shop['rules']).trim().isNotEmpty;
     return Glass(
       padding: EdgeInsets.zero,
       child: Column(
@@ -407,6 +478,31 @@ class _ShopPageState extends State<ShopPage> {
                 const SizedBox(height: 10),
                 Text(_policy(t),
                     style: TextStyle(color: muted(context), fontSize: 12)),
+                if (hasRules) ...[
+                  const SizedBox(height: 8),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _openRules(t.lang),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.rule_rounded,
+                              size: 18, color: lk(context).primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            _x(t.lang, 'قوانین این آرایشگاه',
+                                'This shop’s rules', 'قوانين هذا الصالون'),
+                            style: TextStyle(
+                                color: lk(context).primary,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -430,6 +526,7 @@ class _ShopPageState extends State<ShopPage> {
       for (var i = 0; i <= _maxAdvance; i++)
         DateTime(now.year, now.month, now.day + i),
     ];
+    final hasRules = bStr(_shop['rules']).trim().isNotEmpty;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
       children: [
@@ -494,8 +591,7 @@ class _ShopPageState extends State<ShopPage> {
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 8),
                   child: ChoiceChip(
-                    label: Text(
-                        '${t.t('d_${d.weekday % 7}')} ${fmtNum(d.day, t.lang)}'),
+                    label: Text(_dayLabel(d, t)),
                     selected: bIso(d) == bIso(_day),
                     onSelected: (_) => _setDay(d),
                   ),
@@ -586,6 +682,26 @@ class _ShopPageState extends State<ShopPage> {
         const SizedBox(height: 6),
         Text(t.t('cu_saved_note'),
             style: TextStyle(color: muted(context), fontSize: 12)),
+        if (hasRules) ...[
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: () => _openRules(t.lang),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                _x(
+                    t.lang,
+                    'با ثبت نوبت، قوانین این آرایشگاه را می‌پذیرید. (مشاهده‌ی قوانین)',
+                    'By booking you accept this shop’s rules. (View rules)',
+                    'بالحجز توافق على قوانين هذا الصالون. (عرض القوانين)'),
+                style: TextStyle(
+                    color: lk(context).primary,
+                    fontSize: 12.5,
+                    decoration: TextDecoration.underline),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         GradientButton(
           loading: _busy,

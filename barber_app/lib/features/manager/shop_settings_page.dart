@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-
 import '../../app/settings.dart';
 import '../../app/strings_s2.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
+import 'plans_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
 
 /// تنظیمات آرایشگاه (فقط مدیر)
 class ShopSettingsPage extends StatefulWidget {
   const ShopSettingsPage(this.ctx, {super.key});
-
   final ShopCtx ctx;
 
   @override
@@ -31,12 +30,23 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
   final _ot = TextEditingController();
   final _cancel = TextEditingController();
   String _cal = 'jalali';
-
+  String _plan = '';
   bool _loading = true;
   bool _busy = false;
   String? _err;
 
   String get _lang => SettingsScope.read(context).lang;
+
+  /// عکس آرایشگاه فقط برای پلن ویژه و شخصی
+  bool get _photoOk => _plan == 'special' || _plan == 'personal';
+
+  /// متن‌های کوچکِ همین صفحه (فارسی / انگلیسی / عربی)
+  String _px(String fa, String en, String ar) {
+    final code = '${SettingsScope.read(context).lang}'.toLowerCase();
+    if (code.endsWith('en')) return en;
+    if (code.endsWith('ar')) return ar;
+    return fa;
+  }
 
   @override
   void initState() {
@@ -88,6 +98,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         _buffer.text = jStr(sh['buffer_min']);
         _ot.text = jStr(sh['overtime_min']);
         _cancel.text = jStr(sh['cancel_before_min']);
+        _plan = jStr(sh['plan']).trim().toLowerCase();
         final c = jStr(sh['calendar']);
         _cal = const ['jalali', 'gregorian', 'hijri'].contains(c) ? c : 'jalali';
         _loading = false;
@@ -115,7 +126,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
     final buffer = _num(_buffer);
     final ot = _num(_ot);
     final cancel = _num(_cancel);
-
     if (step == null || step < 5 || step > 120 || step % 5 != 0) {
       toast(context, x.t('ss_bad_step'));
       return;
@@ -126,16 +136,14 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       toast(context, x.t('ed_bad_number'));
       return;
     }
-
     setState(() => _busy = true);
     try {
-      await ShopRaw(SettingsScope.read(context)).call('shop_update', {
+      final params = <String, dynamic>{
         'name': _name.text.trim(),
         'phone': normalizeDigits(_phone.text).trim(),
         'city': _city.text.trim(),
         'address': _address.text.trim(),
         'description': _desc.text.trim(),
-        'photo_url': _photo.text.trim(),
         'currency': _currency.text.trim(),
         'timezone': _tz.text.trim(),
         'calendar': _cal,
@@ -143,7 +151,10 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         'buffer_min': buffer,
         'overtime_min': ot,
         'cancel_before_min': cancel,
-      });
+      };
+      // عکس فقط برای پلن ویژه/شخصی فرستاده می‌شود
+      if (_photoOk) params['photo_url'] = _photo.text.trim();
+      await ShopRaw(SettingsScope.read(context)).call('shop_update', params);
       if (!mounted) return;
       toast(context, x.t('ss_saved'));
       widget.ctx.reload();
@@ -178,6 +189,67 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               selected: c.text.trim() == '$v',
               onSelected: (_) => setState(() => c.text = '$v'),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// بخش عکس: برای ویژه/شخصی فیلد لینک؛ برای بقیه کادر قفل با دکمه‌ی پلن‌ها
+  Widget _photoBlock(T2 x) {
+    if (_photoOk) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GlassField(
+              controller: _photo,
+              label: x.t('ss_photo'),
+              icon: Icons.image_rounded,
+              keyboard: TextInputType.url,
+              ltr: true),
+          _hint(_px(
+            'لینک مستقیم یک عکس از آرایشگاه (فقط یک عکس). مشتری‌ها این عکس را در صفحه‌ی آرایشگاه می‌بینند.',
+            'Direct link to one photo of your shop. Customers see it on your shop page.',
+            'رابط مباشر لصورة واحدة لصالونك. يراها الزبائن في صفحة الصالون.',
+          )),
+        ],
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: lk(context).primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: lk(context).primary.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lock_rounded, color: lk(context).primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _px(
+                    'عکس آرایشگاه فقط برای پلن ویژه و شخصی است',
+                    'Shop photo is only for the Special and Personal plans',
+                    'صورة الصالون متاحة فقط لخطتي المميزة والشخصية',
+                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GradientButton(
+            outlined: true,
+            compact: true,
+            icon: Icons.workspace_premium_rounded,
+            label: _px('مشاهده‌ی پلن‌ها', 'View plans', 'عرض الخطط'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => PlansPage(widget.ctx)),
+            ),
+          ),
         ],
       ),
     );
@@ -247,12 +319,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
                     label: x.t('ss_description'),
                     icon: Icons.notes_rounded),
                 _gap(),
-                GlassField(
-                    controller: _photo,
-                    label: x.t('ss_photo'),
-                    icon: Icons.image_rounded,
-                    keyboard: TextInputType.url,
-                    ltr: true),
+                _photoBlock(x),
                 _gap(),
                 GlassField(
                     controller: _currency,
@@ -261,7 +328,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               ],
             ),
           ),
-
           SectionLabel(x.t('ss_booking')),
           Glass(
             child: Column(
@@ -305,7 +371,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               ],
             ),
           ),
-
           SectionLabel(x.t('ss_calendar')),
           Glass(
             child: SegmentPicker<String>(
@@ -318,7 +383,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               onChanged: (v) => setState(() => _cal = v),
             ),
           ),
-
           SectionLabel(x.t('ss_timezone')),
           Glass(
             child: Column(
@@ -355,7 +419,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               ],
             ),
           ),
-
           const SizedBox(height: 24),
           GradientButton(
             label: x.t('save'),
@@ -366,7 +429,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         ],
       );
     }
-
     return GlassScaffold(title: x.t('ss_title'), body: body);
   }
 }

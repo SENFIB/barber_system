@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
+
 import 'brand.dart';
 import 'look.dart';
 
@@ -17,10 +19,9 @@ LookExt lk(BuildContext c) =>
 Color muted(BuildContext c) =>
     Theme.of(c).colorScheme.onSurface.withOpacity(0.62);
 
-IconData chevron(BuildContext c) =>
-    Directionality.of(c) == TextDirection.rtl
-        ? Icons.chevron_left_rounded
-        : Icons.chevron_right_rounded;
+/// فلشِ «برو جلو». آیکنِ chevron خودش با جهتِ متن می‌چرخد
+/// (چپ‌چین: به راست، راست‌چین: به چپ)، پس اینجا دستی نباید چرخاند.
+IconData chevron(BuildContext c) => Icons.chevron_right_rounded;
 
 void toast(BuildContext c, String m) {
   final ms = ScaffoldMessenger.of(c);
@@ -438,14 +439,13 @@ class Glass extends StatelessWidget {
     final l = lk(context);
     final wantBlur = l.glassBlur > 0.5;
     final useBlur = wantBlur && !kMobileGpu;
-
     var fill = tint ?? l.cardFill;
     if (wantBlur && kMobileGpu) {
       // جبران نبودن بلور: کارت کمی پررنگ‌تر
       fill = fill.withOpacity((fill.opacity * 1.35 + 0.04).clamp(0.0, 1.0));
     }
-
     final br = BorderRadius.circular(radius ?? l.radius);
+
     final inner = Container(
       decoration: BoxDecoration(
         color: fill,

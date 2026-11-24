@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/fmt.dart';
 import '../../app/settings.dart';
-import '../../app/strings_s2.dart';
+import '../../app/strings_s6.dart';
 import '../../app/widgets.dart';
+import 'shifts_editor.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
 import 'shop_settings_page.dart';
@@ -12,7 +14,6 @@ import 'staff_edit_page.dart';
 /// آرایشگرها: مدیر همه را می‌بیند؛ آرایشگر فقط خودش را
 class StaffPage extends StatefulWidget {
   const StaffPage(this.ctx, {super.key});
-
   final ShopCtx ctx;
 
   @override
@@ -71,7 +72,7 @@ class _StaffPageState extends State<StaffPage> {
       if (_lost(e)) return;
       setState(() {
         _loading = false;
-        _err = T2(_lang).error(e);
+        _err = T6(_lang).error(e);
       });
     }
   }
@@ -89,7 +90,7 @@ class _StaffPageState extends State<StaffPage> {
     } catch (e) {
       if (!mounted) return false;
       if (_lost(e)) return false;
-      toast(context, T2(_lang).error(e));
+      toast(context, T6(_lang).error(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -106,7 +107,7 @@ class _StaffPageState extends State<StaffPage> {
   }
 
   Future<void> _add() async {
-    final x = T2(_lang);
+    final x = T6(_lang);
     final c = TextEditingController();
     final name = await showDialog<String>(
       context: context,
@@ -142,6 +143,8 @@ class _StaffPageState extends State<StaffPage> {
 
     var newId = '';
     final ok = await _act(() async {
+      // ساعتِ موقت برای سرورهای قدیمی؛ سرور جدید آرایشگر را «تنظیم‌نشده»
+      // ثبت می‌کند و تا خودش ساعت را ذخیره نکند مشتری وقت نمی‌بیند.
       final r = await _raw.call('staff_add', {
         'name': name,
         'work_start': '09:00',
@@ -149,7 +152,6 @@ class _StaffPageState extends State<StaffPage> {
       });
       newId = jStr(r['staff_id']);
     }, x.t('staff_added'));
-
     if (ok && newId.isNotEmpty && mounted) {
       final rows = _staff.where((r) => jStr(r['staff_id']) == newId).toList();
       if (rows.isNotEmpty) await _edit(rows.first);
@@ -157,7 +159,7 @@ class _StaffPageState extends State<StaffPage> {
   }
 
   Future<void> _remove(Map<String, dynamic> r) async {
-    final x = T2(_lang);
+    final x = T6(_lang);
     final yes = await confirmDialog(
       context,
       title: x.t('remove'),
@@ -173,7 +175,7 @@ class _StaffPageState extends State<StaffPage> {
   }
 
   Future<void> _ownerBarber(bool v) async {
-    final x = T2(_lang);
+    final x = T6(_lang);
     if (!v) {
       final yes = await confirmDialog(
         context,
@@ -200,14 +202,14 @@ class _StaffPageState extends State<StaffPage> {
   }
 
   Future<void> _inviteCreate(Map<String, dynamic> r) async {
-    final x = T2(_lang);
+    final x = T6(_lang);
     await _act(() async {
       await _raw.call('invite_create', {'staff_id': jStr(r['staff_id'])});
     }, x.t('invite_created'));
   }
 
   Future<void> _inviteRevoke(Map<String, dynamic> r, String code) async {
-    final x = T2(_lang);
+    final x = T6(_lang);
     await _act(() async {
       await _raw.call('invite_revoke', {
         'staff_id': jStr(r['staff_id']),
@@ -222,21 +224,48 @@ class _StaffPageState extends State<StaffPage> {
     );
   }
 
-  Widget _info(IconData icon, String text) {
+  Widget _info(IconData icon, String text, {Color? color}) {
+    final c = color ?? muted(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: muted(context)),
+        Icon(icon, size: 16, color: c),
         const SizedBox(width: 6),
         Flexible(
-          child: Text(text,
-              style: TextStyle(color: muted(context), fontSize: 12.5)),
+          child: Text(text, style: TextStyle(color: c, fontSize: 12.5)),
         ),
       ],
     );
   }
 
-  Widget _inviteBox(Map<String, dynamic> r, Map<String, dynamic>? inv, T2 x) {
+  /// هشدار بالای صفحه: آرایشگری که ساعتش را تنظیم نکرده
+  Widget _unsetBanner(T6 x) {
+    final unset = _staff.where(scheduleUnset).toList();
+    if (unset.isEmpty) return const SizedBox.shrink();
+    final msg = _owner
+        ? x.t('sh_unset_owner', {'n': unset.length})
+        : x.t('sh_unset_mine');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Glass(
+        tint: Colors.orange.withOpacity(0.18),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: Colors.orange, size: 26),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(msg,
+                  style: const TextStyle(fontSize: 13.5, height: 1.6)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _inviteBox(Map<String, dynamic> r, Map<String, dynamic>? inv, T6 x) {
     if (inv == null) {
       return Padding(
         padding: const EdgeInsets.only(top: 12),
@@ -293,8 +322,7 @@ class _StaffPageState extends State<StaffPage> {
               ],
             ),
             if (date.isNotEmpty)
-              Text('${x.t('invite_expires')}: $date',
-                  textDirection: TextDirection.ltr,
+              Text(localDigits('${x.t('invite_expires')}: $date', _lang),
                   style: TextStyle(color: muted(context), fontSize: 12.5)),
             const SizedBox(height: 4),
             Text(x.t('invite_hint'),
@@ -306,7 +334,7 @@ class _StaffPageState extends State<StaffPage> {
     );
   }
 
-  Widget _card(Map<String, dynamic> r, T2 x, String lang) {
+  Widget _card(Map<String, dynamic> r, T6 x, String lang) {
     final id = jStr(r['staff_id']);
     final mine = id == _myId;
     final name = jStr(r['name']);
@@ -314,10 +342,11 @@ class _StaffPageState extends State<StaffPage> {
     final hasLogin = jBool(r['has_login']);
     final ot = jInt(r['overtime_min']);
     final cnt = jInt(r['rating_count']) ?? 0;
-    final avg = r['rating_avg'] is num ? (r['rating_avg'] as num).toDouble() : 0.0;
+    final avg =
+        r['rating_avg'] is num ? (r['rating_avg'] as num).toDouble() : 0.0;
     final svcN =
         r['service_id_list'] is List ? (r['service_id_list'] as List).length : 0;
-
+    final unset = scheduleUnset(r);
     final off = <int>[];
     if (r['days_off_list'] is List) {
       for (final v in (r['days_off_list'] as List)) {
@@ -327,7 +356,6 @@ class _StaffPageState extends State<StaffPage> {
     }
     final sep = lang == 'en' ? ', ' : '، ';
     final offText = off.map((d) => x.t('d_$d')).join(sep);
-
     final inv = r['invite'] is Map
         ? Map<String, dynamic>.from(r['invite'] as Map)
         : null;
@@ -383,8 +411,12 @@ class _StaffPageState extends State<StaffPage> {
               spacing: 16,
               runSpacing: 6,
               children: [
-                _info(Icons.schedule_rounded,
-                    '${jStr(r['work_start'])} – ${jStr(r['work_end'])}'),
+                if (unset)
+                  _info(Icons.warning_amber_rounded, x.t('sh_not_set'),
+                      color: Colors.orange)
+                else
+                  _info(Icons.schedule_rounded,
+                      shiftsText(shiftsOfStaff(r), lang)),
                 if (ot != null && ot > 0)
                   _info(Icons.more_time_rounded,
                       x.t('sp_overtime', {'n': ot})),
@@ -398,7 +430,7 @@ class _StaffPageState extends State<StaffPage> {
                       x.t('sp_days_off', {'d': offText})),
                 if (cnt > 0)
                   _info(Icons.star_rounded,
-                      '${avg.toStringAsFixed(1)} ($cnt)'),
+                      localDigits('${avg.toStringAsFixed(1)} ($cnt)', lang)),
               ],
             ),
             if (_owner && !mine && !hasLogin) _inviteBox(r, inv, x),
@@ -429,7 +461,7 @@ class _StaffPageState extends State<StaffPage> {
     );
   }
 
-  Widget _body(T2 x, String lang) {
+  Widget _body(T6 x, String lang) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_err != null) {
       return Center(
@@ -452,13 +484,13 @@ class _StaffPageState extends State<StaffPage> {
         ),
       );
     }
-
     return RefreshIndicator(
       onRefresh: () => _load(silent: true),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
         children: [
+          _unsetBanner(x),
           if (_owner) ...[
             if (_max > 0)
               Glass(
@@ -528,7 +560,7 @@ class _StaffPageState extends State<StaffPage> {
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
-    final x = T2(st.lang);
+    final x = T6(st.lang);
     return GlassScaffold(
       title: x.t(_owner || _loading ? 'staff_title' : 'staff_mine'),
       actions: [

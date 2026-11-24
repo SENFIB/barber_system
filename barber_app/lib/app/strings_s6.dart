@@ -21,11 +21,50 @@ const Map<String, List<List<String>>> _termFix = {
   ],
 };
 
-/// آخرین مرحله‌ی هر متن: درست‌کردن واژه‌ی «باربر» و رقم‌ها به زبان برنامه
+/// «گوشی» → «دستگاه» (برنامه روی ویندوز هم اجرا می‌شود).
+/// «شماره تلفن» و مشابهش دست نمی‌خورد (اول محافظت می‌شود).
+const Map<String, List<List<String>>> _deviceFix = {
+  'fa': [
+    ['شماره‌ی گوشی', 'شماره‌ی تلفن'],
+    ['شماره گوشی', 'شماره تلفن'],
+    ['شماره‌ی موبایل', 'شماره‌ی تلفن'],
+    ['شماره موبایل', 'شماره تلفن'],
+    ['گوشی‌ها', 'دستگاه‌ها'],
+    ['گوشی', 'دستگاه'],
+    ['موبایل', 'دستگاه'],
+  ],
+  'en': [
+    ['mobile number', 'phone number'],
+    ['Your phone', 'Your device'],
+    ['your phone', 'your device'],
+    ['This phone', 'This device'],
+    ['this phone', 'this device'],
+    ['Phone time', 'Device time'],
+    ['phone time', 'device time'],
+    ['Phone storage', 'Device storage'],
+    ['phone storage', 'device storage'],
+    ['on the phone', 'on the device'],
+    ['on your mobile', 'on your device'],
+  ],
+  'ar': [
+    ['رقم الجوال', 'رقم الهاتف'],
+    ['وقت الهاتف', 'وقت الجهاز'],
+    ['ذاكرة الهاتف', 'ذاكرة الجهاز'],
+    ['هذا الهاتف', 'هذا الجهاز'],
+    ['جوالك', 'جهازك'],
+    ['الجوال', 'الجهاز'],
+  ],
+};
+
+/// آخرین مرحله‌ی هر متن: درست‌کردن واژه‌ها («باربر»، «گوشی») و رقم‌ها به زبان برنامه
 String uiText(String s, String lang) {
   var r = s;
   final fixes = _termFix[lang] ?? _termFix['en']!;
   for (final f in fixes) {
+    r = r.replaceAll(f[0], f[1]);
+  }
+  final dev = _deviceFix[lang] ?? _deviceFix['en']!;
+  for (final f in dev) {
     r = r.replaceAll(f[0], f[1]);
   }
   return localDigits(r, lang);
@@ -40,7 +79,10 @@ class T6 {
 
   String t(String key, [Map<String, Object?>? args]) {
     final own = _m[lang]?[key] ?? _m['en']?[key];
-    if (own == null) return uiText(_base.t(key, args?.map((k, v) => MapEntry(k, '$v'))), lang);
+    if (own == null) {
+      return uiText(
+          _base.t(key, args?.map((k, v) => MapEntry(k, '$v'))), lang);
+    }
     var r = own;
     if (args != null) {
       args.forEach((k, v) => r = r.replaceAll('{$k}', '$v'));
@@ -64,7 +106,8 @@ final Map<String, Map<String, String>> _m = {
   'fa': {
     'sh_title': 'ساعت‌های کار',
     'sh_hint':
-        'هر آرایشگر تا ۳ شیفت در روز می‌تواند داشته باشد؛ مثلاً صبح ۹ تا ۱۳ و عصر ۱۶ تا ۲۲. بین شیفت‌ها مشتری نوبت نمی‌گیرد.',
+        'هر آرایشگر در پلن شما تا {n} شیفت در روز می‌تواند داشته باشد؛ مثلاً صبح ۹ تا ۱۳ و عصر ۱۶ تا ۲۲. بین شیفت‌ها مشتری نوبت نمی‌گیرد.',
+    'sh_limit': 'به سقف شیفتِ پلنتان رسیده‌اید ({n} شیفت).',
     'sh_n': 'شیفت {n}',
     'sh_from': 'شروع',
     'sh_to': 'پایان',
@@ -86,11 +129,14 @@ final Map<String, Map<String, String>> _m = {
         'این کد برای اشتراک دیگری است. اشتراک و کد باید یکی باشند.',
     'err_BAD_SHIFTS':
         'ساعت‌های کار درست نیست. شیفت‌ها باید به ترتیب باشند و روی هم نیفتند.',
+    'err_SHIFT_LIMIT':
+        'تعداد شیفت‌ها از سقف پلن شما بیشتر است. شیفت‌ها را کمتر کنید یا پلن را ارتقا دهید.',
   },
   'en': {
     'sh_title': 'Working hours',
     'sh_hint':
-        'Each barber can have up to 3 shifts a day, for example 9–13 and 16–22. Customers cannot book between shifts.',
+        'On your plan each barber can have up to {n} shifts a day, for example 9–13 and 16–22. Customers cannot book between shifts.',
+    'sh_limit': 'You have reached your plan\'s shift limit ({n} shifts).',
     'sh_n': 'Shift {n}',
     'sh_from': 'Start',
     'sh_to': 'End',
@@ -112,11 +158,14 @@ final Map<String, Map<String, String>> _m = {
         'This code belongs to a different plan. The chosen plan and the code must match.',
     'err_BAD_SHIFTS':
         'Working hours are not valid. Shifts must be in order and must not overlap.',
+    'err_SHIFT_LIMIT':
+        'The number of shifts is above your plan\'s limit. Use fewer shifts or upgrade your plan.',
   },
   'ar': {
     'sh_title': 'ساعات العمل',
     'sh_hint':
-        'يمكن لكل حلاق أن يعمل حتى 3 فترات في اليوم، مثلاً 9–13 و16–22. لا يستطيع الزبون الحجز بين الفترات.',
+        'في باقتك يمكن لكل حلاق أن يعمل حتى {n} فترات في اليوم، مثلاً 9–13 و16–22. لا يستطيع الزبون الحجز بين الفترات.',
+    'sh_limit': 'وصلت إلى حد الفترات في باقتك ({n} فترات).',
     'sh_n': 'الفترة {n}',
     'sh_from': 'البداية',
     'sh_to': 'النهاية',
@@ -138,5 +187,7 @@ final Map<String, Map<String, String>> _m = {
         'هذا الرمز لاشتراك آخر. يجب أن يتطابق الاشتراك مع الرمز.',
     'err_BAD_SHIFTS':
         'ساعات العمل غير صحيحة. يجب أن تكون الفترات مرتبة وغير متداخلة.',
+    'err_SHIFT_LIMIT':
+        'عدد الفترات أكبر من الحد المسموح في باقتك. قلّل الفترات أو رقِّ باقتك.',
   },
 };

@@ -1,5 +1,6 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
@@ -7,6 +8,7 @@ import '../../app/strings_s6.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
+import 'server_code.dart';
 import 'shifts_editor.dart';
 import 'shop_api.dart';
 
@@ -19,6 +21,7 @@ String _x(String lang, String fa, String en, String ar) =>
 // ───────────────────────── صفحه‌ی ورود (اول) ─────────────────────────
 class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
+
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -155,6 +158,32 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
                   api: widget.api, onSession: widget.onSession),
             )),
           ),
+          const SizedBox(height: 14),
+          Center(
+            child: TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ServerCodePage())),
+              icon: Icon(
+                  st.hasCustomApiUrl
+                      ? Icons.check_circle_rounded
+                      : Icons.vpn_key_outlined,
+                  size: 18),
+              label: Text(
+                _x(
+                  st.lang,
+                  st.hasCustomApiUrl
+                      ? 'کد سرور اختصاصی (فعال)'
+                      : 'کد سرور اختصاصی',
+                  st.hasCustomApiUrl
+                      ? 'Dedicated server code (active)'
+                      : 'Dedicated server code',
+                  st.hasCustomApiUrl
+                      ? 'رمز الخادم الخاص (مفعّل)'
+                      : 'رمز الخادم الخاص',
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -165,6 +194,7 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
 class SignupChoicePage extends StatelessWidget {
   const SignupChoicePage(
       {super.key, required this.api, required this.onSession});
+
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -231,13 +261,14 @@ class SignupChoicePage extends StatelessWidget {
 String _planName(String lang, String key) {
   switch (key) {
     case 'basic':
-      return _x(lang, 'عادی', 'Basic', 'عادية');
+      return _x(lang, 'پایه', 'Basic', 'أساسية');
     case 'pro':
       return _x(lang, 'پرو', 'Pro', 'برو');
     case 'special':
       return _x(lang, 'ویژه', 'Special', 'مميزة');
     default:
-      return _x(lang, 'خرید برنامه', 'App purchase', 'شراء التطبيق');
+      return _x(lang, 'پلن شخصی (خرید کامل برنامه)',
+          'Personal plan (full app purchase)', 'الخطة الشخصية (شراء التطبيق كاملًا)');
   }
 }
 
@@ -276,9 +307,9 @@ List<String> _planFeatures(String lang, PlanDef p) {
       'وضع صورة صالونك في صفحة الصالونات');
   final winback = _x(
       lang,
-      'پیام «دلمون تنگ شده» با متن خودتان، انتخاب آرایشگر و زمان‌بندی',
-      '"We miss you" messages with your own text, barber choice and timing',
-      'رسائل «اشتقنا لك» بنصّك الخاص مع اختيار الحلاق والتوقيت');
+      'ارسال پیام اختصاصی آرایشگاه در بازه‌های مشخص',
+      'Custom shop messages to customers at set intervals',
+      'إرسال رسالة خاصة بالصالون للزبائن في فترات محددة');
   final n = fmtNum(p.maxBarbers, lang);
   final sh = fmtNum(p.maxShifts, lang);
   final barbers = p.maxBarbers == 1
@@ -292,6 +323,7 @@ List<String> _planFeatures(String lang, PlanDef p) {
       'تا $sh شیفت کاری در روز برای هر آرایشگر',
       'Up to $sh work shifts a day per barber',
       'حتى $sh فترات عمل يوميًا لكل حلاق');
+
   switch (p.key) {
     case 'basic':
       return [
@@ -320,9 +352,9 @@ List<String> _planFeatures(String lang, PlanDef p) {
         _x(lang, 'فضای اختصاصی برای آرایشگاه شما و پشتیبان‌گیری',
             'Dedicated space for your shop, plus backups',
             'مساحة خاصة لصالونك ونسخ احتياطي'),
-        _x(lang, 'فعال‌سازی و راه‌اندازی با کد لایسنس',
-            'Activation and setup with a license code',
-            'التفعيل والإعداد عبر كود الترخيص'),
+        _x(lang, 'راه‌اندازی اختصاصی با کد سرور',
+            'Dedicated setup with a server code',
+            'إعداد خاص عبر رمز الخادم'),
       ];
     default:
       return [
@@ -332,12 +364,16 @@ List<String> _planFeatures(String lang, PlanDef p) {
         winback,
         _x(lang, 'برنامه و سرور مخصوص خودتان', 'The app with your own server',
             'التطبيق مع خادمك الخاص'),
+        _x(lang, 'راه‌اندازی و سرور به عهدهٔ خود آرایشگاه است',
+            'Setup and server are the shop owner\'s responsibility',
+            'الإعداد والخادم على مسؤولية صاحب الصالون'),
       ];
   }
 }
 
 class OwnerPlanPage extends StatelessWidget {
   const OwnerPlanPage({super.key, required this.api, required this.onSession});
+
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -380,6 +416,7 @@ class OwnerPlanPage extends StatelessWidget {
 class _PlanCard extends StatelessWidget {
   const _PlanCard(
       {required this.plan, required this.lang, required this.onTap});
+
   final PlanDef plan;
   final String lang;
   final VoidCallback onTap;
@@ -443,6 +480,7 @@ class OwnerSignupPage extends StatefulWidget {
       required this.api,
       required this.onSession,
       required this.plan});
+
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
@@ -460,6 +498,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   final _city = TextEditingController();
   final _user = TextEditingController();
   final _pass = TextEditingController();
+
   bool _barber = true;
   bool _hide = true;
   bool _loading = false;
@@ -542,11 +581,16 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
 
   @override
   Widget build(BuildContext context) {
-    final lang = SettingsScope.of(context).lang;
+    final st = SettingsScope.of(context);
+    final lang = st.lang;
     final s = T6(lang);
     final order = lang == 'en'
         ? <int>[0, 1, 2, 3, 4, 5, 6]
         : <int>[6, 0, 1, 2, 3, 4, 5];
+    final needsServer = (widget.plan.key == 'special' ||
+            widget.plan.key == 'personal') &&
+        !st.hasCustomApiUrl;
+
     return GlassScaffold(
       title: s.t('signup_owner'),
       body: ListView(
@@ -582,6 +626,34 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               ],
             ),
           ),
+          if (needsServer) ...[
+            const SizedBox(height: 12),
+            Glass(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _x(
+                        lang,
+                        'برای این پلن اول باید «کد سرور اختصاصی» را وارد کنید. بعد از ذخیره، دوباره به همین مرحله برگردید.',
+                        'For this plan, first enter your "dedicated server code". After saving, come back to this step.',
+                        'لهذه الباقة أدخل أولًا «رمز الخادم الخاص». بعد الحفظ ارجع إلى هذه الخطوة.'),
+                    style: TextStyle(color: muted(context), height: 1.5),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const ServerCodePage())),
+                    icon: const Icon(Icons.vpn_key_outlined, size: 18),
+                    label: Text(_x(lang, 'وارد کردن کد سرور',
+                        'Enter server code', 'إدخال رمز الخادم')),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Glass(
             padding: const EdgeInsets.all(18),
@@ -752,6 +824,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
 // ───────────────────────── ورود آرایشگر با کد دعوت ─────────────────────────
 class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
+
   final ShopApi api;
   final SessionCallback onSession;
 

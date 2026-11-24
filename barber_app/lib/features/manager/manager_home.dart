@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/strings_s3.dart';
+import '../../app/strings_s5.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
 import 'bookings_page.dart';
+import 'plans_page.dart';
 import 'renew_page.dart';
 import 'services_page.dart';
 import 'shop_api.dart';
@@ -26,6 +28,7 @@ class ManagerHome extends StatelessWidget {
     final lang = SettingsScope.of(context).lang;
     final s = S(lang);
     final t3 = T3(lang);
+    final t5 = T5(lang);
     final sess = ctx.session;
     final sub = sess.subscription;
     final shop = sess.shop;
@@ -248,6 +251,17 @@ class ManagerHome extends StatelessWidget {
                 ),
                 onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => TimeOffPage(ctx))),
+              ),
+            if (sess.isOwner)
+              tile(
+                icon: Icons.workspace_premium_rounded,
+                title: t5.t('pl_tile'),
+                desc: t5.t('pl_tile_desc'),
+                gradient: const LinearGradient(
+                  colors: [AppColors.blue, AppColors.pink],
+                ),
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => PlansPage(ctx))),
               ),
           ],
         ),

@@ -16,27 +16,21 @@ import 'shop_api.dart';
 import 'staff_page.dart';
 import 'timeoff_page.dart';
 import 'winback_page.dart';
-
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
-
 class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key, required this.ctx});
   final ShopCtx ctx;
-
   @override
   State<ManagerHome> createState() => _ManagerHomeState();
 }
-
 class _ManagerHomeState extends State<ManagerHome> {
   String _synced = '';
-
   String _date(String? d, String lang) {
     if (d == null || d.isEmpty) return '—';
     final s = d.length >= 10 ? d.substring(0, 10) : d;
     return localDigits(s, lang);
   }
-
   @override
   Widget build(BuildContext context) {
     final ctx = widget.ctx;
@@ -48,7 +42,6 @@ class _ManagerHomeState extends State<ManagerHome> {
     final sub = sess.subscription;
     final shop = sess.shop;
     final planKey = 'plan_${shop.plan}';
-
     // اعلان‌های محلیِ پایان اشتراک (۳ و ۱ روز مانده) — فقط برای صاحب
     if (sess.isOwner) {
       final k = '${sub.free}|${sub.expiresAt}|$lang';
@@ -65,7 +58,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         });
       }
     }
-
     Widget tile({
       required IconData icon,
       required String title,
@@ -104,7 +96,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         ),
       );
     }
-
     return GlassScaffold(
       title: s.t('app_name'),
       actions: [
@@ -290,13 +281,13 @@ class _ManagerHomeState extends State<ManagerHome> {
             if (sess.isOwner)
               tile(
                 icon: Icons.favorite_rounded,
-                title: _x(lang, 'پیام «دلمون تنگ شده»', '"We miss you" messages',
-                    'رسائل «اشتقنا لك»'),
+                title: _x(lang, 'پیام اختصاصی آرایشگاه',
+                    'Custom shop message', 'رسالة خاصة بالصالون'),
                 desc: _x(
                     lang,
-                    'متن، آرایشگر و زمان‌بندی پیام به مشتری‌ها',
-                    'Text, barber and timing of messages to customers',
-                    'نص الرسالة والحلاق والتوقيت للزبائن'),
+                    'متن پیام‌ها و فاصلهٔ زمانی ارسال برای مشتری‌ها',
+                    'Message texts and how many days later they are sent to customers',
+                    'نصوص الرسائل وعدد الأيام لإرسالها للزبائن'),
                 gradient: const LinearGradient(
                   colors: [AppColors.pink, AppColors.blue],
                 ),

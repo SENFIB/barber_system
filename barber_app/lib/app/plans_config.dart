@@ -78,6 +78,7 @@ const PlanDef _special = PlanDef(
 );
 
 // پلن شخصی (خرید کامل برنامه): آخرِ فهرست نمایش داده می‌شود
+// فقط یک ویژگی نمایش داده می‌شود: راه‌اندازی توسط خود آرایشگاه
 const PlanDef _personal = PlanDef(
   key: 'personal',
   monthly: 0,
@@ -85,11 +86,6 @@ const PlanDef _personal = PlanDef(
   maxBarbers: 0,
   maxShifts: 5,
   features: <String>[
-    'pl_f_barbers_any',
-    'pl_f_booking',
-    'pl_f_photo',
-    'pl_f_winback',
-    'pl_f_ownserver',
     'pl_f_selfhost',
   ],
 );

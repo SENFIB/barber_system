@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,10 +13,8 @@ import '../legal/privacy_gate.dart';
 import '../manager/booking_common.dart';
 import 'customer_api.dart';
 import 'customer_store.dart';
-
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
-
 class ShopPhoto extends StatelessWidget {
   const ShopPhoto({
     super.key,
@@ -28,7 +27,6 @@ class ShopPhoto extends StatelessWidget {
   final double width;
   final double height;
   final double radius;
-
   @override
   Widget build(BuildContext context) {
     Widget ph() => Container(
@@ -53,16 +51,13 @@ class ShopPhoto extends StatelessWidget {
     );
   }
 }
-
 class ShopPage extends StatefulWidget {
   const ShopPage({super.key, required this.api, required this.card});
   final CustomerApi api;
   final Map<String, dynamic> card;
-
   @override
   State<ShopPage> createState() => _ShopPageState();
 }
-
 class _ShopPageState extends State<ShopPage> {
   bool _loading = true;
   bool _busy = false;
@@ -82,10 +77,8 @@ class _ShopPageState extends State<ShopPage> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   AppSettings? _stRef;
-
   String get _shopId => bStr(widget.card['shop_id']);
   T6 _tr() => T6(SettingsScope.read(context).lang);
-
   @override
   void initState() {
     super.initState();
@@ -96,7 +89,6 @@ class _ShopPageState extends State<ShopPage> {
       if (mounted) _load();
     });
   }
-
   @override
   void dispose() {
     _name.dispose();
@@ -106,7 +98,6 @@ class _ShopPageState extends State<ShopPage> {
     if (s != null) kCalKind = CalConv.kindOf(s.calendarKey, s.lang);
     super.dispose();
   }
-
   /// اگر کاربر تقویم دلخواه نزده باشد، تاریخ‌ها با تقویم همین آرایشگاه نمایش داده می‌شوند
   void _applyShopCal(AppSettings st) {
     _stRef = st;
@@ -114,7 +105,6 @@ class _ShopPageState extends State<ShopPage> {
     final c = bStr(_shop['calendar']);
     if (c.isNotEmpty) kCalKind = CalConv.kindOf(c, st.lang);
   }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -148,31 +138,26 @@ class _ShopPageState extends State<ShopPage> {
       });
     }
   }
-
   List<Map<String, dynamic>> _eligible(String sid) {
     return _staff.where((s) {
       final ids = bIds(s['service_ids']);
       return ids.isEmpty || ids.contains(sid);
     }).toList();
   }
-
   Map<String, dynamic> _svc(String id) => _services.firstWhere(
         (s) => bStr(s['service_id']) == id,
         orElse: () => <String, dynamic>{},
       );
-
   String _staffName(String id) {
     for (final s in _staff) {
       if (bStr(s['staff_id']) == id) return bStr(s['name']);
     }
     return id;
   }
-
   void _resetSlots() {
     _slots = null;
     _slotIdx = -1;
   }
-
   void _toggle(String id) {
     if (_picked.contains(id)) {
       setState(() {
@@ -192,7 +177,6 @@ class _ShopPageState extends State<ShopPage> {
       _resetSlots();
     });
   }
-
   void _setDay(DateTime d) {
     setState(() {
       _day = d;
@@ -200,7 +184,6 @@ class _ShopPageState extends State<ShopPage> {
     });
     if (_picked.isNotEmpty) _loadSlots();
   }
-
   Future<void> _loadSlots() async {
     final t = _tr();
     if (_picked.isEmpty) {
@@ -232,8 +215,8 @@ class _ShopPageState extends State<ShopPage> {
       if (mounted) setState(() => _slotsBusy = false);
     }
   }
-
-  /// یادآوری‌های محلی (۲ ساعت و ۱۰ دقیقه قبل) + پیام «دلمون تنگ شده»
+  /// یادآوری‌های محلی (۲ ساعت و ۱۰ دقیقه قبل) + «پیام اختصاصی آرایشگاه».
+  /// پیام اختصاصی: یک بازهٔ مشترک برای همهٔ متن‌ها؛ اگر چند متن باشد یکی تصادفی انتخاب می‌شود.
   Future<void> _remind(Map<String, dynamic> slot, Map<String, String> choice,
       String lang) async {
     try {
@@ -249,24 +232,28 @@ class _ShopPageState extends State<ShopPage> {
           time: start,
           tz: tz,
           lang: lang);
-      final used = choice.values.where((e) => e.isNotEmpty).toSet();
+      var days = 0;
+      final msgs = <String>[];
       for (final w in _winback) {
-        final ids = bIds(w['staff_ids']);
-        if (ids.isNotEmpty && !ids.any(used.contains)) continue;
-        final days = bInt(w['days_after']);
-        final msg = bStr(w['message']).trim();
-        if (days < 1 || msg.isEmpty) continue;
+        final d = bInt(w['days_after']);
+        final m = bStr(w['message']).trim();
+        if (d < 1 || m.isEmpty) continue;
+        if (days == 0) days = d;
+        msgs.add(m);
+      }
+      if (days >= 1 && msgs.isNotEmpty) {
+        final body =
+            msgs.length == 1 ? msgs.first : msgs[Random().nextInt(msgs.length)];
         await Reminders.winback(
-            key: 'wb|$_shopId|${bStr(w['rule_id'])}',
+            key: 'wb|$_shopId',
             date: date,
             tz: tz,
             days: days,
             title: name,
-            body: msg);
+            body: body);
       }
     } catch (_) {}
   }
-
   Future<void> _book() async {
     final t = _tr();
     if (_picked.isEmpty) {
@@ -319,7 +306,6 @@ class _ShopPageState extends State<ShopPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
   String _policy(T6 t) {
     final m = bInt(_shop['cancel_before_min'], 120);
     final txt = (m >= 60 && m % 60 == 0)
@@ -327,11 +313,9 @@ class _ShopPageState extends State<ShopPage> {
         : t.t('cu_m', {'n': fmtNum(m, t.lang)});
     return t.t('cu_policy', {'t': txt});
   }
-
   void _openRules(String lang) {
     openShopRules(context, lang, bStr(_shop['name']), bStr(_shop['rules']));
   }
-
   /// برچسب روز: «نام روز + روز/ماه» در تقویم انتخاب‌شده
   String _dayLabel(DateTime d, T6 t) {
     final n = CalConv.numeric(bIso(d), kCalKind, t.lang);
@@ -339,13 +323,11 @@ class _ShopPageState extends State<ShopPage> {
     final dm = p.length == 3 ? '${p[1]}/${p[2]}' : n;
     return '${t.t('d_${d.weekday % 7}')} $dm';
   }
-
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(top: 18, bottom: 8),
         child: Text(text,
             style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
       );
-
   @override
   Widget build(BuildContext context) {
     final st0 = SettingsScope.of(context);
@@ -385,7 +367,6 @@ class _ShopPageState extends State<ShopPage> {
       body: body,
     );
   }
-
   Widget _header(T6 t) {
     final avg = cDouble(_shop['rating_avg']);
     final count = bInt(_shop['rating_count']);
@@ -510,7 +491,6 @@ class _ShopPageState extends State<ShopPage> {
       ),
     );
   }
-
   Widget _content(T6 t) {
     final cur = bStr(_shop['currency']);
     var total = 0;
@@ -714,7 +694,6 @@ class _ShopPageState extends State<ShopPage> {
       ],
     );
   }
-
   Widget _choiceRow(String sid, T6 t) {
     final svc = _svc(sid);
     final el = _eligible(sid);

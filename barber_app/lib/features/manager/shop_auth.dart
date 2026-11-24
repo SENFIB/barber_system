@@ -1,20 +1,26 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+import '../../app/fmt.dart';
+import '../../app/plans_config.dart';
 import '../../app/settings.dart';
-import '../../app/strings.dart';
+import '../../app/strings_s6.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
+import 'shifts_editor.dart';
 import 'shop_api.dart';
 
 typedef SessionCallback = Future<void> Function(ManagerSession session);
+
+// متن سه‌زبانه‌ی محلی برای بخش‌های جدید همین صفحه
+String _x(String lang, String fa, String en, String ar) =>
+    lang == 'fa' ? fa : (lang == 'ar' ? ar : en);
 
 // ───────────────────────── صفحه‌ی ورود (اول) ─────────────────────────
 class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
-
   @override
   State<ShopAuthPage> createState() => _ShopAuthPageState();
 }
@@ -33,7 +39,7 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
   }
 
   Future<void> _login() async {
-    final s = S(SettingsScope.read(context).lang);
+    final s = T6(SettingsScope.read(context).lang);
     if (_user.text.trim().isEmpty || _pass.text.isEmpty) {
       toast(context, s.t('v_required'));
       return;
@@ -56,7 +62,7 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
-    final s = S(st.lang);
+    final s = T6(st.lang);
     return GlassScaffold(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded),
@@ -163,8 +169,7 @@ class SignupChoicePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = S(SettingsScope.of(context).lang);
-
+    final s = T6(SettingsScope.of(context).lang);
     Widget card(IconData icon, String title, String desc, VoidCallback onTap) {
       return Glass(
         onTap: onTap,
@@ -202,7 +207,7 @@ class SignupChoicePage extends StatelessWidget {
             s.t('signup_owner'),
             s.t('signup_owner_desc'),
             () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => OwnerSignupPage(api: api, onSession: onSession),
+              builder: (_) => OwnerPlanPage(api: api, onSession: onSession),
             )),
           ),
           const SizedBox(height: 14),
@@ -220,13 +225,202 @@ class SignupChoicePage extends StatelessWidget {
   }
 }
 
-// ───────────────────────── ثبت‌نام صاحب آرایشگاه ─────────────────────────
-class OwnerSignupPage extends StatefulWidget {
-  const OwnerSignupPage(
-      {super.key, required this.api, required this.onSession});
+// ───────────────────────── مرحله‌ی ۱ ثبت‌نام صاحب: انتخاب پلن ─────────────────────────
+String _planName(String lang, String key) {
+  switch (key) {
+    case 'basic':
+      return _x(lang, 'عادی', 'Basic', 'عادية');
+    case 'pro':
+      return _x(lang, 'پرو', 'Pro', 'برو');
+    case 'special':
+      return _x(lang, 'ویژه', 'Special', 'مميزة');
+    default:
+      return _x(lang, 'شخصی', 'Personal', 'شخصية');
+  }
+}
+
+IconData _planIcon(String key) {
+  switch (key) {
+    case 'basic':
+      return Icons.content_cut_rounded;
+    case 'pro':
+      return Icons.workspace_premium_rounded;
+    case 'special':
+      return Icons.diamond_rounded;
+    default:
+      return Icons.dns_rounded;
+  }
+}
+
+String _planPrice(String lang, PlanDef p) {
+  final toman = _x(lang, 'تومان', 'Toman', 'تومان');
+  if (p.key == 'personal' || p.oneTime > 0) {
+    return '${_x(lang, 'خرید یک‌باره', 'One-time purchase', 'شراء لمرة واحدة')}: '
+        '${fmtNum(p.oneTime, lang)} $toman';
+  }
+  if (p.monthly <= 0) return _x(lang, 'رایگان', 'Free', 'مجاني');
+  return '${fmtNum(p.monthly, lang)} $toman ${_x(lang, '/ ماه', '/ month', '/ شهر')}';
+}
+
+List<String> _planFeatures(String lang, PlanDef p) {
+  final booking = _x(lang, 'رزرو آنلاین مشتری', 'Online customer booking',
+      'حجز العملاء عبر الإنترنت');
+  final photo = _x(lang, 'عکس آرایشگاه', 'Shop photo', 'صورة الصالون');
+  final winback = _x(lang, 'پیام «دلمون تنگ شده» برای مشتریان',
+      '"We miss you" messages to customers', 'رسائل «اشتقنا لك» للعملاء');
+  final barbers = p.maxBarbers > 0
+      ? _x(
+          lang,
+          'تا ${fmtNum(p.maxBarbers, lang)} آرایشگر',
+          'Up to ${fmtNum(p.maxBarbers, lang)} barbers',
+          'حتى ${fmtNum(p.maxBarbers, lang)} حلاق')
+      : _x(lang, 'آرایشگر نامحدود', 'Unlimited barbers', 'عدد غير محدود من الحلاقين');
+  switch (p.key) {
+    case 'basic':
+      return [
+        barbers,
+        booking,
+        _x(lang, 'پاکسازی هفتگی نوبت‌های گذشته',
+            'Past bookings cleaned weekly', 'تنظيف الحجوزات القديمة أسبوعياً'),
+      ];
+    case 'pro':
+      return [
+        barbers,
+        booking,
+        _x(lang, 'پاکسازی نوبت‌های گذشته هر دو هفته',
+            'Past bookings cleaned every 2 weeks',
+            'تنظيف الحجوزات القديمة كل أسبوعين'),
+      ];
+    case 'special':
+      return [
+        barbers,
+        booking,
+        photo,
+        winback,
+        _x(lang, 'شیت اختصاصی و پشتیبان‌گیری',
+            'Dedicated sheet and backup', 'جدول خاص ونسخ احتياطي'),
+      ];
+    default:
+      return [
+        barbers,
+        booking,
+        photo,
+        winback,
+        _x(lang, 'سرور اختصاصی خودتان', 'Your own server', 'خادم خاص بك'),
+      ];
+  }
+}
+
+class OwnerPlanPage extends StatelessWidget {
+  const OwnerPlanPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
 
+  @override
+  Widget build(BuildContext context) {
+    final lang = SettingsScope.of(context).lang;
+    return GlassScaffold(
+      title: _x(lang, 'انتخاب پلن', 'Choose a plan', 'اختيار الباقة'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Text(
+              _x(
+                  lang,
+                  'اول پلن آرایشگاهتان را انتخاب کنید',
+                  'First, pick the plan for your shop',
+                  'اختر باقة صالونك أولاً'),
+              style: TextStyle(color: muted(context), height: 1.5),
+            ),
+          ),
+          for (final p in kPlans) ...[
+            _PlanCard(
+              plan: p,
+              lang: lang,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) =>
+                    OwnerSignupPage(api: api, onSession: onSession, plan: p),
+              )),
+            ),
+            const SizedBox(height: 14),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanCard extends StatelessWidget {
+  const _PlanCard(
+      {required this.plan, required this.lang, required this.onTap});
+  final PlanDef plan;
+  final String lang;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final feats = _planFeatures(lang, plan);
+    return Glass(
+      onTap: onTap,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GradientIcon(_planIcon(plan.key), size: 50),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_planName(lang, plan.key),
+                        style: const TextStyle(
+                            fontSize: 19, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(_planPrice(lang, plan),
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              Icon(chevron(context), color: muted(context)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (final f in feats)
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.check_circle_rounded,
+                      size: 18, color: muted(context)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(f,
+                        style: TextStyle(color: muted(context), height: 1.4)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────── مرحله‌ی ۲ ثبت‌نام صاحب آرایشگاه ─────────────────────────
+class OwnerSignupPage extends StatefulWidget {
+  const OwnerSignupPage(
+      {super.key,
+      required this.api,
+      required this.onSession,
+      required this.plan});
+  final ShopApi api;
+  final SessionCallback onSession;
+  final PlanDef plan;
   @override
   State<OwnerSignupPage> createState() => _OwnerSignupPageState();
 }
@@ -243,6 +437,14 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   bool _barber = true;
   bool _hide = true;
   bool _loading = false;
+  late List<Shift> _shifts;
+  List<int> _daysOff = <int>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _shifts = parseShifts('09:00-13:00|16:00-20:00');
+  }
 
   @override
   void dispose() {
@@ -254,7 +456,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     super.dispose();
   }
 
-  String? _validate(S s) {
+  String? _validate(T6 s) {
     if (_license.text.trim().isEmpty ||
         _shop.text.trim().isEmpty ||
         _phone.text.trim().isEmpty ||
@@ -262,15 +464,20 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         _pass.text.isEmpty) {
       return s.t('v_required');
     }
-    final digits = normalizeDigits(_phone.text).replaceAll(RegExp(r'[^0-9]'), '');
+    final digits =
+        normalizeDigits(_phone.text).replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length < 8) return s.t('v_phone');
     if (!usernameOk(_user.text)) return s.t('v_username');
     if (_pass.text.length < 6) return s.t('v_password');
+    if (_barber) {
+      final e = validateShifts(_shifts);
+      if (e != null) return s.t(e);
+    }
     return null;
   }
 
   Future<void> _submit() async {
-    final s = S(SettingsScope.read(context).lang);
+    final s = T6(SettingsScope.read(context).lang);
     final err = _validate(s);
     if (err != null) {
       toast(context, err);
@@ -288,6 +495,9 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         city: _city.text,
         ownerName: _ownerName.text,
         ownerIsBarber: _barber,
+        plan: widget.plan.key,
+        shifts: _shifts,
+        daysOff: _daysOff,
       );
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
@@ -303,12 +513,47 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
 
   @override
   Widget build(BuildContext context) {
-    final s = S(SettingsScope.of(context).lang);
+    final lang = SettingsScope.of(context).lang;
+    final s = T6(lang);
+    final order = lang == 'en'
+        ? <int>[0, 1, 2, 3, 4, 5, 6]
+        : <int>[6, 0, 1, 2, 3, 4, 5];
     return GlassScaffold(
       title: s.t('signup_owner'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
+          // پلن انتخاب‌شده
+          Glass(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                GradientIcon(_planIcon(widget.plan.key), size: 42),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          '${_x(lang, 'پلن شما', 'Your plan', 'باقتك')}: '
+                          '${_planName(lang, widget.plan.key)}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 16)),
+                      const SizedBox(height: 2),
+                      Text(_planPrice(lang, widget.plan),
+                          style:
+                              TextStyle(color: muted(context), fontSize: 13)),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(_x(lang, 'تغییر', 'Change', 'تغيير')),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           Glass(
             padding: const EdgeInsets.all(18),
             child: Column(
@@ -318,6 +563,17 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                   label: s.t('license_key'),
                   icon: Icons.vpn_key_rounded,
                   ltr: true,
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                      _x(
+                          lang,
+                          'کد لایسنس باید مخصوص همین پلن باشد',
+                          'The license code must be for this plan',
+                          'يجب أن يكون رمز الترخيص لهذه الباقة'),
+                      style: TextStyle(color: muted(context), fontSize: 12)),
                 ),
                 _gap(),
                 GlassField(
@@ -368,6 +624,63 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               ],
             ),
           ),
+          if (_barber) ...[
+            const SizedBox(height: 16),
+            Glass(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_x(lang, 'ساعت کاری شما', 'Your working hours',
+                          'ساعات عملك'),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text(
+                      _x(
+                          lang,
+                          'تا ۳ شیفت در روز می‌توانید تعیین کنید. مشتری فقط داخل همین ساعت‌ها نوبت می‌گیرد.',
+                          'You can set up to 3 shifts a day. Customers can only book inside these hours.',
+                          'يمكنك تحديد حتى 3 فترات يومياً. يحجز العملاء داخل هذه الساعات فقط.'),
+                      style: TextStyle(
+                          color: muted(context), fontSize: 12, height: 1.5)),
+                  const SizedBox(height: 12),
+                  ShiftsEditor(
+                    shifts: _shifts,
+                    onChanged: (v) => setState(() => _shifts = v),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                      _x(lang, 'روزهای تعطیل هفتگی', 'Weekly days off',
+                          'العطل الأسبوعية'),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final d in order)
+                        FilterChip(
+                          label: Text(s.t('d_$d')),
+                          selected: _daysOff.contains(d),
+                          onSelected: (v) => setState(() {
+                            final next = List<int>.from(_daysOff);
+                            if (v) {
+                              if (!next.contains(d)) next.add(d);
+                            } else {
+                              next.remove(d);
+                            }
+                            next.sort();
+                            _daysOff = next;
+                          }),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Glass(
             padding: const EdgeInsets.all(18),
@@ -419,7 +732,6 @@ class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
-
   @override
   State<StaffJoinPage> createState() => _StaffJoinPageState();
 }
@@ -440,7 +752,7 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
   }
 
   Future<void> _submit() async {
-    final s = S(SettingsScope.read(context).lang);
+    final s = T6(SettingsScope.read(context).lang);
     if (_code.text.trim().isEmpty ||
         _user.text.trim().isEmpty ||
         _pass.text.isEmpty) {
@@ -470,7 +782,7 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
 
   @override
   Widget build(BuildContext context) {
-    final s = S(SettingsScope.of(context).lang);
+    final s = T6(SettingsScope.of(context).lang);
     return GlassScaffold(
       title: s.t('join_title'),
       body: ListView(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -9,6 +11,7 @@ import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/strings_ex.dart';
 import '../../app/widgets.dart';
+import '../../app/wipe_data.dart';
 import '../legal/privacy_gate.dart';
 import '../manager/shop_api.dart';
 import 'appearance_page.dart';
@@ -22,7 +25,6 @@ String _x3(String lang, String fa, String en, String ar) =>
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
-
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -103,6 +105,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _deleteData() async {
     final st = SettingsScope.read(context);
     final s = S(st.lang);
+    final isWin = Platform.isWindows;
     var resetId = false;
     final ok = await showDialog<bool>(
       context: context,
@@ -115,15 +118,17 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(s.t('delete_data_msg')),
-              const SizedBox(height: 10),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: resetId,
-                onChanged: (v) => setD(() => resetId = v ?? false),
-                title: Text(s.t('delete_device_id')),
-                subtitle: Text(s.t('delete_device_id_desc')),
-              ),
+              if (!isWin) ...[
+                const SizedBox(height: 10),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: resetId,
+                  onChanged: (v) => setD(() => resetId = v ?? false),
+                  title: Text(s.t('delete_device_id')),
+                  subtitle: Text(s.t('delete_device_id_desc')),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -154,7 +159,15 @@ class _SettingsPageState extends State<SettingsPage> {
       await p.remove(_kCustName);
       await p.remove(_kCustPhone);
     } catch (_) {}
-    await st.clearAll(resetDeviceId: resetId);
+    // یادآورهای زمان‌بندی‌شده هم لغو شوند
+    await LocalWipe.cancelReminders();
+    // در ویندوز پوشه کامل حذف می‌شود، پس شناسه‌ی دستگاه هم پاک می‌شود
+    await st.clearAll(resetDeviceId: resetId || isWin);
+    if (isWin) {
+      // پوشه‌ی com.barberapp حذف می‌شود و برنامه بسته می‌شود
+      await LocalWipe.deleteWindowsFolder();
+      return;
+    }
     nav.popUntil((r) => r.isFirst);
     messenger.showSnackBar(SnackBar(content: Text(msg)));
   }
@@ -202,7 +215,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final dev = st.deviceId;
     final devShort = dev.length > 8 ? '${dev.substring(0, 8)}…' : dev;
     final none = s.t('sd_none');
-
     return GlassScaffold(
       title: s.t('settings'),
       body: ListView(

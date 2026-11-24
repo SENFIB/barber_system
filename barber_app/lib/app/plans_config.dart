@@ -12,7 +12,7 @@ class PlanDef {
     required this.features,
   });
 
-  /// basic | pro | special | personal   (personal = «خرید برنامه»)
+  /// basic | pro | special | personal   (personal = «خرید برنامه»، دیگر نمایش داده نمی‌شود)
   final String key;
 
   /// قیمت یک ماه (۰ یعنی رایگان)
@@ -31,69 +31,77 @@ class PlanDef {
   final List<String> features;
 }
 
-const List<PlanDef> kPlans = <PlanDef>[
-  PlanDef(
-    key: 'basic',
-    monthly: 0, // فعلاً رایگان
-    oneTime: 0,
-    maxBarbers: 2,
-    maxShifts: 2,
-    features: <String>[
-      'pl_f_barbers',
-      'pl_f_shifts',
-      'pl_f_booking',
-      'pl_f_cleanup7',
-    ],
-  ),
-  PlanDef(
-    key: 'pro',
-    monthly: 5000000,
-    oneTime: 0,
-    maxBarbers: 5,
-    maxShifts: 3,
-    features: <String>[
-      'pl_f_barbers',
-      'pl_f_shifts',
-      'pl_f_booking',
-      'pl_f_cleanup14',
-    ],
-  ),
-  PlanDef(
-    key: 'special',
-    monthly: 10000000,
-    oneTime: 0,
-    maxBarbers: 30,
-    maxShifts: 5,
-    features: <String>[
-      'pl_f_barbers',
-      'pl_f_shifts',
-      'pl_f_booking',
-      'pl_f_photo',
-      'pl_f_winback',
-      'pl_f_ownsheet',
-      'pl_f_backup',
-      'pl_f_cleanup30',
-    ],
-  ),
-  PlanDef(
-    key: 'personal',
-    monthly: 0,
-    oneTime: 30000000,
-    maxBarbers: 0,
-    maxShifts: 5,
-    features: <String>[
-      'pl_f_barbers_any',
-      'pl_f_booking',
-      'pl_f_photo',
-      'pl_f_winback',
-      'pl_f_ownserver',
-    ],
-  ),
-];
+const PlanDef _basic = PlanDef(
+  key: 'basic',
+  monthly: 0, // فعلاً رایگان
+  oneTime: 0,
+  maxBarbers: 1,
+  maxShifts: 2,
+  features: <String>[
+    'pl_f_barber_one',
+    'pl_f_shifts',
+    'pl_f_booking',
+    'pl_f_cleanup7',
+  ],
+);
+
+const PlanDef _pro = PlanDef(
+  key: 'pro',
+  monthly: 5000000,
+  oneTime: 0,
+  maxBarbers: 5,
+  maxShifts: 3,
+  features: <String>[
+    'pl_f_barbers',
+    'pl_f_shifts',
+    'pl_f_booking',
+    'pl_f_cleanup14',
+  ],
+);
+
+const PlanDef _special = PlanDef(
+  key: 'special',
+  monthly: 10000000,
+  oneTime: 0,
+  maxBarbers: 30,
+  maxShifts: 5,
+  features: <String>[
+    'pl_f_barbers',
+    'pl_f_shifts',
+    'pl_f_booking',
+    'pl_f_photo',
+    'pl_f_winback',
+    'pl_f_ownsheet',
+    'pl_f_backup',
+    'pl_f_cleanup30',
+  ],
+);
+
+// فقط برای آرایشگاه‌هایی که از قبل این پلن را دارند (نمایش داده نمی‌شود)
+const PlanDef _personal = PlanDef(
+  key: 'personal',
+  monthly: 0,
+  oneTime: 30000000,
+  maxBarbers: 0,
+  maxShifts: 5,
+  features: <String>[
+    'pl_f_barbers_any',
+    'pl_f_booking',
+    'pl_f_photo',
+    'pl_f_winback',
+    'pl_f_ownserver',
+  ],
+);
+
+/// پلن‌هایی که به کاربر نشان داده می‌شود (۳ پلن)
+const List<PlanDef> kPlans = <PlanDef>[_basic, _pro, _special];
+
+/// همه‌ی پلن‌ها (شامل «خرید برنامه» برای آرایشگاه‌های قدیمی)
+const List<PlanDef> kAllPlans = <PlanDef>[_basic, _pro, _special, _personal];
 
 /// سقف شیفتِ یک پلن (برای ویرایشگر شیفت‌ها)
 int shiftCapForPlan(String planKey) {
-  for (final p in kPlans) {
+  for (final p in kAllPlans) {
     if (p.key == planKey) return p.maxShifts;
   }
   return 3;

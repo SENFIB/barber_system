@@ -1,7 +1,6 @@
 import 'package:barber_core/barber_core.dart';
 import 'fmt.dart';
 import 'strings_s5.dart';
-
 /// جایگزینی واژه‌ی «باربر» با معادل درست هر زبان (جمع‌ها اول)
 const Map<String, List<List<String>>> _termFix = {
   'fa': [
@@ -20,7 +19,6 @@ const Map<String, List<List<String>>> _termFix = {
     ['باربر', 'barber'],
   ],
 };
-
 /// «گوشی» → «دستگاه» (برنامه روی ویندوز هم اجرا می‌شود).
 /// «شماره تلفن» و مشابهش دست نمی‌خورد (اول محافظت می‌شود).
 const Map<String, List<List<String>>> _deviceFix = {
@@ -55,7 +53,6 @@ const Map<String, List<List<String>>> _deviceFix = {
     ['الجوال', 'الجهاز'],
   ],
 };
-
 /// آخرین مرحله‌ی هر متن: درست‌کردن واژه‌ها («باربر»، «گوشی») و رقم‌ها به زبان برنامه
 String uiText(String s, String lang) {
   var r = s;
@@ -69,14 +66,12 @@ String uiText(String s, String lang) {
   }
   return localDigits(r, lang);
 }
-
 /// متن‌های تازه + همه‌ی متن‌های قبلی (T5 و پایین‌تر).
 /// هر متنی که از این کلاس رد شود، واژه‌ها و رقم‌هایش به زبان برنامه می‌شود.
 class T6 {
   T6(this.lang) : _base = T5(lang);
   final String lang;
   final T5 _base;
-
   String t(String key, [Map<String, Object?>? args]) {
     final own = _m[lang]?[key] ?? _m['en']?[key];
     if (own == null) {
@@ -89,7 +84,6 @@ class T6 {
     }
     return uiText(r, lang);
   }
-
   String error(Object e) {
     if (e is ApiException) {
       final k = 'err_${e.code}';
@@ -101,9 +95,9 @@ class T6 {
     return uiText(_base.error(e), lang);
   }
 }
-
 final Map<String, Map<String, String>> _m = {
   'fa': {
+    'pl_f_winback': 'ارسال پیام اختصاصی آرایشگاه در بازه‌های مشخص',
     'sh_title': 'ساعت‌های کار',
     'sh_hint':
         'هر آرایشگر در پلن شما تا {n} شیفت در روز می‌تواند داشته باشد؛ مثلاً صبح ۹ تا ۱۳ و عصر ۱۶ تا ۲۲. بین شیفت‌ها مشتری نوبت نمی‌گیرد.',
@@ -133,6 +127,7 @@ final Map<String, Map<String, String>> _m = {
         'تعداد شیفت‌ها از سقف پلن شما بیشتر است. شیفت‌ها را کمتر کنید یا پلن را ارتقا دهید.',
   },
   'en': {
+    'pl_f_winback': 'Custom shop messages to customers at set intervals',
     'sh_title': 'Working hours',
     'sh_hint':
         'On your plan each barber can have up to {n} shifts a day, for example 9–13 and 16–22. Customers cannot book between shifts.',
@@ -162,6 +157,7 @@ final Map<String, Map<String, String>> _m = {
         'The number of shifts is above your plan\'s limit. Use fewer shifts or upgrade your plan.',
   },
   'ar': {
+    'pl_f_winback': 'إرسال رسالة خاصة بالصالون للزبائن في فترات محددة',
     'sh_title': 'ساعات العمل',
     'sh_hint':
         'في باقتك يمكن لكل حلاق أن يعمل حتى {n} فترات في اليوم، مثلاً 9–13 و16–22. لا يستطيع الزبون الحجز بين الفترات.',

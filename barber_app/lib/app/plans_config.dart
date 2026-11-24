@@ -8,20 +8,24 @@ class PlanDef {
     required this.monthly,
     required this.oneTime,
     required this.maxBarbers,
+    required this.maxShifts,
     required this.features,
   });
 
-  /// basic | pro | special | personal
+  /// basic | pro | special | personal   (personal = «خرید برنامه»)
   final String key;
 
   /// قیمت یک ماه (۰ یعنی رایگان)
   final int monthly;
 
-  /// قیمت خرید یک‌باره (فقط پلن شخصی)؛ اگر ۰ باشد ماهانه حساب می‌شود
+  /// قیمت خرید یک‌باره (فقط «خرید برنامه»)؛ اگر ۰ باشد ماهانه حساب می‌شود
   final int oneTime;
 
-  /// سقف باربر (۰ یعنی نامحدود)
+  /// سقف آرایشگر (۰ یعنی نامحدود)
   final int maxBarbers;
+
+  /// سقف شیفت کاری هر آرایشگر در روز
+  final int maxShifts;
 
   /// کلید متن ویژگی‌ها (در strings_s5.dart)
   final List<String> features;
@@ -33,22 +37,36 @@ const List<PlanDef> kPlans = <PlanDef>[
     monthly: 0, // فعلاً رایگان
     oneTime: 0,
     maxBarbers: 2,
-    features: <String>['pl_f_barbers', 'pl_f_booking', 'pl_f_cleanup7'],
+    maxShifts: 2,
+    features: <String>[
+      'pl_f_barbers',
+      'pl_f_shifts',
+      'pl_f_booking',
+      'pl_f_cleanup7',
+    ],
   ),
   PlanDef(
     key: 'pro',
     monthly: 5000000,
     oneTime: 0,
     maxBarbers: 5,
-    features: <String>['pl_f_barbers', 'pl_f_booking', 'pl_f_cleanup14'],
+    maxShifts: 3,
+    features: <String>[
+      'pl_f_barbers',
+      'pl_f_shifts',
+      'pl_f_booking',
+      'pl_f_cleanup14',
+    ],
   ),
   PlanDef(
     key: 'special',
     monthly: 10000000,
     oneTime: 0,
     maxBarbers: 30,
+    maxShifts: 5,
     features: <String>[
       'pl_f_barbers',
+      'pl_f_shifts',
       'pl_f_booking',
       'pl_f_photo',
       'pl_f_winback',
@@ -62,6 +80,7 @@ const List<PlanDef> kPlans = <PlanDef>[
     monthly: 0,
     oneTime: 30000000,
     maxBarbers: 0,
+    maxShifts: 5,
     features: <String>[
       'pl_f_barbers_any',
       'pl_f_booking',
@@ -71,6 +90,14 @@ const List<PlanDef> kPlans = <PlanDef>[
     ],
   ),
 ];
+
+/// سقف شیفتِ یک پلن (برای ویرایشگر شیفت‌ها)
+int shiftCapForPlan(String planKey) {
+  for (final p in kPlans) {
+    if (p.key == planKey) return p.maxShifts;
+  }
+  return 3;
+}
 
 /// مدت‌های قابل خرید (ماه)
 const List<int> kMonthOptions = <int>[1, 3, 6, 9, 12];

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import 'look.dart';
 
 /// رنگ‌های پیش‌فرض (ثابت). رنگ‌های قابل‌تغییر از LookExt می‌آیند.
@@ -16,13 +17,16 @@ class AppColors {
     end: Alignment.bottomRight,
     colors: [violet, blue],
   );
-
   static const dangerGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [Color(0xFFFF5252), Color(0xFFFF4D8D)],
   );
 }
+
+/// وزیرمتن همیشه پایه است (داخل خود برنامه است و از اینترنت نمی‌آید).
+/// فونت سیستم هرگز استفاده نمی‌شود؛ فقط آخرِ زنجیره‌ی جایگزین‌هاست.
+const List<String> _kFallback = [kDefaultFont, 'Segoe UI', 'Tahoma'];
 
 ThemeData buildTheme(Brightness b, [AppLook? look]) {
   final lookV = look ?? const AppLook();
@@ -45,35 +49,27 @@ ThemeData buildTheme(Brightness b, [AppLook? look]) {
   );
 
   final tmp = ThemeData(useMaterial3: true, brightness: b, colorScheme: scheme);
-  var tt = tmp.textTheme;
 
+  // پایه: وزیرمتن روی همه‌ی سبک‌های متن (دکمه، فیلد، دیالوگ، منو، ...)
+  var tt = tmp.textTheme.apply(fontFamily: kDefaultFont);
+
+  // فونت انتخابیِ کاربر (اگر وزیرمتن نباشد). اگر نشد یا حرف فارسی نداشت، وزیرمتن جایگزین می‌شود.
   final f = lookV.font;
-  String? family;
-  // اگر فونتِ انتخابی حروف فارسی نداشته باشد، وزیرمتن جایگزین می‌شود
-  final fallback = f.isEmpty
-      ? const ['Segoe UI', 'Tahoma']
-      : const [kDefaultFont, 'Segoe UI', 'Tahoma'];
-
-  if (f == kDefaultFont) {
-    family = kDefaultFont;
-    tt = tt.apply(fontFamily: kDefaultFont);
-  } else if (f.isNotEmpty) {
+  if (f.isNotEmpty && f != kDefaultFont) {
     try {
       tt = GoogleFonts.getTextTheme(f, tt);
-    } catch (_) {
-      family = kDefaultFont;
-      tt = tt.apply(fontFamily: kDefaultFont);
-    }
+    } catch (_) {}
   }
-  tt = tt.apply(fontFamilyFallback: fallback);
+  tt = tt.apply(fontFamilyFallback: _kFallback);
 
   return ThemeData(
     useMaterial3: true,
     brightness: b,
     colorScheme: scheme,
     textTheme: tt,
-    fontFamily: family,
-    fontFamilyFallback: fallback,
+    primaryTextTheme: tt,
+    fontFamily: kDefaultFont,
+    fontFamilyFallback: _kFallback,
     scaffoldBackgroundColor: lk.bg[0],
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,

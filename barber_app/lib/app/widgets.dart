@@ -1,13 +1,14 @@
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
-
 import 'brand.dart';
 import 'look.dart';
 
 bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
+
+/// روی گوشی (اندروید/iOS) بلورِ زیر کارت‌ها خاموش است تا برنامه روان بماند
+final bool kMobileGpu = Platform.isAndroid || Platform.isIOS;
 
 /// رنگ‌ها و تنظیمات ظاهریِ فعلی (طرح، پس‌زمینه، شیشه و ...)
 LookExt lk(BuildContext c) =>
@@ -56,7 +57,9 @@ Future<bool> confirmDialog(
   return r == true;
 }
 
-/// پس‌زمینه: حباب متحرک، گرادیان، موج، نقطه‌ای، راه‌راه، ساده یا عکس کاربر
+/// پس‌زمینه: حباب متحرک، گرادیان، موج، نقطه‌ای، راه‌راه، ساده یا عکس کاربر.
+/// کل لایه‌ی پس‌زمینه داخل RepaintBoundary است و حباب‌ها فقط جابه‌جا می‌شوند
+/// (بدون رسم دوباره)، پس روی اندروید هم روان است.
 class AppBackground extends StatefulWidget {
   const AppBackground({super.key, required this.child});
   final Widget child;
@@ -69,7 +72,7 @@ class _AppBackgroundState extends State<AppBackground>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 20),
+    duration: Duration(seconds: kMobileGpu ? 32 : 24),
   );
 
   @override
@@ -88,22 +91,53 @@ class _AppBackgroundState extends State<AppBackground>
     super.dispose();
   }
 
-  Widget _blob(double size, Color color, double left, double top, bool dark) {
-    return Positioned(
-      left: left,
-      top: top,
+  /// یک حباب نرم؛ فقط یک بار رسم می‌شود (داخل RepaintBoundary)
+  Widget _blobShape(double size, Color color, bool dark) {
+    final a = dark ? 0.52 : 0.40;
+    return RepaintBoundary(
       child: IgnorePointer(
         child: Container(
           width: size,
           height: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: RadialGradient(colors: [
-              color.withOpacity(dark ? 0.50 : 0.38),
-              color.withOpacity(0),
-            ]),
+            gradient: RadialGradient(
+              colors: [
+                color.withOpacity(a),
+                color.withOpacity(a * 0.45),
+                color.withOpacity(a * 0.12),
+                color.withOpacity(0),
+              ],
+              stops: const [0.0, 0.35, 0.7, 1.0],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _moving({
+    required double size,
+    required Color color,
+    required bool dark,
+    required double left,
+    required double top,
+    required double dx,
+    required double dy,
+  }) {
+    return Positioned(
+      left: left,
+      top: top,
+      child: AnimatedBuilder(
+        animation: _c,
+        child: _blobShape(size, color, dark),
+        builder: (context, child) {
+          final t = Curves.easeInOutSine.transform(_c.value);
+          return Transform.translate(
+            offset: Offset(dx * t, dy * t),
+            child: child,
+          );
+        },
       ),
     );
   }
@@ -114,6 +148,24 @@ class _AppBackgroundState extends State<AppBackground>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: l.bg,
+          ),
+        ),
+      );
+
+  /// سایه‌روشن ظریف بالا و پایین؛ ثابت و ارزان
+  Widget _vignette(bool dark) => IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                (dark ? Colors.white : Colors.white).withOpacity(dark ? 0.03 : 0.18),
+                Colors.transparent,
+                (dark ? Colors.black : Colors.black).withOpacity(dark ? 0.28 : 0.05),
+              ],
+              stops: const [0.0, 0.45, 1.0],
+            ),
           ),
         ),
       );
@@ -163,24 +215,42 @@ class _AppBackgroundState extends State<AppBackground>
 
     if (l.bgMode == 'blobs') {
       layers.add(LayoutBuilder(builder: (context, box) {
-        final w = box.maxWidth;
-        final h = box.maxHeight;
+        final w = box.maxWidth.isFinite ? box.maxWidth : 400.0;
+        final h = box.maxHeight.isFinite ? box.maxHeight : 800.0;
         final base = max(w, h) * 0.75;
-        return AnimatedBuilder(
-          animation: _c,
-          builder: (context, _) {
-            final t = Curves.easeInOut.transform(_c.value);
-            return Stack(children: [
-              _blob(base, l.primary, -0.25 * w + 0.15 * w * t,
-                  -0.15 * h + 0.10 * h * t, dark),
-              _blob(base * 0.9, l.secondary, 0.45 * w - 0.12 * w * t,
-                  0.55 * h - 0.10 * h * t, dark),
-              _blob(base * 0.6, l.accent, 0.55 * w - 0.2 * w * t,
-                  -0.10 * h + 0.2 * h * t, dark),
-            ]);
-          },
+        return Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            _moving(
+                size: base,
+                color: l.primary,
+                dark: dark,
+                left: -0.25 * w,
+                top: -0.15 * h,
+                dx: 0.15 * w,
+                dy: 0.10 * h),
+            _moving(
+                size: base * 0.9,
+                color: l.secondary,
+                dark: dark,
+                left: 0.45 * w,
+                top: 0.55 * h,
+                dx: -0.12 * w,
+                dy: -0.10 * h),
+            _moving(
+                size: base * 0.6,
+                color: l.accent,
+                dark: dark,
+                left: 0.55 * w,
+                top: -0.10 * h,
+                dx: -0.20 * w,
+                dy: 0.20 * h),
+          ],
         );
       }));
+      layers.add(_vignette(dark));
+    } else if (l.bgMode == 'gradient') {
+      layers.add(_vignette(dark));
     } else if (l.bgMode == 'waves') {
       layers.add(CustomPaint(
         size: Size.infinite,
@@ -200,7 +270,14 @@ class _AppBackgroundState extends State<AppBackground>
 
     return Stack(
       fit: StackFit.expand,
-      children: [...layers, widget.child],
+      children: [
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: Stack(fit: StackFit.expand, children: layers),
+          ),
+        ),
+        widget.child,
+      ],
     );
   }
 }
@@ -338,7 +415,8 @@ class GlassScaffold extends StatelessWidget {
   }
 }
 
-/// کارت شیشه‌ای
+/// کارت شیشه‌ای.
+/// ویندوز: بلور واقعی. گوشی: بدون بلور (روان) و با رنگ کمی غلیظ‌تر.
 class Glass extends StatelessWidget {
   const Glass({
     super.key,
@@ -358,9 +436,16 @@ class Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = lk(context);
-    final fill = tint ?? l.cardFill;
-    final br = BorderRadius.circular(radius ?? l.radius);
+    final wantBlur = l.glassBlur > 0.5;
+    final useBlur = wantBlur && !kMobileGpu;
 
+    var fill = tint ?? l.cardFill;
+    if (wantBlur && kMobileGpu) {
+      // جبران نبودن بلور: کارت کمی پررنگ‌تر
+      fill = fill.withOpacity((fill.opacity * 1.35 + 0.04).clamp(0.0, 1.0));
+    }
+
+    final br = BorderRadius.circular(radius ?? l.radius);
     final inner = Container(
       decoration: BoxDecoration(
         color: fill,
@@ -382,15 +467,15 @@ class Glass extends StatelessWidget {
         borderRadius: br,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(l.dark ? 0.22 : 0.07),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: Colors.black.withOpacity(l.dark ? 0.20 : 0.06),
+            blurRadius: kMobileGpu ? 14 : 24,
+            offset: Offset(0, kMobileGpu ? 6 : 10),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: br,
-        child: l.glassBlur > 0.5
+        child: useBlur
             ? BackdropFilter(
                 filter: ImageFilter.blur(
                     sigmaX: l.glassBlur, sigmaY: l.glassBlur),
@@ -483,9 +568,9 @@ class GradientButton extends StatelessWidget {
                 ? null
                 : [
                     BoxShadow(
-                      color: (danger ? l.danger : l.primary).withOpacity(0.35),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
+                      color: (danger ? l.danger : l.primary).withOpacity(0.32),
+                      blurRadius: kMobileGpu ? 12 : 18,
+                      offset: Offset(0, kMobileGpu ? 5 : 8),
                     ),
                   ],
           ),

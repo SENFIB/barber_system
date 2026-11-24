@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../app/fmt.dart';
 import '../../app/settings.dart';
-import '../../app/strings_s2.dart';
+import '../../app/strings_s6.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
+import 'shifts_editor.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
 
-/// ویرایش یک آرایشگر: نام، تخصص، خدمات، ساعت، روز تعطیل، اضافه‌کار
+/// ویرایش یک آرایشگر: نام، تخصص، خدمات، شیفت‌ها، روز تعطیل، اضافه‌کار
 class StaffEditPage extends StatefulWidget {
   const StaffEditPage(this.ctx, this.staff, {super.key, required this.isOwner});
-
   final ShopCtx ctx;
   final Map<String, dynamic> staff;
   final bool isOwner;
@@ -23,14 +24,12 @@ class _StaffEditPageState extends State<StaffEditPage> {
   final _name = TextEditingController();
   final _spec = TextEditingController();
   final _ot = TextEditingController();
-
-  String _start = '09:00';
-  String _end = '18:00';
+  List<Shift> _shifts = [];
+  bool _unset = false;
   final Set<int> _off = {};
   final Set<String> _svc = {};
   bool _all = true;
   bool _otDefault = true;
-
   List<Map<String, dynamic>> _services = [];
   bool _loading = true;
   String? _err;
@@ -44,8 +43,8 @@ class _StaffEditPageState extends State<StaffEditPage> {
     final s = widget.staff;
     _name.text = jStr(s['name']);
     _spec.text = jStr(s['specialty']);
-    _start = _normTime(s['work_start'], '09:00');
-    _end = _normTime(s['work_end'], '18:00');
+    _shifts = shiftsOfStaff(s);
+    _unset = scheduleUnset(s);
 
     // روزهای تعطیل
     if (s['days_off_list'] is List) {
@@ -89,17 +88,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
     super.dispose();
   }
 
-  String _normTime(dynamic v, String d) {
-    final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(jStr(v));
-    if (m == null) return d;
-    return '${m[1]!.padLeft(2, '0')}:${m[2]}';
-  }
-
-  int _toMin(String t) {
-    final p = t.split(':');
-    return (int.tryParse(p[0]) ?? 0) * 60 + (int.tryParse(p[1]) ?? 0);
-  }
-
   bool _lost(Object e) {
     if (isSessionLost(e)) {
       Navigator.of(context).pop();
@@ -138,42 +126,21 @@ class _StaffEditPageState extends State<StaffEditPage> {
       if (_lost(e)) return;
       setState(() {
         _loading = false;
-        _err = T2(_lang).error(e);
+        _err = T6(_lang).error(e);
       });
     }
   }
 
-  Future<void> _pickTime(bool start) async {
-    final cur = _toMin(start ? _start : _end);
-    final r = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: cur ~/ 60, minute: cur % 60),
-      builder: (c, child) => MediaQuery(
-        data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
-    );
-    if (r == null) return;
-    final v =
-        '${r.hour.toString().padLeft(2, '0')}:${r.minute.toString().padLeft(2, '0')}';
-    setState(() {
-      if (start) {
-        _start = v;
-      } else {
-        _end = v;
-      }
-    });
-  }
-
   Future<void> _save() async {
-    final x = T2(_lang);
+    final x = T6(_lang);
     final name = _name.text.trim();
     if (name.isEmpty) {
       toast(context, x.t('v_required'));
       return;
     }
-    if (_toMin(_start) >= _toMin(_end)) {
-      toast(context, x.t('err_BAD_TIME'));
+    final bad = validateShifts(_shifts);
+    if (bad != null) {
+      toast(context, x.t(bad));
       return;
     }
 
@@ -195,8 +162,10 @@ class _StaffEditPageState extends State<StaffEditPage> {
       'name': name,
       'specialty': _spec.text.trim(),
       'service_ids': ids.join(','),
-      'work_start': _start,
-      'work_end': _end,
+      // شروع و پایانِ کل روز (برای سرورهای قدیمی) + خودِ شیفت‌ها
+      'work_start': _shifts.first.start,
+      'work_end': _shifts.last.end,
+      'shifts': shiftsToString(_shifts),
       'days_off': days.join('|'),
     };
 
@@ -228,27 +197,38 @@ class _StaffEditPageState extends State<StaffEditPage> {
     }
   }
 
-  Widget _timeCard(String label, String value, bool start) {
-    return Glass(
-      onTap: () => _pickTime(start),
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
+  Widget _unsetBox(T6 x) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Glass(
+        tint: Colors.orange.withOpacity(0.18),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style: TextStyle(color: muted(context), fontSize: 12.5)),
-            const SizedBox(height: 6),
-            Text(value,
-                textDirection: TextDirection.ltr,
-                style:
-                    const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+            const Icon(Icons.warning_amber_rounded,
+                color: Colors.orange, size: 26),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(x.t('sh_unset_title'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 15)),
+                  const SizedBox(height: 4),
+                  Text(x.t('sh_unset_msg'),
+                      style: TextStyle(
+                          color: muted(context), fontSize: 13, height: 1.6)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _servicesBox(T2 x) {
+  Widget _servicesBox(T6 x) {
     return Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,8 +269,9 @@ class _StaffEditPageState extends State<StaffEditPage> {
                 children: [
                   for (final r in _services)
                     FilterChip(
-                      label: Text(
-                          '${jStr(r['name'])} · ${jStr(r['duration_min'])} ${x.t('unit_min')}'),
+                      label: Text(localDigits(
+                          '${jStr(r['name'])} · ${jStr(r['duration_min'])} ${x.t('unit_min')}',
+                          _lang)),
                       selected: _svc.contains(jStr(r['service_id'])),
                       onSelected: (v) => setState(() {
                         final id = jStr(r['service_id']);
@@ -312,7 +293,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
-    final x = T2(st.lang);
+    final x = T6(st.lang);
     final days = st.lang == 'en'
         ? const [0, 1, 2, 3, 4, 5, 6]
         : const [6, 0, 1, 2, 3, 4, 5];
@@ -322,6 +303,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
         children: [
+          if (_unset) _unsetBox(x),
           Glass(
             child: Column(
               children: [
@@ -339,19 +321,13 @@ class _StaffEditPageState extends State<StaffEditPage> {
               ],
             ),
           ),
-
           SectionLabel(x.t('ed_services')),
           _servicesBox(x),
-
-          SectionLabel(x.t('ed_hours')),
-          Row(
-            children: [
-              Expanded(child: _timeCard(x.t('work_start'), _start, true)),
-              const SizedBox(width: 12),
-              Expanded(child: _timeCard(x.t('work_end'), _end, false)),
-            ],
+          SectionLabel(x.t('sh_title')),
+          ShiftsEditor(
+            shifts: _shifts,
+            onChanged: (v) => setState(() => _shifts = v),
           ),
-
           SectionLabel(x.t('ed_days_off')),
           Glass(
             child: Column(
@@ -382,7 +358,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
               ],
             ),
           ),
-
           if (widget.isOwner) ...[
             SectionLabel(x.t('ed_overtime')),
             Glass(
@@ -412,7 +387,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
                       children: [
                         for (final v in const [0, 5, 10, 15, 20, 30])
                           ChoiceChip(
-                            label: Text('$v'),
+                            label: Text(localDigits('$v', st.lang)),
                             selected: _ot.text.trim() == '$v',
                             onSelected: (_) => setState(() => _ot.text = '$v'),
                           ),
@@ -423,7 +398,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
               ),
             ),
           ],
-
           const SizedBox(height: 24),
           GradientButton(
             label: x.t('save'),
@@ -436,3 +410,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
     );
   }
 }
+
+
+

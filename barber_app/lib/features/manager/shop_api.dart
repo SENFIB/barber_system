@@ -1,4 +1,5 @@
 import 'package:barber_core/barber_core.dart';
+
 import '../../app/settings.dart';
 import '../../app/util.dart';
 
@@ -10,6 +11,7 @@ class ShopCtx {
     required this.reload,
     required this.logout,
   });
+
   final ShopApi api;
   final ManagerSession session;
   final Future<void> Function() reload;
@@ -51,6 +53,10 @@ class ShopApi {
 
   // ───────────── بدون ورود ─────────────
 
+  /// plan = اشتراکی که مالک خودش انتخاب کرده (basic | pro | special | personal).
+  /// سرور چک می‌کند کد لایسنس با همین اشتراک بخواند.
+  /// shifts = «09:00-13:00|16:00-22:00» و daysOff = روزهای تعطیل (0 = یکشنبه)
+  /// برای مالکی که خودش هم آرایشگر است.
   Future<ManagerSession> register({
     required String licenseKey,
     required String shopName,
@@ -62,6 +68,9 @@ class ShopApi {
     String ownerName = '',
     String specialty = '',
     required bool ownerIsBarber,
+    String plan = '',
+    String shifts = '',
+    List<int>? daysOff,
   }) async {
     final p = <String, dynamic>{
       'license_key': licenseKey.trim().toUpperCase(),
@@ -76,6 +85,20 @@ class ShopApi {
     if (city.trim().isNotEmpty) p['city'] = city.trim();
     if (ownerName.trim().isNotEmpty) p['owner_name'] = ownerName.trim();
     if (specialty.trim().isNotEmpty) p['specialty'] = specialty.trim();
+    if (plan.isNotEmpty) p['plan'] = plan;
+    if (ownerIsBarber && shifts.isNotEmpty) {
+      p['shifts'] = shifts;
+      final first = shifts.split('|').first.split('-');
+      final last = shifts.split('|').last.split('-');
+      if (first.length == 2 && last.length == 2) {
+        p['work_start'] = first[0];
+        p['work_end'] = last[1];
+      }
+      if (daysOff != null) {
+        final d = [...daysOff]..sort();
+        p['days_off'] = d.join('|');
+      }
+    }
     return _session(await _open('register_shop', p));
   }
 
@@ -111,8 +134,8 @@ class ShopApi {
   }
 
   /// فقط صاحب آرایشگاه. فیلدها: name, phone, address, city, description,
-  /// currency, photo_url, buffer_min, overtime_min, cancel_before_min,
-  /// slot_step_min, calendar, timezone
+  /// currency, photo_url (فقط اشتراک ویژه/شخصی), buffer_min, overtime_min,
+  /// cancel_before_min, slot_step_min, calendar, timezone
   Future<Map<String, dynamic>> shopUpdate(Map<String, dynamic> fields) async =>
       _map(await _auth('shop_update', fields));
 
@@ -141,6 +164,8 @@ class ShopApi {
 
   /// فقط فیلدهایی که null نیستند ارسال می‌شوند.
   /// serviceIds خالی = این آرایشگر همه‌ی خدمات را انجام می‌دهد.
+  /// shifts = «09:00-13:00|16:00-22:00» (تا ۳ شیفت)؛ ذخیره‌ی آن یعنی
+  /// آرایشگر ساعتش را تنظیم کرده و مشتری می‌تواند وقت ببیند.
   /// clearOvertime = اضافه‌کار اختصاصی پاک شود و تنظیم آرایشگاه اعمال شود.
   Future<void> staffUpdate({
     required String staffId,
@@ -149,6 +174,7 @@ class ShopApi {
     List<String>? serviceIds,
     String? workStart,
     String? workEnd,
+    String? shifts,
     List<int>? daysOff,
     int? overtimeMin,
     bool clearOvertime = false,
@@ -160,6 +186,7 @@ class ShopApi {
       if (serviceIds != null) 'service_ids': serviceIds,
       if (workStart != null) 'work_start': workStart,
       if (workEnd != null) 'work_end': workEnd,
+      if (shifts != null) 'shifts': shifts,
       if (daysOff != null) 'days_off': daysOff,
       if (overtimeMin != null) 'overtime_min': overtimeMin,
       if (clearOvertime) 'overtime_min': null,

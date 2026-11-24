@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-
 import 'app/app_header.dart';
+import 'app/cal_conv.dart';
 import 'app/fmt.dart';
+import 'app/reminders.dart';
 import 'app/settings.dart';
 import 'app/strings.dart';
 import 'app/theme.dart';
+import 'app/version_gate.dart';
 import 'features/customer/customer_home.dart';
+import 'features/legal/privacy_gate.dart';
 import 'features/manager/manager_entry.dart';
 import 'features/onboarding/language_page.dart';
 import 'features/onboarding/role_page.dart';
@@ -15,6 +18,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final settings = await AppSettings.load();
   kDigitsLang = settings.lang;
+  kCalKind = CalConv.kindOf(settings.calendarKey, settings.lang);
+  await Reminders.init();
   runApp(SettingsScope(settings: settings, child: const BarberApp()));
 }
 
@@ -27,8 +32,9 @@ class BarberApp extends StatelessWidget {
     final look = st.look;
     // زبان اعداد همیشه با زبان برنامه یکی است
     kDigitsLang = st.lang;
+    // تقویم نمایش از انتخاب هدر (یا پیش‌فرض زبان)
+    kCalKind = CalConv.kindOf(st.calendarKey, st.lang);
     final dir = st.isRtl ? TextDirection.rtl : TextDirection.ltr;
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: kNavKey,
@@ -93,14 +99,17 @@ class _Root extends StatelessWidget {
       page = const RolePage();
     } else if (st.role == 'customer') {
       key = 'customer';
-      page = const CustomerHome();
+      page = const VersionGate(app: 'customer', child: CustomerHome());
     } else {
       key = 'shop';
-      page = const ManagerEntry();
+      page = const VersionGate(app: 'manager', child: ManagerEntry());
     }
-    return AnimatedSwitcher(
+    final sw = AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
       child: KeyedSubtree(key: ValueKey(key), child: page),
     );
+    // بعد از انتخاب زبان، تا قبول حریم خصوصی و قوانین هیچ صفحه‌ای باز نمی‌شود
+    if (st.language == null) return sw;
+    return PrivacyGate(lang: st.lang, child: sw);
   }
 }

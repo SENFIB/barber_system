@@ -1,0 +1,148 @@
+import 'strings_s4.dart';
+
+class T5 {
+  T5(this.lang) : _p = T4(lang);
+  final String lang;
+  final T4 _p;
+
+  static const Map<String, Map<String, String>> _m = {
+    'fa': {
+      'pl_tile': 'پلن‌ها و خرید اشتراک',
+      'pl_tile_desc': 'مقایسه‌ی پلن‌ها، قیمت و تمدید',
+      'pl_title': 'پلن‌ها',
+      'pl_desc': 'یک پلن را انتخاب کنید',
+      'pl_current': 'پلن فعلی',
+      'pl_selected': 'انتخاب‌شده',
+      'pl_free_now': 'فعلاً رایگان',
+      'pl_per_month': '{p} {c} / ماه',
+      'pl_one_time': '{p} {c} · خرید یک‌باره',
+      'pl_months': '{n} ماهه',
+      'pl_off': '{n}٪ تخفیف',
+      'pl_total': 'مبلغ نهایی',
+      'pl_save': 'صرفه‌جویی: {p} {c}',
+      'pl_buy': 'خرید این پلن',
+      'pl_have_code': 'کد لایسنس دارم',
+      'pl_buy_title': 'سفارش اشتراک',
+      'pl_copy': 'کپی خلاصه‌ی سفارش',
+      'pl_copied': 'خلاصه‌ی سفارش کپی شد',
+      'pl_close': 'بستن',
+      'pl_contact': 'راه ارتباط: {c}',
+      'pl_unset': 'خلاصه‌ی سفارش را کپی کنید و برای توسعه‌دهنده بفرستید. بعد از پرداخت، کد لایسنس برای شما ارسال می‌شود و با «کد لایسنس دارم» فعالش می‌کنید.',
+      'pl_order': 'سفارش اشتراک {plan} · {months} · مبلغ {total} {c} · آرایشگاه: {shop}',
+      'pl_months_one_time': 'خرید یک‌باره',
+      'pl_toman': 'تومان',
+      'pl_name_basic': 'عادی',
+      'pl_name_pro': 'پرو',
+      'pl_name_special': 'ویژه',
+      'pl_name_personal': 'شخصی (برنامه و سرور اختصاصی)',
+      'pl_f_barbers': 'تا {n} باربر',
+      'pl_f_barbers_any': 'تعداد باربر بدون محدودیت',
+      'pl_f_booking': 'نوبت‌دهی آنلاین و تلفنی',
+      'pl_f_photo': 'عکس آرایشگاه برای مشتری‌ها',
+      'pl_f_winback': 'پیام «دلمون تنگ شده» برای مشتری‌ها',
+      'pl_f_ownsheet': 'فایل و داده‌ی اختصاصی',
+      'pl_f_backup': 'پشتیبان‌گیری',
+      'pl_f_ownserver': 'سرور و پایگاه داده‌ی شخصی',
+      'pl_f_cleanup7': 'نگهداری سابقه: هفتگی پاک می‌شود',
+      'pl_f_cleanup14': 'نگهداری سابقه: دو هفته',
+      'pl_f_cleanup30': 'نگهداری سابقه: یک ماه',
+    },
+    'en': {
+      'pl_tile': 'Plans & subscription',
+      'pl_tile_desc': 'Compare plans, prices and renew',
+      'pl_title': 'Plans',
+      'pl_desc': 'Choose a plan',
+      'pl_current': 'Current plan',
+      'pl_selected': 'Selected',
+      'pl_free_now': 'Free for now',
+      'pl_per_month': '{p} {c} / month',
+      'pl_one_time': '{p} {c} · one-time purchase',
+      'pl_months': '{n} months',
+      'pl_off': '{n}% off',
+      'pl_total': 'Total',
+      'pl_save': 'You save: {p} {c}',
+      'pl_buy': 'Buy this plan',
+      'pl_have_code': 'I have a license code',
+      'pl_buy_title': 'Subscription order',
+      'pl_copy': 'Copy order summary',
+      'pl_copied': 'Order summary copied',
+      'pl_close': 'Close',
+      'pl_contact': 'Contact: {c}',
+      'pl_unset': 'Copy the order summary and send it to the developer. After payment you will receive a license code; activate it with "I have a license code".',
+      'pl_order': 'Subscription order {plan} · {months} · total {total} {c} · shop: {shop}',
+      'pl_months_one_time': 'One-time purchase',
+      'pl_toman': 'Toman',
+      'pl_name_basic': 'Basic',
+      'pl_name_pro': 'Pro',
+      'pl_name_special': 'Special',
+      'pl_name_personal': 'Personal (own app & server)',
+      'pl_f_barbers': 'Up to {n} barbers',
+      'pl_f_barbers_any': 'Unlimited barbers',
+      'pl_f_booking': 'Online and phone booking',
+      'pl_f_photo': 'Shop photo shown to customers',
+      'pl_f_winback': '"We miss you" messages to customers',
+      'pl_f_ownsheet': 'Dedicated data file',
+      'pl_f_backup': 'Backups',
+      'pl_f_ownserver': 'Your own server and database',
+      'pl_f_cleanup7': 'History: cleaned weekly',
+      'pl_f_cleanup14': 'History: kept 2 weeks',
+      'pl_f_cleanup30': 'History: kept 1 month',
+    },
+    'ar': {
+      'pl_tile': 'الباقات والاشتراك',
+      'pl_tile_desc': 'قارن الباقات والأسعار وجدّد',
+      'pl_title': 'الباقات',
+      'pl_desc': 'اختر باقة',
+      'pl_current': 'الباقة الحالية',
+      'pl_selected': 'محددة',
+      'pl_free_now': 'مجانية حاليًا',
+      'pl_per_month': '{p} {c} / شهر',
+      'pl_one_time': '{p} {c} · شراء لمرة واحدة',
+      'pl_months': '{n} أشهر',
+      'pl_off': 'خصم {n}٪',
+      'pl_total': 'المبلغ النهائي',
+      'pl_save': 'التوفير: {p} {c}',
+      'pl_buy': 'شراء هذه الباقة',
+      'pl_have_code': 'لدي كود ترخيص',
+      'pl_buy_title': 'طلب اشتراك',
+      'pl_copy': 'نسخ ملخص الطلب',
+      'pl_copied': 'تم نسخ ملخص الطلب',
+      'pl_close': 'إغلاق',
+      'pl_contact': 'للتواصل: {c}',
+      'pl_unset': 'انسخ ملخص الطلب وأرسله إلى المطوّر. بعد الدفع ستصلك رسالة بكود ترخيص، فعّله عبر «لدي كود ترخيص».',
+      'pl_order': 'طلب اشتراك {plan} · {months} · المبلغ {total} {c} · الصالون: {shop}',
+      'pl_months_one_time': 'شراء لمرة واحدة',
+      'pl_toman': 'تومان',
+      'pl_name_basic': 'عادية',
+      'pl_name_pro': 'برو',
+      'pl_name_special': 'مميزة',
+      'pl_name_personal': 'شخصية (تطبيق وخادم خاص)',
+      'pl_f_barbers': 'حتى {n} حلاقين',
+      'pl_f_barbers_any': 'عدد غير محدود من الحلاقين',
+      'pl_f_booking': 'حجز عبر التطبيق وبالهاتف',
+      'pl_f_photo': 'صورة الصالون تظهر للزبائن',
+      'pl_f_winback': 'رسائل «اشتقنا لك» للزبائن',
+      'pl_f_ownsheet': 'ملف بيانات خاص',
+      'pl_f_backup': 'نسخ احتياطي',
+      'pl_f_ownserver': 'خادم وقاعدة بيانات خاصة بك',
+      'pl_f_cleanup7': 'السجل: يُحذف أسبوعيًا',
+      'pl_f_cleanup14': 'السجل: أسبوعان',
+      'pl_f_cleanup30': 'السجل: شهر',
+    },
+  };
+
+  String t(String key, [Map<String, String>? args]) {
+    final m = _m[lang] ?? _m['en']!;
+    final v = m[key] ?? _m['en']![key];
+    if (v == null) return _p.t(key, args);
+    var out = v;
+    if (args != null) {
+      for (final e in args.entries) {
+        out = out.replaceAll('{${e.key}}', e.value);
+      }
+    }
+    return out;
+  }
+
+  String error(Object e) => _p.error(e);
+}

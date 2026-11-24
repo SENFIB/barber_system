@@ -29,6 +29,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
   final _buffer = TextEditingController();
   final _ot = TextEditingController();
   final _cancel = TextEditingController();
+  final _rules = TextEditingController();
   String _cal = 'jalali';
   String _plan = '';
   bool _loading = true;
@@ -58,7 +59,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
   void dispose() {
     for (final c in [
       _name, _phone, _city, _address, _desc, _photo, //
-      _currency, _tz, _step, _buffer, _ot, _cancel,
+      _currency, _tz, _step, _buffer, _ot, _cancel, _rules,
     ]) {
       c.dispose();
     }
@@ -98,6 +99,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         _buffer.text = jStr(sh['buffer_min']);
         _ot.text = jStr(sh['overtime_min']);
         _cancel.text = jStr(sh['cancel_before_min']);
+        _rules.text = jStr(sh['rules']);
         _plan = jStr(sh['plan']).trim().toLowerCase();
         final c = jStr(sh['calendar']);
         _cal = const ['jalali', 'gregorian', 'hijri'].contains(c) ? c : 'jalali';
@@ -151,6 +153,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         'buffer_min': buffer,
         'overtime_min': ot,
         'cancel_before_min': cancel,
+        'rules': _rules.text.trim(),
       };
       // عکس فقط برای پلن ویژه/شخصی فرستاده می‌شود
       if (_photoOk) params['photo_url'] = _photo.text.trim();
@@ -231,9 +234,9 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               Expanded(
                 child: Text(
                   _px(
-                    'عکس آرایشگاه فقط برای پلن ویژه و شخصی است',
-                    'Shop photo is only for the Special and Personal plans',
-                    'صورة الصالون متاحة فقط لخطتي المميزة والشخصية',
+                    'عکس آرایشگاه فقط برای پلن ویژه است',
+                    'Shop photo is only for the Special plan',
+                    'صورة الصالون متاحة فقط للباقة المميزة',
                   ),
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
@@ -260,7 +263,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
     final st = SettingsScope.of(context);
     final x = T2(st.lang);
     final unit = x.t('unit_min');
-
     Widget body;
     if (_loading) {
       body = const Center(child: CircularProgressIndicator());
@@ -325,6 +327,35 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
                     controller: _currency,
                     label: x.t('ss_currency'),
                     icon: Icons.payments_rounded),
+              ],
+            ),
+          ),
+          SectionLabel(
+              _px('قوانین این آرایشگاه', 'This shop’s rules', 'قوانين هذا الصالون')),
+          Glass(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _rules,
+                  minLines: 4,
+                  maxLines: 8,
+                  maxLength: 1500,
+                  decoration: InputDecoration(
+                    hintText: _px(
+                      'مثلاً: ۱۰ دقیقه دیرتر از وقت نوبت، نوبت لغو می‌شود. لغو نوبت تا ۲ ساعت قبل ممکن است...',
+                      'e.g. Bookings are cancelled if you are 10 minutes late. Cancel up to 2 hours before...',
+                      'مثال: يُلغى الحجز عند التأخر 10 دقائق. يمكن الإلغاء قبل ساعتين...',
+                    ),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+                _hint(_px(
+                  'این متن را مشتری‌ها در صفحه‌ی آرایشگاه شما می‌بینند و با نوبت گرفتن آن را می‌پذیرند. قوانین نباید خلاف قانون یا حریم خصوصی مشتری باشد.',
+                  'Customers see this text on your shop page and accept it by booking. Rules must not break the law or the customer’s privacy.',
+                  'يراه الزبائن في صفحة صالونك ويوافقون عليه عند الحجز. يجب ألا تخالف القوانين أو خصوصية الزبون.',
+                )),
               ],
             ),
           ),

@@ -18,14 +18,14 @@ String localDigits(String s, [String? lang]) {
   return b.toString();
 }
 
-/// عدد با جداکننده‌ی هزارگان و رقم‌های زبان: 1250000 → 1,250,000 / ۱٬۲۵۰٬۰۰۰
+/// عدد با جداکننده‌ی هزارگانِ کامای معمولی (روی خط) و رقم‌های زبان:
+/// 1250000 → 1,250,000 / ۱,۲۵۰,۰۰۰
 String fmtNum(num n, [String? lang]) {
   final l = lang ?? kDigitsLang;
   final s = n.round().abs().toString();
-  final sep = l == 'en' ? ',' : '٬';
   final b = StringBuffer();
   for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) b.write(sep);
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
     b.write(s[i]);
   }
   return localDigits((n < 0 ? '-' : '') + b.toString(), l);

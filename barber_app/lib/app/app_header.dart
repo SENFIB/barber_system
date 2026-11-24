@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../features/legal/privacy_gate.dart';
 import 'brand.dart';
 import 'settings.dart';
 import 'strings.dart';
@@ -20,7 +22,14 @@ void _closePicker() {
 String _tr(String lang, String fa, String en, String ar) =>
     lang == 'fa' ? fa : (lang == 'ar' ? ar : en);
 
-/// هدر ثابت برنامه: نام، زبان، ساعت (مغازه/دستگاه) و تقویم
+void _openRules(AppSettings st) {
+  final ctx = kNavKey.currentContext;
+  if (ctx == null) return;
+  if (_pickerOpen.value) return;
+  openAppPolicy(ctx, st.lang);
+}
+
+/// هدر ثابت برنامه: نام، زبان، ساعت (مغازه/دستگاه)، تقویم و قوانین
 class AppHeader extends StatelessWidget {
   const AppHeader({super.key});
 
@@ -34,6 +43,7 @@ class AppHeader extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final base = Color.alphaBlend(
         l.primary.withOpacity(l.dark ? 0.12 : 0.08), l.bg[0]);
+
     final langCode = lang == 'fa' ? 'فا' : (lang == 'ar' ? 'ع' : 'EN');
     final calName = () {
       switch (st.calendar) {
@@ -106,6 +116,16 @@ class AppHeader extends StatelessWidget {
                       icon: Icons.calendar_month_rounded,
                       label: compact ? null : calName,
                       onTap: () => _calSheet(st),
+                    ),
+                    const SizedBox(width: 6),
+                    _HBtn(
+                      semantic: _tr(lang, 'قوانین و مقررات',
+                          'Terms and policy', 'القوانين والأحكام'),
+                      icon: Icons.gavel_rounded,
+                      label: compact
+                          ? null
+                          : _tr(lang, 'قوانین', 'Rules', 'القوانين'),
+                      onTap: () => _openRules(st),
                     ),
                   ],
                 ),

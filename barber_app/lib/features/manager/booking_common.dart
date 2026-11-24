@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/fmt.dart';
+
 String bStr(dynamic v) => v == null ? '' : v.toString();
 
 int bInt(dynamic v, [int d = 0]) {
@@ -63,6 +65,7 @@ int bMin(String hhmm) {
 
 String bTime(TimeOfDay t) => '${_p2(t.hour)}:${_p2(t.minute)}';
 
+/// رقم‌های فارسی/عربی → انگلیسی (برای خواندن ورودی و ارسال به سرور)
 String bDigits(String s) {
   const fa = '۰۱۲۳۴۵۶۷۸۹';
   const ar = '٠١٢٣٤٥٦٧٨٩';
@@ -75,6 +78,10 @@ String bDigits(String s) {
   }
   return sb.toString().trim();
 }
+
+/// برعکس بالایی: فقط برای «نمایش» به کاربر؛ رقم‌ها به زبان برنامه
+/// (فارسی ۰۱۲۳ ، عربی ٠١٢٣ ، انگلیسی 0123). هیچ‌وقت برای ارسال به سرور استفاده نشود.
+String bDisp(String s, [String? lang]) => localDigits(s, lang);
 
 void bSnack(BuildContext context, String msg) {
   final m = ScaffoldMessenger.maybeOf(context);

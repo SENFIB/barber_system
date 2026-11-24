@@ -1,9 +1,10 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../app/brand.dart';
 import '../../app/config.dart';
+import '../../app/fmt.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/strings_ex.dart';
@@ -11,9 +12,15 @@ import '../../app/widgets.dart';
 import '../manager/shop_api.dart';
 import 'appearance_page.dart';
 
+// کلیدهای نام و شماره‌ی مشتری که روی گوشی ذخیره می‌شوند (همان کلیدهای CustomerStore)
+const String _kCustName = 'cust_name';
+const String _kCustPhone = 'cust_phone';
+
+String _x3(String lang, String fa, String en, String ar) =>
+    lang == 'fa' ? fa : (lang == 'ar' ? ar : en);
+
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
-
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -23,6 +30,8 @@ class _SettingsPageState extends State<SettingsPage> {
   int _taps = 0;
   bool _showServer = false;
   bool _testing = false;
+  String _custName = '';
+  String _custPhone = '';
   final _urlC = TextEditingController();
 
   @override
@@ -32,12 +41,24 @@ class _SettingsPageState extends State<SettingsPage> {
       // فقط شماره‌ی نسخه؛ بدون شماره‌ی build
       if (mounted) setState(() => _version = p.version);
     });
+    _loadCustomer();
   }
 
   @override
   void dispose() {
     _urlC.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCustomer() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        _custName = p.getString(_kCustName) ?? '';
+        _custPhone = p.getString(_kCustPhone) ?? '';
+      });
+    } catch (_) {}
   }
 
   void _tapVersion() {
@@ -117,18 +138,21 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
     if (ok != true) return;
-
     final msg = s.t('data_deleted');
     final messenger = ScaffoldMessenger.of(context);
     final nav = Navigator.of(context);
-
     if (st.hasShopToken) {
       try {
         await ShopApi(st).logout().timeout(const Duration(seconds: 8));
       } catch (_) {}
     }
+    // نام و شماره‌ی ذخیره‌شده‌ی مشتری هم پاک شود
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.remove(_kCustName);
+      await p.remove(_kCustPhone);
+    } catch (_) {}
     await st.clearAll(resetDeviceId: resetId);
-
     nav.popUntil((r) => r.isFirst);
     messenger.showSnackBar(SnackBar(content: Text(msg)));
   }
@@ -158,7 +182,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final st = SettingsScope.of(context);
     final s = S(st.lang);
     final x = X(st.lang);
-
     final roleText = st.role == 'shop'
         ? s.t('role_shop')
         : st.role == 'customer'
@@ -176,7 +199,7 @@ class _SettingsPageState extends State<SettingsPage> {
             : 'English';
     final dev = st.deviceId;
     final devShort = dev.length > 8 ? '${dev.substring(0, 8)}…' : dev;
-
+    final none = s.t('sd_none');
     return GlassScaffold(
       title: s.t('settings'),
       body: ListView(
@@ -281,6 +304,16 @@ class _SettingsPageState extends State<SettingsPage> {
                         ? x.t('sd_look_custom')
                         : x.t('sd_look_default')),
                 _row(s.t('sd_device'), devShort, ltr: true),
+                _row(
+                    _x3(st.lang, 'نام مشتری', 'Customer name', 'اسم الزبون'),
+                    _custName.isEmpty ? none : _custName),
+                _row(
+                    _x3(st.lang, 'شماره‌ی مشتری', 'Customer phone',
+                        'رقم الزبون'),
+                    _custPhone.isEmpty
+                        ? none
+                        : localDigits(_custPhone, st.lang),
+                    ltr: true),
                 _row(s.t('sd_session'),
                     st.hasShopToken ? s.t('sd_yes') : s.t('sd_no')),
                 _row(s.t('sd_server'),
@@ -334,7 +367,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
           const SizedBox(height: 28),
-
           // توسعه‌دهنده: پایین همه‌چیز و بالای خط نسخه
           Center(
             child: Row(

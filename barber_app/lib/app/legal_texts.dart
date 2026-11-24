@@ -23,17 +23,17 @@ class LegalGroup {
 LegalSection _closing(String lang) {
   if (lang == 'ar') {
     return const LegalSection(
-        'آمل أن يساعد ESMAIRO في تنظيم عملكم وأن تبقى مواعيدكم عامرة دائمًا.',
-        '— إسماعيل');
+        'هذا ليس مجرد نظام لحجز المواعيد؛ بل محاولة لبناء تجربة أفضل وعمل أكثر تنظيمًا ومستقبل أكثر إشراقًا.',
+        'آمل أن تكون هذه المنصة رفيقًا موثوقًا في مسار نموّكم ونجاحكم.\n\nPowered by ESMAIL\n— إسماعيل');
   }
   if (lang == 'en') {
     return const LegalSection(
-        'I hope ESMAIRO helps your business run smoothly and keeps your chairs full.',
-        '— Esmaeil');
+        'This is not just a booking system; it is an attempt to build a better experience, a more organized business and a brighter future.',
+        'I hope this platform will be a trustworthy companion on your path to growth and success.\n\nPowered by ESMAIL\n— Esmaeil');
   }
   return const LegalSection(
-      'امیدوارم ESMAIRO به رونق و نظم کار شما کمک کند و نوبت‌هایتان همیشه پر باشد.',
-      '— اسماعیل');
+      'این فقط یک سیستم نوبت‌دهی نیست؛ تلاشی است برای ساختن تجربه‌ای بهتر، کسب‌وکاری منظم‌تر و آینده‌ای روشن‌تر.',
+      'امیدوارم این پلتفرم، همراهی قابل اعتماد در مسیر رشد و موفقیت شما باشد.\n\nPowered by ESMAIL\n— اسماعیل');
 }
 
 List<LegalSection> appPolicy(String lang) {

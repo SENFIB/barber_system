@@ -1,14 +1,24 @@
+import 'cal_conv.dart';
+
 /// زبانِ اعداد (main.dart آن را با زبان برنامه هماهنگ نگه می‌دارد)
 String kDigitsLang = 'fa';
 
-/// ارقام انگلیسی را به رقم‌های زبان تبدیل می‌کند.
+/// تقویمِ نمایش (main.dart از انتخاب هدر/زبان تنظیمش می‌کند).
+/// هر تاریخ YYYY-MM-DD که از localDigits رد شود، به این تقویم تبدیل می‌شود.
+CalKind kCalKind = CalKind.gregorian;
+
+/// ارقام انگلیسی را به رقم‌های زبان تبدیل می‌کند و تاریخ‌ها را به تقویم انتخابی می‌برد.
 /// fa → ۰۱۲۳۴۵۶۷۸۹ ، ar → ٠١٢٣٤٥٦٧٨٩ ، en → بدون تغییر
 String localDigits(String s, [String? lang]) {
   final l = lang ?? kDigitsLang;
-  if (l == 'en') return s;
+  var t = s;
+  if (kCalKind != CalKind.gregorian && t.length >= 10) {
+    t = CalConv.convertText(t, kCalKind, l);
+  }
+  if (l == 'en') return t;
   final base = l == 'ar' ? 0x0660 : 0x06F0;
   final b = StringBuffer();
-  for (final r in s.runes) {
+  for (final r in t.runes) {
     if (r >= 0x30 && r <= 0x39) {
       b.writeCharCode(base + (r - 0x30));
     } else {

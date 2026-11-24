@@ -9,10 +9,11 @@ import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/strings_ex.dart';
 import '../../app/widgets.dart';
+import '../legal/privacy_gate.dart';
 import '../manager/shop_api.dart';
 import 'appearance_page.dart';
 
-// کلیدهای نام و شماره‌ی مشتری که روی گوشی ذخیره می‌شوند (همان کلیدهای CustomerStore)
+// کلیدهای نام و شماره‌ی مشتری که روی دستگاه ذخیره می‌شوند (همان کلیدهای CustomerStore)
 const String _kCustName = 'cust_name';
 const String _kCustPhone = 'cust_phone';
 
@@ -21,6 +22,7 @@ String _x3(String lang, String fa, String en, String ar) =>
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -200,6 +202,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final dev = st.deviceId;
     final devShort = dev.length > 8 ? '${dev.substring(0, 8)}…' : dev;
     final none = s.t('sd_none');
+
     return GlassScaffold(
       title: s.t('settings'),
       body: ListView(
@@ -286,6 +289,37 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           ],
+          const SizedBox(height: 14),
+          Glass(
+            onTap: () => openAppPolicy(context, st.lang),
+            child: Row(
+              children: [
+                const GradientIcon(Icons.privacy_tip_rounded, size: 44),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          _x3(st.lang, 'حریم خصوصی و قوانین',
+                              'Privacy & terms', 'الخصوصية والشروط'),
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(
+                          _x3(
+                              st.lang,
+                              'چه اطلاعاتی نگه‌داری می‌شود و قوانین استفاده',
+                              'What data is kept, and the terms of use',
+                              'ما البيانات التي تُحفظ وشروط الاستخدام'),
+                          style: TextStyle(
+                              color: muted(context), fontSize: 12.5)),
+                    ],
+                  ),
+                ),
+                Icon(chevron(context), color: muted(context)),
+              ],
+            ),
+          ),
           SectionLabel(s.t('saved_data')),
           Glass(
             child: Column(

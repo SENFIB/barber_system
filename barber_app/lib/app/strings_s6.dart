@@ -40,7 +40,7 @@ class T6 {
 
   String t(String key, [Map<String, Object?>? args]) {
     final own = _m[lang]?[key] ?? _m['en']?[key];
-    if (own == null) return uiText(_base.t(key, args), lang);
+    if (own == null) return uiText(_base.t(key, args?.map((k, v) => MapEntry(k, '$v'))), lang);
     var r = own;
     if (args != null) {
       args.forEach((k, v) => r = r.replaceAll('{$k}', '$v'));

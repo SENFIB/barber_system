@@ -2,7 +2,7 @@ import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
-import '../../app/strings_s3.dart';
+import '../../app/strings_s6.dart';
 import '../../app/widgets.dart';
 import 'booking_common.dart';
 import 'shop_api.dart';
@@ -12,7 +12,6 @@ class ManualBookingPage extends StatefulWidget {
   const ManualBookingPage(this.ctx, {super.key, this.initialDate});
   final ShopCtx ctx;
   final String? initialDate;
-
   @override
   State<ManualBookingPage> createState() => _ManualBookingPageState();
 }
@@ -37,7 +36,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
 
   bool get _owner => widget.ctx.session.isOwner;
   String get _myStaff => bStr(widget.ctx.session.staffId);
-  T3 _tr() => T3(SettingsScope.read(context).lang);
+  T6 _tr() => T6(SettingsScope.read(context).lang);
 
   @override
   void initState() {
@@ -123,6 +122,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
   }
 
   void _toggle(String id) {
+    final lang = SettingsScope.read(context).lang;
     if (_picked.contains(id)) {
       setState(() {
         _picked.remove(id);
@@ -132,7 +132,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
       return;
     }
     if (_owner && _picked.length >= _maxServices) {
-      bSnack(context, _tr().t('m_max', {'n': fmtNum(_maxServices)}));
+      bSnack(context, _tr().t('m_max', {'n': fmtNum(_maxServices, lang)}));
       return;
     }
     setState(() {
@@ -255,8 +255,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = T3(SettingsScope.of(context).lang);
-
+    final t = T6(SettingsScope.of(context).lang);
     Widget body;
     if (_loading) {
       body = const Center(child: CircularProgressIndicator());
@@ -285,7 +284,6 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
     } else {
       body = _form(t);
     }
-
     return GlassScaffold(
       title: t.t('m_title'),
       maxWidth: 600,
@@ -293,7 +291,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
     );
   }
 
-  Widget _form(T3 t) {
+  Widget _form(T6 t) {
     final services = _visibleServices();
     final slots = _slots;
     return ListView(
@@ -313,7 +311,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
               for (final s in services)
                 FilterChip(
                   label: Text(
-                      '${bStr(s['name'])} · ${fmtNum(bInt(s['duration_min']))} ${t.t('b_min')}'),
+                      '${bStr(s['name'])} · ${fmtNum(bInt(s['duration_min']), t.lang)} ${t.t('b_min')}'),
                   selected: _picked.contains(bStr(s['service_id'])),
                   onSelected: (_) => _toggle(bStr(s['service_id'])),
                 ),
@@ -322,7 +320,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
           if (_owner)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text(t.t('m_max', {'n': fmtNum(_maxServices)}),
+              child: Text(t.t('m_max', {'n': fmtNum(_maxServices, t.lang)}),
                   style: TextStyle(color: muted(context), fontSize: 12)),
             ),
         ],
@@ -344,7 +342,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
               Text(t.t('d_${_day.weekday % 7}'),
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(width: 10),
-              Text(bIso(_day),
+              Text(localDigits(bIso(_day), t.lang),
                   textDirection: TextDirection.ltr,
                   style: TextStyle(color: muted(context))),
             ],
@@ -374,7 +372,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
               children: [
                 for (var i = 0; i < slots.length; i++)
                   ChoiceChip(
-                    label: Text(bStr(slots[i]['start']),
+                    label: Text(localDigits(bStr(slots[i]['start']), t.lang),
                         textDirection: TextDirection.ltr),
                     selected: i == _slotIdx,
                     onSelected: (_) => setState(() => _slotIdx = i),
@@ -409,7 +407,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
     );
   }
 
-  Widget _choiceRow(String sid, T3 t) {
+  Widget _choiceRow(String sid, T6 t) {
     final svc = _services.firstWhere(
       (s) => bStr(s['service_id']) == sid,
       orElse: () => <String, dynamic>{},

@@ -1,8 +1,10 @@
 // متن حریم خصوصی و شرایط استفاده در سه زبان.
 // نسخه را وقتی بالا ببری که متن تغییر مهم کرد؛ آن‌وقت از همه دوباره تأیید گرفته می‌شود.
+import 'registry.dart';
+
 const int kLegalVersion = 1;
 
-/// شماره یا ایمیل تماس (اختیاری). اگر پر باشد، آخر متن حریم خصوصی نمایش داده می‌شود.
+/// شماره یا ایمیل تماس. وقتی فرم پیام فعال باشد (kRegistryUrl پر باشد) نمایش داده نمی‌شود.
 const String kLegalContact = 'efmfib.1373@gmail.com';
 
 class LegalSection {
@@ -17,26 +19,31 @@ class LegalGroup {
   const LegalGroup(this.title, this.sections);
 }
 
-/// جملهٔ پایانی که زیر همهٔ قوانین نمایش داده می‌شود.
+/// جملهٔ پایانی؛ فقط یک بار، زیر «شرایط استفاده».
 LegalSection _closing(String lang) {
   if (lang == 'ar') {
     return const LegalSection(
-        'مع تمنياتي بالتوفيق', 'التوفيق لكم — إسماعيل');
+        'آمل أن يساعد ESMAIRO في تنظيم عملكم وأن تبقى مواعيدكم عامرة دائمًا.',
+        '— إسماعيل');
   }
   if (lang == 'en') {
-    return const LegalSection('Wishing you success', 'Success to you — Esmaeil');
+    return const LegalSection(
+        'I hope ESMAIRO helps your business run smoothly and keeps your chairs full.',
+        '— Esmaeil');
   }
-  return const LegalSection('با آرزوی موفقیت', 'موفقیت برای شما — اسماعیل');
+  return const LegalSection(
+      'امیدوارم ESMAIRO به رونق و نظم کار شما کمک کند و نوبت‌هایتان همیشه پر باشد.',
+      '— اسماعیل');
 }
 
 List<LegalSection> appPolicy(String lang) {
   final base = lang == 'ar' ? _arP : (lang == 'en' ? _enP : _faP);
   final list = List<LegalSection>.of(base);
-  if (kLegalContact.trim().isNotEmpty) {
+  // اگر فرم پیام فعال نیست، ایمیل را نشان بده
+  if (kRegistryUrl.trim().isEmpty && kLegalContact.trim().isNotEmpty) {
     final last = list.removeLast();
     list.add(LegalSection(last.h, '${last.b}\n${kLegalContact.trim()}'));
   }
-  list.add(_closing(lang));
   return list;
 }
 
@@ -48,7 +55,7 @@ List<LegalSection> appTerms(String lang) {
 // =========================================================== فارسی
 const List<LegalSection> _faP = [
   LegalSection('۱. معرفی',
-      'ESMAIRO (اسمایرو) برنامهٔ نوبت‌دهی آنلاین برای آرایشگاه‌ها و مشتریان آن‌هاست که «اسماعیل» آن را توسعه داده است. این متن توضیح می‌دهد چه اطلاعاتی گرفته می‌شود، برای چه کاری استفاده می‌شود، چه کسی آن را می‌بیند و تا کی نگه داشته می‌شود. با تأیید این متن و استفاده از برنامه، آن را می‌پذیرید.'),
+      'ESMAIRO (اسمایرو) برنامهٔ نوبت‌دهی آنلاین برای آرایشگاه‌ها و مشتریان آن‌هاست. این متن توضیح می‌دهد چه اطلاعاتی گرفته می‌شود، برای چه کاری استفاده می‌شود، چه کسی آن را می‌بیند و تا کی نگه داشته می‌شود. با تأیید این متن و استفاده از برنامه، آن را می‌پذیرید.'),
   LegalSection('۲. اطلاعاتی که گرفته می‌شود',
       'مشتری:\n• نام و شماره تلفنی که خودتان وارد می‌کنید (روی دستگاه خودتان ذخیره می‌شود و هنگام ثبت نوبت برای آرایشگاه ارسال می‌شود).\n• یک شناسهٔ تصادفی دستگاه که فقط برای نمایش نوبت‌های خودتان به‌کار می‌رود و ربطی به هویت واقعی شما ندارد.\n• اطلاعات نوبت: آرایشگاه، آرایشگر، خدمت، تاریخ و ساعت، وضعیت نوبت و امتیازی که می‌دهید.\n\nآرایشگاه:\n• نام، شماره تماس، نشانی، شهر و (در پلن‌هایی که امکانش را دارند) عکس آرایشگاه.\n• نام کاربری و رمز عبور مدیر و آرایشگران؛ رمز عبور هرگز به‌صورت متن اصلی ذخیره نمی‌شود و فقط نسخهٔ رمزنگاری‌شدهٔ یک‌طرفه نگهداری می‌شود.\n• فهرست آرایشگران، خدمت‌ها، ساعت کاری، مرخصی‌ها، نوبت‌ها، کد لایسنس و وضعیت اشتراک.'),
   LegalSection('۳. اطلاعاتی که گرفته نمی‌شود',
@@ -95,7 +102,7 @@ const List<LegalSection> _faT = [
 // =========================================================== English
 const List<LegalSection> _enP = [
   LegalSection('1. Introduction',
-      'ESMAIRO is an online appointment-booking app for barber shops and their customers, developed by Esmaeil. This text explains what information is collected, what it is used for, who can see it, and how long it is kept. By accepting this text and using the app, you agree to it.'),
+      'ESMAIRO is an online appointment-booking app for barber shops and their customers. This text explains what information is collected, what it is used for, who can see it, and how long it is kept. By accepting this text and using the app, you agree to it.'),
   LegalSection('2. Information we collect',
       'Customers:\n• The name and phone number you enter yourself (stored on your own device and sent to the shop when you book).\n• A random device ID used only to show your own bookings; it is not linked to your real identity.\n• Booking details: shop, barber, service, date and time, booking status and the rating you give.\n\nShops:\n• Name, phone number, address, city and (on plans that include it) the shop photo.\n• Usernames and passwords of the manager and barbers; passwords are never stored in plain text, only a one-way encrypted version is kept.\n• List of barbers, services, working hours, time off, bookings, license code and subscription status.'),
   LegalSection('3. Information we do not collect',
@@ -142,7 +149,7 @@ const List<LegalSection> _enT = [
 // =========================================================== العربية
 const List<LegalSection> _arP = [
   LegalSection('١. مقدمة',
-      'ESMAIRO (إسمايرو) تطبيق لحجز المواعيد عبر الإنترنت للصالونات وزبائنها، طوّره «إسماعيل». يوضّح هذا النص ما المعلومات التي تُجمع، ولماذا، ومن يراها، ومدة الاحتفاظ بها. بموافقتك على هذا النص واستخدامك للتطبيق فإنك تقبله.'),
+      'ESMAIRO (إسمايرو) تطبيق لحجز المواعيد عبر الإنترنت للصالونات وزبائنها. يوضّح هذا النص ما المعلومات التي تُجمع، ولماذا، ومن يراها، ومدة الاحتفاظ بها. بموافقتك على هذا النص واستخدامك للتطبيق فإنك تقبله.'),
   LegalSection('٢. المعلومات التي تُجمع',
       'الزبون:\n• الاسم ورقم الهاتف اللذان تدخلهما بنفسك (يُحفظان على جهازك ويُرسلان إلى الصالون عند حجز موعد).\n• معرّف عشوائي للجهاز يُستخدم فقط لعرض مواعيدك، ولا علاقة له بهويتك الحقيقية.\n• بيانات الموعد: الصالون والحلّاق والخدمة والتاريخ والوقت وحالة الموعد والتقييم الذي تمنحه.\n\nالصالون:\n• الاسم ورقم الهاتف والعنوان والمدينة، وصورة الصالون (في الخطط التي تتيحها).\n• اسم المستخدم وكلمة المرور للمدير والحلّاقين؛ لا تُحفظ كلمة المرور نصًّا صريحًا، بل نسخة مشفّرة أحادية الاتجاه فقط.\n• قائمة الحلّاقين والخدمات وساعات العمل والإجازات والمواعيد ورمز الترخيص وحالة الاشتراك.'),
   LegalSection('٣. المعلومات التي لا تُجمع',

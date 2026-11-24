@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'config.dart';
 import 'look.dart';
 
@@ -14,6 +16,8 @@ const _kDevice = 'device_id';
 const _kApi = 'api_url';
 const _kToken = 'shop_token';
 const _kLook = 'look';
+const _kTime = 'time_mode';
+const _kCal = 'calendar_mode';
 
 String _newDeviceId() {
   final r = Random.secure();
@@ -69,17 +73,34 @@ class AppSettings extends ChangeNotifier {
   }
 
   String get deviceId => _p.getString(_kDevice) ?? '';
-
   bool get hasCustomApiUrl => (_get(_kApi) ?? '').trim().isNotEmpty;
   String get apiUrl => hasCustomApiUrl ? _get(_kApi)!.trim() : kDefaultApiUrl;
 
   String? get shopToken => _get(_kToken);
   bool get hasShopToken => shopToken != null;
 
+  // ---------- ساعت و تقویم ----------
+
+  /// 'shop' = ساعت و تاریخ مغازه | 'phone' = ساعت و تاریخ گوشی
+  String get timeMode => _get(_kTime) ?? 'shop';
+  bool get usePhoneTime => timeMode == 'phone';
+
+  /// 'auto' | 'jalali' | 'gregorian' | 'hijri'
+  String get calendarKey => _get(_kCal) ?? 'auto';
+
+  /// تقویم نهایی: در حالت خودکار از روی زبان
+  /// فارسی = شمسی ، انگلیسی = میلادی ، عربی = هجری
+  String get calendar {
+    final k = calendarKey;
+    if (k != 'auto') return k;
+    if (lang == 'fa') return 'jalali';
+    if (lang == 'ar') return 'hijri';
+    return 'gregorian';
+  }
+
   // ---------- ظاهر ----------
   String? _lookRaw;
   AppLook _lookVal = const AppLook();
-
   AppLook get look {
     final raw = _get(_kLook);
     if (raw != _lookRaw) {
@@ -103,8 +124,9 @@ class AppSettings extends ChangeNotifier {
   Future<void> setThemeKey(String v) => _set(_kTheme, v);
   Future<void> setApiUrl(String? v) => _set(_kApi, v?.trim());
   Future<void> setShopToken(String? v) => _set(_kToken, v);
-
   Future<void> setLook(AppLook l) => _set(_kLook, jsonEncode(l.toJson()));
+  Future<void> setTimeMode(String v) => _set(_kTime, v);
+  Future<void> setCalendarKey(String v) => _set(_kCal, v);
 
   /// عکس انتخابی را در حافظه‌ی خصوصی برنامه کپی می‌کند و به‌عنوان پس‌زمینه می‌گذارد
   Future<void> setBackgroundImage(String sourcePath) async {

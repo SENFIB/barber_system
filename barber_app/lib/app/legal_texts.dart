@@ -1,23 +1,18 @@
 // متن حریم خصوصی و شرایط استفاده در سه زبان.
 // نسخه را وقتی بالا ببری که متن تغییر مهم کرد؛ آن‌وقت از همه دوباره تأیید گرفته می‌شود.
-
 const int kLegalVersion = 1;
-
 /// شماره یا ایمیل تماس (اختیاری). اگر پر باشد، آخر متن حریم خصوصی نمایش داده می‌شود.
-const String kLegalContact = '';
-
+const String kLegalContact = 'efmfib.1373@gmail.com';
 class LegalSection {
   final String h;
   final String b;
   const LegalSection(this.h, this.b);
 }
-
 class LegalGroup {
   final String title;
   final List<LegalSection> sections;
   const LegalGroup(this.title, this.sections);
 }
-
 List<LegalSection> appPolicy(String lang) {
   final base = lang == 'ar' ? _arP : (lang == 'en' ? _enP : _faP);
   if (kLegalContact.trim().isEmpty) return base;
@@ -26,10 +21,8 @@ List<LegalSection> appPolicy(String lang) {
   list.add(LegalSection(last.h, '${last.b}\n${kLegalContact.trim()}'));
   return list;
 }
-
 List<LegalSection> appTerms(String lang) =>
     lang == 'ar' ? _arT : (lang == 'en' ? _enT : _faT);
-
 // =========================================================== فارسی
 const List<LegalSection> _faP = [
   LegalSection('۱. معرفی',
@@ -57,7 +50,6 @@ const List<LegalSection> _faP = [
   LegalSection('۱۲. ارتباط',
       'برای سؤال، شکایت یا درخواست حذف اطلاعات با توسعه‌دهنده (اسماعیل) تماس بگیرید.'),
 ];
-
 const List<LegalSection> _faT = [
   LegalSection('۱. ماهیت برنامه',
       'ESMAIRO فقط ابزار نوبت‌دهی است. خدمتی که انجام می‌شود توافق بین آرایشگاه و مشتری است. توسعه‌دهنده در قبال کیفیت خدمت، قیمت‌ها، ساعت کاری، تأخیر یا حاضر نشدن هیچ‌یک از طرفین مسئولیتی ندارد.'),
@@ -76,7 +68,6 @@ const List<LegalSection> _faT = [
   LegalSection('۸. تغییر و پایان استفاده',
       'شرایط ممکن است تغییر کند و در تغییرهای مهم دوباره تأیید می‌گیریم. در صورت نقض شرایط، دسترسی شما می‌تواند محدود شود.'),
 ];
-
 // =========================================================== English
 const List<LegalSection> _enP = [
   LegalSection('1. Introduction',
@@ -104,7 +95,6 @@ const List<LegalSection> _enP = [
   LegalSection('12. Contact',
       'For questions, complaints or data-deletion requests, contact the developer (Esmaeil).'),
 ];
-
 const List<LegalSection> _enT = [
   LegalSection('1. Nature of the app',
       'ESMAIRO is only a booking tool. The service itself is an agreement between the shop and the customer. The developer is not responsible for the quality of service, prices, working hours, or lateness or absence of either party.'),
@@ -123,7 +113,6 @@ const List<LegalSection> _enT = [
   LegalSection('8. Changes and termination',
       'These terms may change and we will ask for acceptance again for important changes. If the terms are breached, your access may be restricted.'),
 ];
-
 // =========================================================== العربية
 const List<LegalSection> _arP = [
   LegalSection('١. مقدمة',
@@ -151,7 +140,6 @@ const List<LegalSection> _arP = [
   LegalSection('١٢. التواصل',
       'للأسئلة أو الشكاوى أو طلب حذف البيانات تواصل مع المطوّر (إسماعيل).'),
 ];
-
 const List<LegalSection> _arT = [
   LegalSection('١. طبيعة التطبيق',
       'ESMAIRO أداة لحجز المواعيد فقط. الخدمة المقدَّمة اتفاق بين الصالون والزبون، ولا يتحمل المطوّر أي مسؤولية عن جودة الخدمة أو الأسعار أو ساعات العمل أو تأخّر أي طرف أو عدم حضوره.'),

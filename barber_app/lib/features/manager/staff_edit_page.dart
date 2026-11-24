@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/fmt.dart';
+import '../../app/plans_config.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/util.dart';
@@ -143,7 +144,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
       toast(context, x.t(bad));
       return;
     }
-
     var ids = <String>[];
     if (!_all) {
       ids = [
@@ -155,7 +155,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
         return;
       }
     }
-
     final days = _off.toList()..sort();
     final params = <String, dynamic>{
       'staff_id': jStr(widget.staff['staff_id']),
@@ -168,7 +167,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
       'shifts': shiftsToString(_shifts),
       'days_off': days.join('|'),
     };
-
     if (widget.isOwner) {
       if (_otDefault) {
         params['clear_overtime'] = true;
@@ -181,7 +179,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
         params['overtime_min'] = n;
       }
     }
-
     setState(() => _busy = true);
     try {
       await ShopRaw(SettingsScope.read(context)).call('staff_update', params);
@@ -297,7 +294,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
     final days = st.lang == 'en'
         ? const [0, 1, 2, 3, 4, 5, 6]
         : const [6, 0, 1, 2, 3, 4, 5];
-
+    final cap = shiftCapForPlan(widget.ctx.session.shop.plan);
     return GlassScaffold(
       title: x.t('ed_title'),
       body: ListView(
@@ -326,6 +323,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
           SectionLabel(x.t('sh_title')),
           ShiftsEditor(
             shifts: _shifts,
+            max: cap,
             onChanged: (v) => setState(() => _shifts = v),
           ),
           SectionLabel(x.t('ed_days_off')),
@@ -410,6 +408,3 @@ class _StaffEditPageState extends State<StaffEditPage> {
     );
   }
 }
-
-
-

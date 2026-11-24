@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
-import '../../app/strings_s3.dart';
+import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import 'booking_common.dart';
@@ -14,7 +14,6 @@ import 'timeoff_page.dart';
 class BookingsPage extends StatefulWidget {
   const BookingsPage(this.ctx, {super.key});
   final ShopCtx ctx;
-
   @override
   State<BookingsPage> createState() => _BookingsPageState();
 }
@@ -30,7 +29,7 @@ class _BookingsPageState extends State<BookingsPage> {
   String _staffFilter = '';
 
   bool get _owner => widget.ctx.session.isOwner;
-  T3 _tr() => T3(SettingsScope.read(context).lang);
+  T6 _tr() => T6(SettingsScope.read(context).lang);
 
   @override
   void initState() {
@@ -219,12 +218,10 @@ class _BookingsPageState extends State<BookingsPage> {
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
-    final t = T3(st.lang);
-    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final t = T6(st.lang);
     final groups = _groups();
-
     final children = <Widget>[
-      _dayBar(t, rtl),
+      _dayBar(t),
       const SizedBox(height: 10),
     ];
     if (_owner && _staff.length > 1) {
@@ -281,7 +278,7 @@ class _BookingsPageState extends State<BookingsPage> {
           child: Wrap(
             spacing: 8,
             children: [
-              Pill(t.t('b_count', {'n': fmtNum(groups.length)})),
+              Pill(t.t('b_count', {'n': fmtNum(groups.length, t.lang)})),
             ],
           ),
         ));
@@ -294,7 +291,6 @@ class _BookingsPageState extends State<BookingsPage> {
       }
     }
     children.add(const SizedBox(height: 90));
-
     return GlassScaffold(
       title: t.t('b_title'),
       maxWidth: 720,
@@ -326,19 +322,18 @@ class _BookingsPageState extends State<BookingsPage> {
     );
   }
 
-  Widget _dayBar(T3 t, bool rtl) {
+  Widget _dayBar(T6 t) {
     final day = _date;
     final dt = day == null ? null : bParse(day);
     final wd = dt == null ? '' : t.t('d_${dt.weekday % 7}');
     final isToday = day != null && day == bStr(_now['date']);
+    // فلش‌ها خودشان در RTL برعکس می‌شوند؛ دستی برعکس نکن
     return Glass(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       child: Row(
         children: [
           IconButton(
-            icon: Icon(rtl
-                ? Icons.chevron_right_rounded
-                : Icons.chevron_left_rounded),
+            icon: const Icon(Icons.chevron_left_rounded),
             onPressed: day == null ? null : () => _shift(-1),
           ),
           Expanded(
@@ -363,7 +358,7 @@ class _BookingsPageState extends State<BookingsPage> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(day ?? '—',
+                    Text(day == null ? '—' : localDigits(day, t.lang),
                         textDirection: TextDirection.ltr,
                         style: TextStyle(color: muted(context))),
                   ],
@@ -372,9 +367,7 @@ class _BookingsPageState extends State<BookingsPage> {
             ),
           ),
           IconButton(
-            icon: Icon(rtl
-                ? Icons.chevron_left_rounded
-                : Icons.chevron_right_rounded),
+            icon: const Icon(Icons.chevron_right_rounded),
             onPressed: day == null ? null : () => _shift(1),
           ),
         ],
@@ -382,7 +375,7 @@ class _BookingsPageState extends State<BookingsPage> {
     );
   }
 
-  Widget _filterBar(T3 t) {
+  Widget _filterBar(T6 t) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -415,7 +408,7 @@ class _BookingsPageState extends State<BookingsPage> {
     );
   }
 
-  Widget _groupCard(List<Map<String, dynamic>> g, T3 t) {
+  Widget _groupCard(List<Map<String, dynamic>> g, T6 t) {
     final first = g.first;
     final name = bStr(first['customer_name']);
     final phone = bStr(first['customer_phone']);
@@ -435,14 +428,13 @@ class _BookingsPageState extends State<BookingsPage> {
     });
     final anyBooked = g.any((b) => bStr(b['status']) == 'booked');
     final gid = bStr(first['group_id']);
-
     final card = Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text('${bStr(first['start_time'])} – $endStr',
+              Text(localDigits('${bStr(first['start_time'])} – $endStr', t.lang),
                   textDirection: TextDirection.ltr,
                   style: const TextStyle(
                       fontSize: 18, fontWeight: FontWeight.w800)),
@@ -476,7 +468,7 @@ class _BookingsPageState extends State<BookingsPage> {
                         Icon(Icons.phone_rounded,
                             size: 16, color: muted(context)),
                         const SizedBox(width: 4),
-                        Text(phone,
+                        Text(localDigits(phone, t.lang),
                             textDirection: TextDirection.ltr,
                             style: TextStyle(color: muted(context))),
                       ],
@@ -514,7 +506,7 @@ class _BookingsPageState extends State<BookingsPage> {
     return allDead ? Opacity(opacity: 0.6, child: card) : card;
   }
 
-  Widget _line(Map<String, dynamic> b, T3 t) {
+  Widget _line(Map<String, dynamic> b, T6 t) {
     final status = bStr(b['status']);
     final canDone = status == 'booked' || status == 'checked_in';
     final canNo = status == 'booked' && _started(b);
@@ -524,10 +516,9 @@ class _BookingsPageState extends State<BookingsPage> {
     final bid = bStr(b['booking_id']);
     final sub = <String>[
       if (bStr(b['staff_name']).isNotEmpty) bStr(b['staff_name']),
-      if (dur > 0) '${fmtNum(dur)} ${t.t('b_min')}',
-      if (price > 0) fmtNum(price),
+      if (dur > 0) '${fmtNum(dur, t.lang)} ${t.t('b_min')}',
+      if (price > 0) fmtNum(price, t.lang),
     ].join(' · ');
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -556,7 +547,7 @@ class _BookingsPageState extends State<BookingsPage> {
                 const Icon(Icons.star_rounded,
                     size: 18, color: AppColors.amber),
                 const SizedBox(width: 2),
-                Text(fmtNum(rating),
+                Text(fmtNum(rating, t.lang),
                     style: const TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(width: 8),
               ],
@@ -610,6 +601,3 @@ class _BookingsPageState extends State<BookingsPage> {
     );
   }
 }
-
-
-

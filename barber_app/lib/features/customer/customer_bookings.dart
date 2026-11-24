@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
-import '../../app/strings_s4.dart';
+import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../manager/booking_common.dart';
@@ -13,7 +13,6 @@ class MyBookingsTab extends StatefulWidget {
   const MyBookingsTab({super.key, required this.api, this.refresh});
   final CustomerApi api;
   final ValueListenable<int>? refresh;
-
   @override
   State<MyBookingsTab> createState() => _MyBookingsTabState();
 }
@@ -24,7 +23,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   Object? _err;
   List<List<Map<String, dynamic>>> _groups = <List<Map<String, dynamic>>>[];
 
-  T4 _tr() => T4(SettingsScope.read(context).lang);
+  T6 _tr() => T6(SettingsScope.read(context).lang);
 
   @override
   void initState() {
@@ -107,9 +106,10 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     }
   }
 
-  String _gid(List<Map<String, dynamic>> g) => bStr(g.first['group_id']).isNotEmpty
-      ? bStr(g.first['group_id'])
-      : bStr(g.first['booking_id']);
+  String _gid(List<Map<String, dynamic>> g) =>
+      bStr(g.first['group_id']).isNotEmpty
+          ? bStr(g.first['group_id'])
+          : bStr(g.first['booking_id']);
 
   Future<void> _cancel(List<Map<String, dynamic>> g) async {
     final t = _tr();
@@ -175,7 +175,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final t = T4(SettingsScope.of(context).lang);
+    final t = T6(SettingsScope.of(context).lang);
     final children = <Widget>[];
     if (_loading && _groups.isEmpty) {
       children.add(const Padding(
@@ -239,7 +239,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       }
     }
     children.add(const SizedBox(height: 30));
-
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -256,7 +255,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
       );
 
-  Widget _card(List<Map<String, dynamic>> g, T4 t) {
+  Widget _card(List<Map<String, dynamic>> g, T6 t) {
     final first = g.first;
     var endMin = 0;
     var endStr = '';
@@ -279,7 +278,6 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     final address = bStr(first['shop_address']);
     final dt = bParse(bStr(first['date']));
     final wd = dt == null ? '' : t.t('d_${dt.weekday % 7}');
-
     final card = Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,16 +286,27 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               style:
                   const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(Icons.calendar_month_rounded,
-                  size: 18, color: muted(context)),
-              const SizedBox(width: 6),
-              Text('$wd  ${bStr(first['date'])}',
-                  textDirection: TextDirection.ltr,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(width: 12),
-              Text('${bStr(first['start_time'])} – $endStr',
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_month_rounded,
+                      size: 18, color: muted(context)),
+                  const SizedBox(width: 6),
+                  Text(wd,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 6),
+                  Text(localDigits(bStr(first['date']), t.lang),
+                      textDirection: TextDirection.ltr,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                ],
+              ),
+              Text(
+                  localDigits('${bStr(first['start_time'])} – $endStr', t.lang),
                   textDirection: TextDirection.ltr,
                   style: const TextStyle(fontWeight: FontWeight.w700)),
             ],
@@ -310,7 +319,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 Icon(Icons.place_rounded, size: 18, color: muted(context)),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(address,
+                  child: Text(localDigits(address, t.lang),
                       style: TextStyle(color: muted(context), fontSize: 12.5)),
                 ),
               ],
@@ -331,7 +340,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                     Icon(Icons.phone_rounded,
                         size: 18, color: muted(context)),
                     const SizedBox(width: 6),
-                    Text(phone,
+                    Text(localDigits(phone, t.lang),
                         textDirection: TextDirection.ltr,
                         style: TextStyle(color: muted(context))),
                   ],
@@ -388,15 +397,15 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     return dead ? Opacity(opacity: 0.6, child: card) : card;
   }
 
-  Widget _line(Map<String, dynamic> b, T4 t) {
+  Widget _line(Map<String, dynamic> b, T6 t) {
     final status = bStr(b['status']);
     final rating = bInt(b['rating']);
     final price = bInt(b['price']);
     final dur = bInt(b['duration_min']);
     final sub = <String>[
       if (bStr(b['staff_name']).isNotEmpty) bStr(b['staff_name']),
-      if (dur > 0) '${fmtNum(dur)} ${t.t('b_min')}',
-      if (price > 0) fmtNum(price),
+      if (dur > 0) '${fmtNum(dur, t.lang)} ${t.t('b_min')}',
+      if (price > 0) fmtNum(price, t.lang),
     ].join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -422,7 +431,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
           if (rating > 0) ...[
             const Icon(Icons.star_rounded, size: 18, color: AppColors.amber),
             const SizedBox(width: 2),
-            Text(fmtNum(rating),
+            Text(fmtNum(rating, t.lang),
                 style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(width: 8),
           ],
@@ -436,8 +445,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
 class _RateDialog extends StatefulWidget {
   const _RateDialog({required this.rows, required this.t});
   final List<Map<String, dynamic>> rows;
-  final T4 t;
-
+  final T6 t;
   @override
   State<_RateDialog> createState() => _RateDialogState();
 }

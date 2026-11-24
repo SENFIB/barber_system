@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/settings.dart';
-import '../../app/strings.dart';
-import '../../app/strings_s4.dart';
+import '../../app/strings_s6.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
 import 'customer_api.dart';
@@ -10,7 +9,6 @@ import 'customer_shops.dart';
 
 class CustomerHome extends StatefulWidget {
   const CustomerHome({super.key});
-
   @override
   State<CustomerHome> createState() => _CustomerHomeState();
 }
@@ -28,12 +26,10 @@ class _CustomerHomeState extends State<CustomerHome> {
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
-    final t = T4(st.lang);
-    final s = S(st.lang);
+    final t = T6(st.lang);
     final api = CustomerApi(st);
-
     return GlassScaffold(
-      title: s.t('app_name'),
+      title: t.t('app_name'),
       maxWidth: 720,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded),

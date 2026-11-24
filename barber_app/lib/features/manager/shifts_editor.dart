@@ -82,7 +82,7 @@ String shiftsText(List<Shift> l, String lang) => l
     .map((s) => localDigits('${s.start} – ${s.end}', lang))
     .join('   •   ');
 
-/// ویرایشگر شیفت‌ها (تا ۳ شیفت)
+/// ویرایشگر شیفت‌ها (سقف از روی پلن می‌آید)
 class ShiftsEditor extends StatelessWidget {
   const ShiftsEditor({
     super.key,
@@ -211,8 +211,9 @@ class ShiftsEditor extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(x.t('sh_hint'),
-              style: TextStyle(color: muted(context), fontSize: 12.5, height: 1.7)),
+          Text(x.t('sh_hint', {'n': max}),
+              style: TextStyle(
+                  color: muted(context), fontSize: 12.5, height: 1.7)),
           const SizedBox(height: 12),
           for (var i = 0; i < shifts.length; i++) ...[
             _row(context, x, i),
@@ -225,7 +226,10 @@ class ShiftsEditor extends StatelessWidget {
               compact: true,
               outlined: true,
               onPressed: () => _add(context, x),
-            ),
+            )
+          else
+            Text(x.t('sh_limit', {'n': max}),
+                style: TextStyle(color: muted(context), fontSize: 12.5)),
         ],
       ),
     );

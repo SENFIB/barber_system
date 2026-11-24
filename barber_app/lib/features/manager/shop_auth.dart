@@ -21,7 +21,6 @@ String _x(String lang, String fa, String en, String ar) =>
 // ───────────────────────── صفحه‌ی ورود (اول) ─────────────────────────
 class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
-
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -171,15 +170,9 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
               label: Text(
                 _x(
                   st.lang,
-                  st.hasCustomApiUrl
-                      ? 'کد سرور اختصاصی (فعال)'
-                      : 'کد سرور اختصاصی',
-                  st.hasCustomApiUrl
-                      ? 'Dedicated server code (active)'
-                      : 'Dedicated server code',
-                  st.hasCustomApiUrl
-                      ? 'رمز الخادم الخاص (مفعّل)'
-                      : 'رمز الخادم الخاص',
+                  st.hasCustomApiUrl ? 'کد راه‌اندازی (فعال)' : 'کد راه‌اندازی',
+                  st.hasCustomApiUrl ? 'Setup code (active)' : 'Setup code',
+                  st.hasCustomApiUrl ? 'رمز الإعداد (مفعّل)' : 'رمز الإعداد',
                 ),
               ),
             ),
@@ -194,7 +187,6 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
 class SignupChoicePage extends StatelessWidget {
   const SignupChoicePage(
       {super.key, required this.api, required this.onSession});
-
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -267,8 +259,7 @@ String _planName(String lang, String key) {
     case 'special':
       return _x(lang, 'ویژه', 'Special', 'مميزة');
     default:
-      return _x(lang, 'پلن شخصی (خرید کامل برنامه)',
-          'Personal plan (full app purchase)', 'الخطة الشخصية (شراء التطبيق كاملًا)');
+      return _x(lang, 'پلن شخصی', 'Personal plan', 'الخطة الشخصية');
   }
 }
 
@@ -288,9 +279,7 @@ IconData _planIcon(String key) {
 String _planPrice(String lang, PlanDef p) {
   final toman = _x(lang, 'تومان', 'Toman', 'تومان');
   if (p.key == 'personal' || p.oneTime > 0) {
-    final once =
-        _x(lang, 'خرید یک‌باره', 'One-time purchase', 'شراء لمرة واحدة');
-    return '$once: ${fmtNum(p.oneTime, lang)} $toman';
+    return _x(lang, 'خرید یکباره', 'One-time purchase', 'شراء لمرة واحدة');
   }
   if (p.monthly <= 0) return _x(lang, 'رایگان', 'Free', 'مجاني');
   final perMonth = _x(lang, '/ ماه', '/ month', '/ شهر');
@@ -352,28 +341,21 @@ List<String> _planFeatures(String lang, PlanDef p) {
         _x(lang, 'فضای اختصاصی برای آرایشگاه شما و پشتیبان‌گیری',
             'Dedicated space for your shop, plus backups',
             'مساحة خاصة لصالونك ونسخ احتياطي'),
-        _x(lang, 'راه‌اندازی اختصاصی با کد سرور',
-            'Dedicated setup with a server code',
-            'إعداد خاص عبر رمز الخادم'),
+        _x(lang, 'فعال‌سازی اختصاصی با کد راه‌اندازی',
+            'Dedicated activation with a setup code',
+            'تفعيل خاص برمز الإعداد'),
       ];
     default:
+      // پلن شخصی: فقط همین یک خط
       return [
-        barbers,
-        booking,
-        photo,
-        winback,
-        _x(lang, 'برنامه و سرور مخصوص خودتان', 'The app with your own server',
-            'التطبيق مع خادمك الخاص'),
-        _x(lang, 'راه‌اندازی و سرور به عهدهٔ خود آرایشگاه است',
-            'Setup and server are the shop owner\'s responsibility',
-            'الإعداد والخادم على مسؤولية صاحب الصالون'),
+        _x(lang, 'راه‌اندازی توسط خود آرایشگاه', 'Set up by the shop itself',
+            'الإعداد يتولاه الصالون بنفسه'),
       ];
   }
 }
 
 class OwnerPlanPage extends StatelessWidget {
   const OwnerPlanPage({super.key, required this.api, required this.onSession});
-
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -416,7 +398,6 @@ class OwnerPlanPage extends StatelessWidget {
 class _PlanCard extends StatelessWidget {
   const _PlanCard(
       {required this.plan, required this.lang, required this.onTap});
-
   final PlanDef plan;
   final String lang;
   final VoidCallback onTap;
@@ -480,7 +461,6 @@ class OwnerSignupPage extends StatefulWidget {
       required this.api,
       required this.onSession,
       required this.plan});
-
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
@@ -498,7 +478,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   final _city = TextEditingController();
   final _user = TextEditingController();
   final _pass = TextEditingController();
-
   bool _barber = true;
   bool _hide = true;
   bool _loading = false;
@@ -590,7 +569,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     final needsServer = (widget.plan.key == 'special' ||
             widget.plan.key == 'personal') &&
         !st.hasCustomApiUrl;
-
     return GlassScaffold(
       title: s.t('signup_owner'),
       body: ListView(
@@ -636,9 +614,9 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                   Text(
                     _x(
                         lang,
-                        'برای این پلن اول باید «کد سرور اختصاصی» را وارد کنید. بعد از ذخیره، دوباره به همین مرحله برگردید.',
-                        'For this plan, first enter your "dedicated server code". After saving, come back to this step.',
-                        'لهذه الباقة أدخل أولًا «رمز الخادم الخاص». بعد الحفظ ارجع إلى هذه الخطوة.'),
+                        'برای این پلن اول باید «کد راه‌اندازی» را وارد کنید. بعد از ذخیره، دوباره به همین مرحله برگردید.',
+                        'For this plan, first enter your "setup code". After saving, come back to this step.',
+                        'لهذه الباقة أدخل أولًا «رمز الإعداد». بعد الحفظ ارجع إلى هذه الخطوة.'),
                     style: TextStyle(color: muted(context), height: 1.5),
                   ),
                   const SizedBox(height: 8),
@@ -647,8 +625,8 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                         MaterialPageRoute(
                             builder: (_) => const ServerCodePage())),
                     icon: const Icon(Icons.vpn_key_outlined, size: 18),
-                    label: Text(_x(lang, 'وارد کردن کد سرور',
-                        'Enter server code', 'إدخال رمز الخادم')),
+                    label: Text(_x(lang, 'وارد کردن کد راه‌اندازی',
+                        'Enter setup code', 'إدخال رمز الإعداد')),
                   ),
                 ],
               ),
@@ -824,7 +802,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
 // ───────────────────────── ورود آرایشگر با کد دعوت ─────────────────────────
 class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
-
   final ShopApi api;
   final SessionCallback onSession;
 

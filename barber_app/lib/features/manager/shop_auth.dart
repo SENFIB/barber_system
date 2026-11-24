@@ -1,6 +1,5 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
-
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
@@ -18,12 +17,24 @@ typedef SessionCallback = Future<void> Function(ManagerSession session);
 String _x(String lang, String fa, String en, String ar) =>
     lang == 'fa' ? fa : (lang == 'ar' ? ar : en);
 
+/// کد واردشده را به آدرس کامل تبدیل می‌کند؛ اگر معتبر نبود null
+String? _normCode(String raw) {
+  final t = raw.trim().replaceAll(RegExp(r'\s'), '');
+  if (RegExp(r'^https://script\.google\.com/macros/s/[A-Za-z0-9_\-]+/exec$')
+      .hasMatch(t)) {
+    return t;
+  }
+  if (RegExp(r'^[A-Za-z0-9_\-]{20,}$').hasMatch(t)) {
+    return 'https://script.google.com/macros/s/$t/exec';
+  }
+  return null;
+}
+
 // ───────────────────────── صفحه‌ی ورود (اول) ─────────────────────────
 class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
-
   @override
   State<ShopAuthPage> createState() => _ShopAuthPageState();
 }
@@ -193,7 +204,6 @@ class SignupChoicePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = T6(SettingsScope.of(context).lang);
-
     Widget card(IconData icon, String title, String desc, VoidCallback onTap) {
       return Glass(
         onTap: onTap,
@@ -312,7 +322,6 @@ List<String> _planFeatures(String lang, PlanDef p) {
       'تا $sh شیفت کاری در روز برای هر آرایشگر',
       'Up to $sh work shifts a day per barber',
       'حتى $sh فترات عمل يوميًا لكل حلاق');
-
   switch (p.key) {
     case 'basic':
       return [
@@ -464,13 +473,13 @@ class OwnerSignupPage extends StatefulWidget {
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
-
   @override
   State<OwnerSignupPage> createState() => _OwnerSignupPageState();
 }
 
 class _OwnerSignupPageState extends State<OwnerSignupPage> {
   final _license = TextEditingController();
+  final _code = TextEditingController();
   final _shop = TextEditingController();
   final _phone = TextEditingController();
   final _ownerName = TextEditingController();
@@ -484,6 +493,9 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   late List<Shift> _shifts;
   List<int> _daysOff = <int>[];
 
+  bool get _planNeedsCode =>
+      widget.plan.key == 'special' || widget.plan.key == 'personal';
+
   @override
   void initState() {
     super.initState();
@@ -496,7 +508,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   @override
   void dispose() {
     for (final c in [
-      _license, _shop, _phone, _ownerName, _address, _city, _user, _pass
+      _license, _code, _shop, _phone, _ownerName, _address, _city, _user, _pass
     ]) {
       c.dispose();
     }
@@ -524,11 +536,30 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   }
 
   Future<void> _submit() async {
-    final s = T6(SettingsScope.read(context).lang);
+    final st = SettingsScope.read(context);
+    final lang = st.lang;
+    final s = T6(lang);
     final err = _validate(s);
     if (err != null) {
       toast(context, err);
       return;
+    }
+    // باکس «کد» فقط وقتی لازم است که هنوز ذخیره نشده باشد
+    final showCode = _planNeedsCode && !st.hasCustomApiUrl;
+    String? serverUrl;
+    if (showCode) {
+      if (_code.text.trim().isEmpty) {
+        toast(context, s.t('v_required'));
+        return;
+      }
+      serverUrl = _normCode(_code.text);
+      if (serverUrl == null) {
+        toast(
+            context,
+            _x(lang, 'کد واردشده درست نیست', 'The code is not valid',
+                'الرمز المدخل غير صحيح'));
+        return;
+      }
     }
     setState(() => _loading = true);
     try {
@@ -545,12 +576,23 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         plan: widget.plan.key,
         shifts: _barber ? shiftsToString(_shifts) : '',
         daysOff: _barber ? _daysOff : null,
+        serverUrl: serverUrl,
       );
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
       await widget.onSession(sess);
     } on ApiException catch (e) {
       if (mounted) toast(context, s.error(e));
+    } catch (_) {
+      if (mounted) {
+        toast(
+            context,
+            _x(
+                lang,
+                'اتصال برقرار نشد. کد و اینترنت را بررسی کنید',
+                'Could not connect. Check the code and your internet',
+                'تعذر الاتصال. تحقق من الرمز والإنترنت'));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -566,9 +608,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     final order = lang == 'en'
         ? <int>[0, 1, 2, 3, 4, 5, 6]
         : <int>[6, 0, 1, 2, 3, 4, 5];
-    final needsServer = (widget.plan.key == 'special' ||
-            widget.plan.key == 'personal') &&
-        !st.hasCustomApiUrl;
+    final showCode = _planNeedsCode && !st.hasCustomApiUrl;
     return GlassScaffold(
       title: s.t('signup_owner'),
       body: ListView(
@@ -604,34 +644,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               ],
             ),
           ),
-          if (needsServer) ...[
-            const SizedBox(height: 12),
-            Glass(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _x(
-                        lang,
-                        'برای این پلن اول باید «کد راه‌اندازی» را وارد کنید. بعد از ذخیره، دوباره به همین مرحله برگردید.',
-                        'For this plan, first enter your "setup code". After saving, come back to this step.',
-                        'لهذه الباقة أدخل أولًا «رمز الإعداد». بعد الحفظ ارجع إلى هذه الخطوة.'),
-                    style: TextStyle(color: muted(context), height: 1.5),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const ServerCodePage())),
-                    icon: const Icon(Icons.vpn_key_outlined, size: 18),
-                    label: Text(_x(lang, 'وارد کردن کد راه‌اندازی',
-                        'Enter setup code', 'إدخال رمز الإعداد')),
-                  ),
-                ],
-              ),
-            ),
-          ],
           const SizedBox(height: 16),
           Glass(
             padding: const EdgeInsets.all(18),
@@ -654,6 +666,15 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                           'يجب أن يكون رمز الترخيص لهذه الباقة'),
                       style: TextStyle(color: muted(context), fontSize: 12)),
                 ),
+                if (showCode) ...[
+                  _gap(),
+                  GlassField(
+                    controller: _code,
+                    label: _x(lang, 'کد', 'Code', 'الرمز'),
+                    icon: Icons.tag_rounded,
+                    ltr: true,
+                  ),
+                ],
                 _gap(),
                 GlassField(
                   controller: _shop,
@@ -804,7 +825,6 @@ class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
-
   @override
   State<StaffJoinPage> createState() => _StaffJoinPageState();
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../app/fmt.dart';
+import '../../app/reminders.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/strings_s3.dart';
@@ -13,18 +15,31 @@ import 'services_page.dart';
 import 'shop_api.dart';
 import 'staff_page.dart';
 import 'timeoff_page.dart';
+import 'winback_page.dart';
 
-class ManagerHome extends StatelessWidget {
+String _x(String l, String fa, String en, String ar) =>
+    l == 'fa' ? fa : (l == 'ar' ? ar : en);
+
+class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key, required this.ctx});
   final ShopCtx ctx;
 
-  String _date(String? d) {
+  @override
+  State<ManagerHome> createState() => _ManagerHomeState();
+}
+
+class _ManagerHomeState extends State<ManagerHome> {
+  String _synced = '';
+
+  String _date(String? d, String lang) {
     if (d == null || d.isEmpty) return '—';
-    return d.length >= 10 ? d.substring(0, 10) : d;
+    final s = d.length >= 10 ? d.substring(0, 10) : d;
+    return localDigits(s, lang);
   }
 
   @override
   Widget build(BuildContext context) {
+    final ctx = widget.ctx;
     final lang = SettingsScope.of(context).lang;
     final s = S(lang);
     final t3 = T3(lang);
@@ -33,6 +48,23 @@ class ManagerHome extends StatelessWidget {
     final sub = sess.subscription;
     final shop = sess.shop;
     final planKey = 'plan_${shop.plan}';
+
+    // اعلان‌های محلیِ پایان اشتراک (۳ و ۱ روز مانده) — فقط برای صاحب
+    if (sess.isOwner) {
+      final k = '${sub.free}|${sub.expiresAt}|$lang';
+      if (k != _synced) {
+        _synced = k;
+        final exp = sub.expiresAt ?? '';
+        final free = sub.free;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (free || exp.isEmpty) {
+            Reminders.cancelExpiry();
+          } else {
+            Reminders.ask().then((_) => Reminders.expiry(exp, lang));
+          }
+        });
+      }
+    }
 
     Widget tile({
       required IconData icon,
@@ -92,7 +124,10 @@ class ManagerHome extends StatelessWidget {
               cancelLabel: s.t('cancel'),
               danger: true,
             );
-            if (ok) await ctx.logout();
+            if (ok) {
+              Reminders.cancelExpiry();
+              await ctx.logout();
+            }
           },
         ),
       ],
@@ -181,7 +216,7 @@ class ManagerHome extends StatelessWidget {
                       children: [
                         Text('${s.t('sub_expires')}: ',
                             style: TextStyle(color: muted(context))),
-                        Text(_date(sub.expiresAt),
+                        Text(_date(sub.expiresAt, lang),
                             textDirection: TextDirection.ltr,
                             style:
                                 const TextStyle(fontWeight: FontWeight.w700)),
@@ -189,7 +224,7 @@ class ManagerHome extends StatelessWidget {
                     ),
                     if (sub.daysLeft != null) ...[
                       const SizedBox(height: 4),
-                      Text('${sub.daysLeft} ${s.t('sub_days_left')}',
+                      Text('${fmtNum(sub.daysLeft!, lang)} ${s.t('sub_days_left')}',
                           style: TextStyle(color: muted(context))),
                     ],
                     if (sess.isOwner) ...[
@@ -251,6 +286,22 @@ class ManagerHome extends StatelessWidget {
                 ),
                 onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => TimeOffPage(ctx))),
+              ),
+            if (sess.isOwner)
+              tile(
+                icon: Icons.favorite_rounded,
+                title: _x(lang, 'پیام «دلمون تنگ شده»', '"We miss you" messages',
+                    'رسائل «اشتقنا لك»'),
+                desc: _x(
+                    lang,
+                    'متن، آرایشگر و زمان‌بندی پیام به مشتری‌ها',
+                    'Text, barber and timing of messages to customers',
+                    'نص الرسالة والحلاق والتوقيت للزبائن'),
+                gradient: const LinearGradient(
+                  colors: [AppColors.pink, AppColors.blue],
+                ),
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => WinbackPage(ctx))),
               ),
             if (sess.isOwner)
               tile(

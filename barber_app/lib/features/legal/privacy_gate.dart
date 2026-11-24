@@ -1,10 +1,9 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../app/legal_texts.dart';
+import 'contact_box.dart';
 
 /// ذخیرهٔ تأیید حریم خصوصی (مستقل از AppSettings)
 class PolicyStore {
@@ -208,6 +207,7 @@ class PolicyViewPage extends StatelessWidget {
   final List<LegalGroup> groups;
   final String? plain;
   final String? note;
+  final bool showContact;
   const PolicyViewPage({
     super.key,
     required this.lang,
@@ -215,6 +215,7 @@ class PolicyViewPage extends StatelessWidget {
     this.groups = const [],
     this.plain,
     this.note,
+    this.showContact = false,
   });
 
   @override
@@ -243,6 +244,7 @@ class PolicyViewPage extends StatelessWidget {
                       if (plain != null)
                         Text(plain!, style: const TextStyle(height: 1.8, fontSize: 14)),
                       if (groups.isNotEmpty) _GroupsView(groups: groups),
+                      if (showContact) ContactBox(lang: lang),
                     ],
                   ),
                 ),
@@ -291,6 +293,7 @@ void openAppPolicy(BuildContext context, String lang) {
         LegalGroup(LegalUi.privacy(lang), appPolicy(lang)),
         LegalGroup(LegalUi.terms(lang), appTerms(lang)),
       ],
+      showContact: true,
     ),
   ));
 }

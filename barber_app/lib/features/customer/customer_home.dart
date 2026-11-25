@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/brand.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/widgets.dart';
@@ -28,8 +29,11 @@ class _CustomerHomeState extends State<CustomerHome> {
     final st = SettingsScope.of(context);
     final t = T6(st.lang);
     final api = CustomerApi(st);
+    final shopsTab = st.lang == 'fa'
+        ? 'کسب‌وکارها'
+        : (st.lang == 'ar' ? 'الأنشطة التجارية' : 'Businesses');
     return GlassScaffold(
-      title: t.t('app_name'),
+      title: appNameFor(st.lang),
       maxWidth: 720,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded),
@@ -49,7 +53,7 @@ class _CustomerHomeState extends State<CustomerHome> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
             child: SegmentPicker<int>(
               options: <MapEntry<int, String>>[
-                MapEntry<int, String>(0, t.t('cu_tab_shops')),
+                MapEntry<int, String>(0, shopsTab),
                 MapEntry<int, String>(1, t.t('cu_tab_mine')),
               ],
               value: _tab,

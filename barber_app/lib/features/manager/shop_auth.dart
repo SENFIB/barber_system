@@ -1,5 +1,8 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+import '../../app/biz_icons.dart';
+import '../../app/biz_panel.dart';
+import '../../app/business_types.dart';
 import '../../app/config.dart' show kDefaultApiUrl;
 import '../../app/extra_http.dart' show extraPost;
 import '../../app/fmt.dart';
@@ -49,11 +52,6 @@ const Map<String, List<String>> _ov = {
     'برمز الدعوة من صاحب النشاط التجاري'
   ],
   'shop_name': ['نام کسب‌وکار', 'Business name', 'اسم النشاط التجاري'],
-  'i_am_barber': [
-    'خودم هم خدمت می‌دهم',
-    'I also provide services myself',
-    'أقدّم الخدمات بنفسي'
-  ],
   'create_shop': ['ساخت کسب‌وکار', 'Create business', 'إنشاء النشاط التجاري'],
 };
 
@@ -63,9 +61,9 @@ String _w(String lang, T6 s, String key) {
   return lang == 'fa' ? o[0] : (lang == 'ar' ? o[2] : o[1]);
 }
 
-Future<void> _saveGender(
-    AppSettings st, String gender, String plan, String? serverUrl) async {
-  if (gender != 'men' && gender != 'women') return;
+/// نوع کسب‌وکار (و جنسیت، فقط برای آرایش و زیبایی) را بعد از ثبت‌نام ذخیره می‌کند
+Future<void> _saveBiz(AppSettings st, String bizType, String gender,
+    String plan, String? serverUrl) async {
   try {
     final String url;
     if (plan == 'basic') {
@@ -75,12 +73,17 @@ Future<void> _saveGender(
     } else {
       url = serverUrl ?? st.apiUrl;
     }
-    await extraPost(url, <String, dynamic>{
+    final body = <String, dynamic>{
       'action': 'shop_update',
       'token': st.shopToken,
       'device_id': st.deviceId,
-      'gender': gender,
-    });
+      'biz_type': bizType,
+    };
+    if (BizPanel.of(bizType).beauty &&
+        (gender == 'men' || gender == 'women')) {
+      body['gender'] = gender;
+    }
+    await extraPost(url, body).timeout(const Duration(seconds: 12));
   } catch (_) {}
 }
 
@@ -470,9 +473,87 @@ class OwnerPlanPage extends StatelessWidget {
               plan: p,
               lang: lang,
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) =>
-                    OwnerSignupPage(api: api, onSession: onSession, plan: p),
+                builder: (_) => OwnerCategoryPage(
+                    api: api, onSession: onSession, plan: p),
               )),
+            ),
+            const SizedBox(height: 14),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// انتخاب اجباری نوع کسب‌وکار هنگام ثبت‌نام
+class OwnerCategoryPage extends StatelessWidget {
+  const OwnerCategoryPage(
+      {super.key,
+      required this.api,
+      required this.onSession,
+      required this.plan});
+  final ShopApi api;
+  final SessionCallback onSession;
+  final PlanDef plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = SettingsScope.of(context).lang;
+    return GlassScaffold(
+      title: _x(lang, 'نوع کسب‌وکار', 'Business type', 'نوع النشاط التجاري'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Text(
+              _x(
+                  lang,
+                  'کسب‌وکار شما از کدام دسته است؟ یکی را انتخاب کنید',
+                  'Which category is your business in? Pick one',
+                  'من أي فئة نشاطك التجاري؟ اختر واحدة'),
+              style: TextStyle(color: muted(context), height: 1.5),
+            ),
+          ),
+          for (final g in kBizGroups) ...[
+            Glass(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      GradientIcon(bizGroupIcon(g.key), size: 38),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(g.name(lang),
+                            style: const TextStyle(
+                                fontSize: 16.5, fontWeight: FontWeight.w800)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final t in bizTypesOf(g.key))
+                        ActionChip(
+                          avatar: Icon(bizTypeIcon(t.key), size: 18),
+                          label: Text(t.name(lang)),
+                          onPressed: () =>
+                              Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => OwnerSignupPage(
+                                api: api,
+                                onSession: onSession,
+                                plan: plan,
+                                bizType: t.key),
+                          )),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
           ],
@@ -546,10 +627,12 @@ class OwnerSignupPage extends StatefulWidget {
       {super.key,
       required this.api,
       required this.onSession,
-      required this.plan});
+      required this.plan,
+      required this.bizType});
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
+  final String bizType;
   @override
   State<OwnerSignupPage> createState() => _OwnerSignupPageState();
 }
@@ -576,6 +659,8 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.bizType == 'barber') _gender = 'men';
+    if (widget.bizType == 'salon') _gender = 'women';
     _shifts = parseShifts('09:00-13:00|16:00-20:00');
     final cap = widget.plan.maxShifts;
     if (_shifts.length > cap) _shifts = _shifts.sublist(0, cap);
@@ -636,6 +721,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     }
     final gender = _gender;
     final planKey = widget.plan.key;
+    final bizType = widget.bizType;
     final onSession = widget.onSession;
     setState(() => _loading = true);
     try {
@@ -654,10 +740,10 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         daysOff: _barber ? _daysOff : null,
         serverUrl: serverUrl,
       );
+      await _saveBiz(st, bizType, gender, planKey, serverUrl);
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
       await onSession(sess);
-      _saveGender(st, gender, planKey, serverUrl);
     } on ApiException catch (e) {
       if (mounted) toast(context, s.error(e));
     } catch (_) {
@@ -733,6 +819,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     final st = SettingsScope.of(context);
     final lang = st.lang;
     final s = T6(lang);
+    final panel = BizPanel.of(widget.bizType);
     final order = lang == 'en'
         ? <int>[0, 1, 2, 3, 4, 5, 6]
         : <int>[6, 0, 1, 2, 3, 4, 5];
@@ -761,6 +848,40 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                       Text(_planPrice(lang, widget.plan),
                           style:
                               TextStyle(color: muted(context), fontSize: 13)),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final nav = Navigator.of(context);
+                    nav.pop();
+                    nav.pop();
+                  },
+                  child: Text(_x(lang, 'تغییر', 'Change', 'تغيير')),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Glass(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                GradientIcon(panel.icon, size: 42),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          _x(lang, 'نوع کسب‌وکار', 'Business type',
+                              'نوع النشاط التجاري'),
+                          style:
+                              TextStyle(color: muted(context), fontSize: 12.5)),
+                      const SizedBox(height: 2),
+                      Text(panel.typeName(lang),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 16)),
                     ],
                   ),
                 ),
@@ -827,8 +948,10 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          _genderBox(lang),
+          if (panel.beauty) ...[
+            const SizedBox(height: 16),
+            _genderBox(lang),
+          ],
           const SizedBox(height: 16),
           Glass(
             padding: const EdgeInsets.all(18),
@@ -844,7 +967,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                   contentPadding: EdgeInsets.zero,
                   value: _barber,
                   onChanged: (v) => setState(() => _barber = v),
-                  title: Text(_w(lang, s, 'i_am_barber')),
+                  title: Text(panel.selfLabel(lang)),
                 ),
               ],
             ),

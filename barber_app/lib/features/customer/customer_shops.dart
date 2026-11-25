@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../app/biz_icons.dart';
+import '../../app/business_types.dart';
 import '../../app/fmt.dart';
 import '../../app/registry.dart';
 import '../../app/settings.dart';
@@ -10,8 +12,10 @@ import '../manager/booking_common.dart';
 import 'customer_api.dart';
 import 'customer_filters.dart';
 import 'customer_shop_page.dart';
+
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
+
 class ShopsTab extends StatefulWidget {
   const ShopsTab({super.key, required this.api, required this.onBooked});
   final CustomerApi api;
@@ -19,6 +23,7 @@ class ShopsTab extends StatefulWidget {
   @override
   State<ShopsTab> createState() => _ShopsTabState();
 }
+
 class _ShopsTabState extends State<ShopsTab> {
   final _q = TextEditingController();
   Timer? _timer;
@@ -29,6 +34,7 @@ class _ShopsTabState extends State<ShopsTab> {
   SearchFilters _f = SearchFilters();
   List<String> _cities = <String>[];
   List<Map<String, dynamic>> _shops = <Map<String, dynamic>>[];
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +43,7 @@ class _ShopsTabState extends State<ShopsTab> {
       if (mounted) _load();
     });
   }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -44,6 +51,7 @@ class _ShopsTabState extends State<ShopsTab> {
     _q.dispose();
     super.dispose();
   }
+
   void _onText() {
     final v = _q.text.trim();
     if (v == _last) return;
@@ -53,13 +61,17 @@ class _ShopsTabState extends State<ShopsTab> {
       if (mounted) _load();
     });
   }
+
   SearchFilters _current() => SearchFilters(
         q: _q.text.trim(),
         city: _f.city,
         gender: _f.gender,
         cat: _f.cat,
         sort: _f.sort,
+        group: _f.group,
+        type: _f.type,
       );
+
   Future<void> _load() async {
     final seq = ++_seq;
     setState(() {
@@ -86,8 +98,9 @@ class _ShopsTabState extends State<ShopsTab> {
       });
     }
   }
+
   Future<void> _open(Map<String, dynamic> shop) async {
-    // آرایشگاه‌های سرورهای دیگر با سرور خودشان کار می‌کنند
+    // کسب‌وکارهای سرورهای دیگر با سرور خودشان کار می‌کنند
     final server = bStr(shop['_server']);
     final api = server.isEmpty
         ? widget.api
@@ -102,13 +115,20 @@ class _ShopsTabState extends State<ShopsTab> {
       if (mounted) widget.onBooked();
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final t = T6(SettingsScope.of(context).lang);
     final children = <Widget>[
       GlassField(
         controller: _q,
-        label: t.t('cu_search'),
+        label: _x(t.lang, 'دنبال چی هستی؟', 'What are you looking for?',
+            'عن ماذا تبحث؟'),
+        hint: _x(
+            t.lang,
+            'خدمت، نام کسب‌وکار یا شهر را وارد کن',
+            'Type a service, business name or city',
+            'اكتب خدمة أو اسم نشاط أو مدينة'),
         icon: Icons.search_rounded,
       ),
       const SizedBox(height: 10),
@@ -153,7 +173,9 @@ class _ShopsTabState extends State<ShopsTab> {
             children: [
               const GradientIcon(Icons.search_off_rounded, size: 44),
               const SizedBox(height: 12),
-              Text(t.t('cu_no_shops'),
+              Text(
+                  _x(t.lang, 'موردی پیدا نشد', 'Nothing found',
+                      'لم يتم العثور على نتائج'),
                   style: TextStyle(color: muted(context))),
             ],
           ),
@@ -183,6 +205,23 @@ class _ShopsTabState extends State<ShopsTab> {
       ),
     );
   }
+
+  Widget _thumb(Map<String, dynamic> s, String bk) {
+    final url = bStr(s['photo_url']);
+    if (url.isNotEmpty) {
+      return ShopPhoto(url: url, width: 72, height: 72);
+    }
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: Colors.grey.withOpacity(0.14),
+      ),
+      child: Center(child: GradientIcon(bizTypeIcon(bk), size: 36)),
+    );
+  }
+
   Widget _card(Map<String, dynamic> s, T6 t) {
     final avg = cDouble(s['rating_avg']);
     final count = bInt(s['rating_count']);
@@ -193,11 +232,13 @@ class _ShopsTabState extends State<ShopsTab> {
     final gender = bStr(s['gender']);
     final priceFrom = bInt(s['price_from']);
     final showPrice = _f.cat.isNotEmpty && priceFrom > 0;
+    final bk = bizKeyOf(s);
+    final typeName = bizTypeByKey(bk)?.name(t.lang) ?? '';
     return Glass(
       onTap: () => _open(s),
       child: Row(
         children: [
-          ShopPhoto(url: bStr(s['photo_url']), width: 72, height: 72),
+          _thumb(s, bk),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -208,6 +249,22 @@ class _ShopsTabState extends State<ShopsTab> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 16.5, fontWeight: FontWeight.w800)),
+                if (typeName.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(bizTypeIcon(bk), size: 15, color: muted(context)),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(typeName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: muted(context), fontSize: 12.5)),
+                      ),
+                    ],
+                  ),
+                ],
                 if (place.isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text(place,

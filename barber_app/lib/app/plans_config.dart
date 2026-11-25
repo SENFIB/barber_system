@@ -55,6 +55,7 @@ const PlanDef _pro = PlanDef(
     'pl_f_barbers',
     'pl_f_shifts',
     'pl_f_booking',
+    'pl_f_store_pro',
     'pl_f_cleanup14',
   ],
 );
@@ -71,6 +72,7 @@ const PlanDef _special = PlanDef(
     'pl_f_booking',
     'pl_f_photo',
     'pl_f_winback',
+    'pl_f_store_sp',
     'pl_f_ownsheet',
     'pl_f_backup',
     'pl_f_cleanup30',
@@ -96,7 +98,7 @@ const List<PlanDef> kPlans = <PlanDef>[_basic, _pro, _special, _personal];
 /// همه‌ی پلن‌ها
 const List<PlanDef> kAllPlans = <PlanDef>[_basic, _pro, _special, _personal];
 
-/// سقف شیفتِ یک پلن (برای ویرایشگر شیفت‌ها)
+/// سقفِ شیفتِ یک پلن (برای ویرایشگر شیفت‌ها)
 int shiftCapForPlan(String planKey) {
   for (final p in kAllPlans) {
     if (p.key == planKey) return p.maxShifts;

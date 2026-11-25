@@ -29,7 +29,6 @@ const List<CatalogItem> kServiceCatalog = [
   CatalogItem('hair_color', 'both', 90, 'رنگ مو', 'Hair coloring', 'صبغ الشعر'),
   CatalogItem('skin_clean', 'both', 45, 'پاکسازی پوست', 'Facial cleansing', 'تنظيف البشرة'),
   CatalogItem('hair_mask', 'both', 40, 'ماسک و احیای مو', 'Hair mask & repair', 'ماسك وترميم الشعر'),
-
   // ---- سلامت و آرامش ----
   CatalogItem('massage_body', 'both', 60, 'ماساژ بدن', 'Body massage', 'مساج الجسم', 'wellness'),
   CatalogItem('massage_foot', 'both', 30, 'ماساژ پا', 'Foot massage', 'مساج القدمين', 'wellness'),
@@ -40,7 +39,6 @@ const List<CatalogItem> kServiceCatalog = [
   CatalogItem('yoga_class', 'both', 60, 'کلاس یوگا', 'Yoga class', 'حصة يوغا', 'wellness'),
   CatalogItem('meditation_session', 'both', 45, 'جلسه‌ی مدیتیشن', 'Meditation session', 'جلسة تأمل', 'wellness'),
   CatalogItem('pt_session', 'both', 60, 'جلسه‌ی مربی بدنسازی', 'Personal training session', 'جلسة تدريب شخصي', 'wellness'),
-
   // ---- خودرو ----
   CatalogItem('wash_out', 'both', 20, 'شست‌وشوی بیرون خودرو', 'Exterior car wash', 'غسيل خارجي للسيارة', 'auto'),
   CatalogItem('wash_full', 'both', 45, 'شست‌وشوی کامل (بیرون و داخل)', 'Full wash (inside & out)', 'غسيل كامل (داخل وخارج)', 'auto'),
@@ -52,7 +50,6 @@ const List<CatalogItem> kServiceCatalog = [
   CatalogItem('tire_balance', 'both', 30, 'تعویض لاستیک و بالانس', 'Tires & balancing', 'تغيير الإطارات والموازنة', 'auto'),
   CatalogItem('body_paint_job', 'both', 240, 'صافکاری و نقاشی', 'Body work & paint', 'سمكرة ودهان', 'auto'),
   CatalogItem('car_inspection', 'both', 45, 'کارشناسی خودرو', 'Car inspection', 'فحص السيارة', 'auto'),
-
   // ---- خدمات تخصصی و مشاوره ----
   CatalogItem('photo_shoot', 'both', 60, 'عکاسی در آتلیه', 'Studio photo shoot', 'جلسة تصوير في الاستوديو', 'pro'),
   CatalogItem('wedding_shoot', 'both', 180, 'عکاسی عروسی', 'Wedding photography', 'تصوير حفلات الزفاف', 'pro'),
@@ -60,7 +57,6 @@ const List<CatalogItem> kServiceCatalog = [
   CatalogItem('legal_consulting', 'both', 45, 'مشاوره‌ی حقوقی', 'Legal consultation', 'استشارة قانونية', 'pro'),
   CatalogItem('finance_consulting', 'both', 45, 'مشاوره‌ی مالی', 'Financial consulting', 'استشارة مالية', 'pro'),
   CatalogItem('translation_service', 'both', 30, 'ترجمه', 'Translation', 'ترجمة', 'pro'),
-
   // ---- آموزش و ورزش ----
   CatalogItem('gym_session', 'both', 90, 'تمرین در باشگاه', 'Gym session', 'تمرين في النادي', 'edu'),
   CatalogItem('coach_session', 'both', 60, 'جلسه‌ی مربی خصوصی', 'Private coaching', 'جلسة مدرب خاص', 'edu'),
@@ -68,9 +64,9 @@ const List<CatalogItem> kServiceCatalog = [
   CatalogItem('language_lesson', 'both', 60, 'کلاس زبان', 'Language lesson', 'حصة لغة', 'edu'),
   CatalogItem('driving_lesson', 'both', 60, 'کلاس رانندگی', 'Driving lesson', 'درس قيادة', 'edu'),
   CatalogItem('private_lesson', 'both', 60, 'کلاس خصوصی', 'Private lesson', 'حصة خصوصية', 'edu'),
-
   // ---- حیوانات خانگی ----
   CatalogItem('pet_grooming_s', 'both', 60, 'آرایش و شست‌وشوی حیوان', 'Pet grooming & bath', 'تجميل واستحمام الحيوان', 'pets'),
+  CatalogItem('pet_clean_trim', 'both', 45, 'نظافت و اصلاح', 'Cleaning & trimming', 'تنظيف وتقليم', 'pets'),
   CatalogItem('pet_visit', 'both', 30, 'ویزیت دامپزشکی', 'Vet visit', 'زيارة بيطرية', 'pets'),
   CatalogItem('pet_vaccine', 'both', 20, 'واکسیناسیون حیوان', 'Pet vaccination', 'تطعيم الحيوان', 'pets'),
   CatalogItem('pet_boarding', 'both', 60, 'نگهداری و پانسیون', 'Pet boarding', 'إيواء ورعاية', 'pets'),

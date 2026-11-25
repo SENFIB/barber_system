@@ -3,21 +3,29 @@ import 'fmt.dart';
 class CalFmt {
   const CalFmt._();
 
+  static String _byLang(String lang) =>
+      lang == 'fa' ? 'jalali' : (lang == 'ar' ? 'hijri' : 'gregorian');
+
+  /// نوع تقویم نهایی. در حالت «خودکار»: فارسی شمسی، عربی هجری، انگلیسی میلادی
   static String kind(String key, String lang) {
     final k = key.toLowerCase();
+    if (k.isEmpty || k == 'auto') return _byLang(lang);
     if (k.contains('jal') ||
         k.contains('shams') ||
         k.contains('persian') ||
         k == 'fa') {
       return 'jalali';
     }
-    if (k.contains('hij') || k.contains('qamar') || k.contains('islam')) {
+    if (k.contains('hij') ||
+        k.contains('qamar') ||
+        k.contains('islam') ||
+        k == 'ar') {
       return 'hijri';
     }
     if (k.contains('greg') || k.contains('mil') || k == 'g' || k == 'en') {
       return 'gregorian';
     }
-    return lang == 'fa' ? 'jalali' : 'gregorian';
+    return _byLang(lang);
   }
 
   static List<int> _jalali(int gy, int gm, int gd) {
@@ -71,25 +79,25 @@ class CalFmt {
 
   static String _two(int v) => v < 10 ? '0$v' : '$v';
 
-  static String date(String? iso, String calendarKey, String lang) {
-    if (iso == null || iso.trim().isEmpty) return '—';
+  /// [سال، ماه، روز] در تقویم انتخابی. اگر ورودی درست نباشد null
+  static List<int>? ymd(String? iso, String calendarKey, String lang) {
+    if (iso == null || iso.trim().isEmpty) return null;
     final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(iso.trim());
-    if (m == null) return localDigits(iso.trim(), lang);
+    if (m == null) return null;
     final gy = int.parse(m.group(1)!);
     final gm = int.parse(m.group(2)!);
     final gd = int.parse(m.group(3)!);
-    if (gm < 1 || gm > 12 || gd < 1 || gd > 31) {
-      return localDigits(iso.trim(), lang);
-    }
+    if (gm < 1 || gm > 12 || gd < 1 || gd > 31) return null;
     final k = kind(calendarKey, lang);
-    List<int> p;
-    if (k == 'jalali') {
-      p = _jalali(gy, gm, gd);
-    } else if (k == 'hijri') {
-      p = _hijri(gy, gm, gd);
-    } else {
-      p = [gy, gm, gd];
-    }
+    if (k == 'jalali') return _jalali(gy, gm, gd);
+    if (k == 'hijri') return _hijri(gy, gm, gd);
+    return [gy, gm, gd];
+  }
+
+  static String date(String? iso, String calendarKey, String lang) {
+    if (iso == null || iso.trim().isEmpty) return '—';
+    final p = ymd(iso, calendarKey, lang);
+    if (p == null) return localDigits(iso.trim(), lang);
     final text = '${p[0]}/${_two(p[1])}/${_two(p[2])}';
     return localDigits(text, lang);
   }

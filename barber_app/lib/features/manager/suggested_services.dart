@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/biz_icons.dart';
 import '../../app/extra_http.dart';
 import '../../app/service_catalog.dart';
 import '../../app/settings.dart';
@@ -43,11 +44,34 @@ const Map<String, Map<String, String>> _tx = {
   },
 };
 
+const List<String> _groupKeys = <String>[
+  'beauty',
+  'wellness',
+  'auto',
+  'pro',
+  'edu',
+  'pets',
+];
+
+const Map<String, Map<String, String>> _groupNames = {
+  'beauty': {'fa': 'زیبایی و آرایش', 'en': 'Beauty & grooming', 'ar': 'التجميل والعناية'},
+  'wellness': {'fa': 'سلامت و آرامش', 'en': 'Wellness & relaxation', 'ar': 'الصحة والاسترخاء'},
+  'auto': {'fa': 'خودرو', 'en': 'Cars', 'ar': 'السيارات'},
+  'pro': {'fa': 'خدمات حرفه‌ای', 'en': 'Professional services', 'ar': 'خدمات مهنية'},
+  'edu': {'fa': 'آموزش و ورزش', 'en': 'Training & sports', 'ar': 'التعليم والرياضة'},
+  'pets': {'fa': 'حیوانات خانگی', 'en': 'Pets', 'ar': 'الحيوانات الأليفة'},
+};
+
 class SuggestedServicesPage extends StatefulWidget {
-  const SuggestedServicesPage({super.key, required this.settings, required this.gender});
+  const SuggestedServicesPage({
+    super.key,
+    required this.settings,
+    required this.gender,
+    this.initialGroup = 'beauty',
+  });
   final AppSettings settings;
   final String gender;
-
+  final String initialGroup;
   @override
   State<SuggestedServicesPage> createState() => _SuggestedServicesPageState();
 }
@@ -57,7 +81,8 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
   bool _saving = false;
   String? _error;
   Set<String> _have = <String>{};
-  late final List<CatalogItem> _items;
+  final Map<String, List<CatalogItem>> _byGroup = {};
+  final List<CatalogItem> _items = [];
   final Map<String, bool> _sel = {};
   final Map<String, TextEditingController> _min = {};
   final Map<String, TextEditingController> _price = {};
@@ -65,15 +90,23 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
   AppSettings get _st => widget.settings;
   String get _lang => _st.lang;
   String _t(String k) => (_tx[_lang] ?? _tx['fa']!)[k] ?? _tx['fa']![k] ?? k;
+  String _gName(String g) =>
+      (_groupNames[g] ?? const <String, String>{})[_lang] ?? g;
 
   @override
   void initState() {
     super.initState();
-    _items = catalogFor(widget.gender);
-    for (final c in _items) {
-      _sel[c.key] = false;
-      _min[c.key] = TextEditingController(text: '${c.minutes}');
-      _price[c.key] = TextEditingController();
+    for (final g in _groupKeys) {
+      final list = catalogForGroup(g, widget.gender);
+      if (list.isEmpty) continue;
+      _byGroup[g] = list;
+      for (final c in list) {
+        if (_sel.containsKey(c.key)) continue;
+        _items.add(c);
+        _sel[c.key] = false;
+        _min[c.key] = TextEditingController(text: '${c.minutes}');
+        _price[c.key] = TextEditingController();
+      }
     }
     _load();
   }
@@ -196,6 +229,34 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
     );
   }
 
+  Widget _groupTile(String g) {
+    final list = _byGroup[g]!;
+    var picked = 0;
+    for (final c in list) {
+      if (_sel[c.key] == true && !_have.contains(c.key)) picked++;
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Glass(
+        padding: EdgeInsets.zero,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            key: PageStorageKey<String>('sg_$g'),
+            initiallyExpanded: g == widget.initialGroup,
+            leading: Icon(bizGroupIcon(g)),
+            title: Text(
+              picked > 0 ? '${_gName(g)}  ($picked)' : _gName(g),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
+            children: [for (final c in list) _row(c)],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget body;
@@ -216,7 +277,8 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
         children: [
           Text(_t('intro'), style: TextStyle(color: muted(context))),
           const SizedBox(height: 12),
-          for (final c in _items) _row(c),
+          for (final g in _groupKeys)
+            if (_byGroup.containsKey(g)) _groupTile(g),
           const SizedBox(height: 8),
           GradientButton(
             label: _t('save'),

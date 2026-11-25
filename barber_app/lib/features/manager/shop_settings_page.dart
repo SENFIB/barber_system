@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../app/biz_text.dart';
+import '../../app/biz_words.dart';
 import '../../app/business_types.dart';
 import '../../app/look.dart';
 import '../../app/settings.dart';
@@ -13,16 +14,13 @@ import 'plans_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
 import 'store_section.dart';
-
-/// تنظیمات آرایشگاه (فقط مدیر)
+/// تنظیمات کسب‌وکار (فقط مدیر)
 class ShopSettingsPage extends StatefulWidget {
   const ShopSettingsPage(this.ctx, {super.key});
   final ShopCtx ctx;
-
   @override
   State<ShopSettingsPage> createState() => _ShopSettingsPageState();
 }
-
 class _ShopSettingsPageState extends State<ShopSettingsPage> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
@@ -44,12 +42,11 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
   bool _loading = true;
   bool _busy = false;
   String? _err;
-
   String get _lang => SettingsScope.read(context).lang;
-
   /// عکس و ظاهر اختصاصی فقط برای پلن ویژه و شخصی
   bool get _photoOk => _plan == 'special' || _plan == 'personal';
-
+  /// «آرایشگاه» یا «کسب‌وکار» بسته به نوع انتخاب‌شده
+  String get _sw => bwShop(_biz, _lang);
   /// متن‌های کوچکِ همین صفحه (فارسی / انگلیسی / عربی)
   String _px(String fa, String en, String ar) {
     final code = '${SettingsScope.read(context).lang}'.toLowerCase();
@@ -57,13 +54,11 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
     if (code.endsWith('ar')) return ar;
     return fa;
   }
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
-
   @override
   void dispose() {
     for (final c in [
@@ -74,7 +69,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
     }
     super.dispose();
   }
-
   bool _lost(Object e) {
     if (isSessionLost(e)) {
       Navigator.of(context).pop();
@@ -83,7 +77,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
     }
     return false;
   }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -128,10 +121,8 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       });
     }
   }
-
   int? _num(TextEditingController c) =>
       int.tryParse(normalizeDigits(c.text).trim());
-
   Future<void> _save() async {
     final x = T2(_lang);
     if (_name.text.trim().isEmpty) {
@@ -184,7 +175,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
   /// ذخیره یا حذف ظاهر اختصاصی صفحه (عکس پس‌زمینه‌ی دستگاه فرستاده نمی‌شود)
   Future<void> _saveTheme(AppLook? look) async {
     var value = '';
@@ -197,7 +187,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         .call('shop_update', {'theme': value});
     if (mounted) setState(() => _theme = value);
   }
-
   Future<void> _editTheme() async {
     final st = SettingsScope.read(context);
     final bt = BT(st.lang);
@@ -213,7 +202,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
     );
     if (saved == true && mounted) toast(context, bt.t('th_saved'));
   }
-
   Future<void> _removeTheme() async {
     final bt = BT(_lang);
     final ok = await confirmDialog(
@@ -232,16 +220,13 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       if (mounted) toast(context, T2(_lang).error(e));
     }
   }
-
   Widget _gap() => const SizedBox(height: 12);
-
   Widget _hint(String t) => Padding(
         padding: const EdgeInsets.only(top: 6, bottom: 2),
         child: Text(t,
             style:
                 TextStyle(color: muted(context), fontSize: 12.5, height: 1.6)),
       );
-
   Widget _chips(List<int> values, TextEditingController c) {
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -259,7 +244,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       ),
     );
   }
-
   /// کادر قفل با دکمه‌ی پلن‌ها (برای ویژگی‌های مخصوص پلن ویژه)
   Widget _locked(String text) {
     final bt = BT(_lang);
@@ -299,9 +283,9 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       ),
     );
   }
-
   /// بخش عکس: برای ویژه/شخصی فیلد لینک؛ برای بقیه کادر قفل با دکمه‌ی پلن‌ها
   Widget _photoBlock(T2 x) {
+    final sw = _sw;
     if (_photoOk) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,20 +297,19 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               keyboard: TextInputType.url,
               ltr: true),
           _hint(_px(
-            'لینک مستقیم یک عکس از آرایشگاه (فقط یک عکس). مشتری‌ها این عکس را در صفحه‌ی آرایشگاه می‌بینند.',
-            'Direct link to one photo of your shop. Customers see it on your shop page.',
-            'رابط مباشر لصورة واحدة لصالونك. يراها الزبائن في صفحة الصالون.',
+            'لینک مستقیم یک عکس از $sw (فقط یک عکس). مشتری‌ها این عکس را در صفحه‌ی $sw می‌بینند.',
+            'Direct link to one photo of your $sw. Customers see it on your $sw page.',
+            'رابط مباشر لصورة واحدة لـ$sw. يراها الزبائن في صفحته.',
           )),
         ],
       );
     }
     return _locked(_px(
-      'عکس آرایشگاه فقط برای پلن ویژه است',
-      'Shop photo is only for the Special plan',
-      'صورة الصالون متاحة فقط للباقة المميزة',
+      'عکس $sw فقط برای پلن ویژه است',
+      'The $sw photo is only for the Special plan',
+      'الصورة متاحة فقط للباقة المميزة',
     ));
   }
-
   /// انتخاب نوع کسب‌وکار: اول گروه، بعد نوع
   Widget _bizBlock(BT bt) {
     final lang = _lang;
@@ -367,7 +350,6 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       ],
     );
   }
-
   /// ظاهر اختصاصی صفحه (فقط پلن ویژه)
   Widget _themeBlock(BT bt) {
     if (!_photoOk) return _locked(bt.t('th_locked'));
@@ -400,13 +382,14 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       ],
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
     final x = T2(st.lang);
     final bt = BT(st.lang);
     final unit = x.t('unit_min');
+    final beauty = bwBeauty(_biz);
+    final sw = _sw;
     Widget body;
     if (_loading) {
       body = const Center(child: CircularProgressIndicator());
@@ -440,7 +423,10 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               children: [
                 GlassField(
                     controller: _name,
-                    label: x.t('shop_name'),
+                    label: beauty
+                        ? x.t('shop_name')
+                        : _px('نام کسب‌وکار', 'Business name',
+                            'اسم النشاط التجاري'),
                     icon: Icons.storefront_rounded),
                 _gap(),
                 GlassField(
@@ -479,7 +465,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
           SectionLabel(bt.t('th_title')),
           Glass(child: _themeBlock(bt)),
           SectionLabel(
-              _px('قوانین این آرایشگاه', 'This shop’s rules', 'قوانين هذا الصالون')),
+              _px('قوانین این $sw', 'This $sw’s rules', 'قوانين هذا $sw')),
           Glass(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,9 +486,9 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
                   ),
                 ),
                 _hint(_px(
-                  'این متن را مشتری‌ها در صفحه‌ی آرایشگاه شما می‌بینند و با نوبت گرفتن آن را می‌پذیرند. قوانین نباید خلاف قانون یا حریم خصوصی مشتری باشد.',
-                  'Customers see this text on your shop page and accept it by booking. Rules must not break the law or the customer’s privacy.',
-                  'يراه الزبائن في صفحة صالونك ويوافقون عليه عند الحجز. يجب ألا تخالف القوانين أو خصوصية الزبون.',
+                  'این متن را مشتری‌ها در صفحه‌ی $sw شما می‌بینند و با نوبت گرفتن آن را می‌پذیرند. قوانین نباید خلاف قانون یا حریم خصوصی مشتری باشد.',
+                  'Customers see this text on your $sw page and accept it by booking. Rules must not break the law or the customer’s privacy.',
+                  'يراه الزبائن في صفحتك ويوافقون عليه عند الحجز. يجب ألا تخالف القوانين أو خصوصية الزبون.',
                 )),
               ],
             ),
@@ -611,6 +597,11 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         ],
       );
     }
-    return GlassScaffold(title: x.t('ss_title'), body: body);
+    return GlassScaffold(
+        title: beauty
+            ? x.t('ss_title')
+            : _px('تنظیمات کسب‌وکار', 'Business settings',
+                'إعدادات النشاط التجاري'),
+        body: body);
   }
 }

@@ -8,6 +8,7 @@ import '../../app/strings_s5.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
+import 'booking_rules_page.dart';
 import 'bookings_page.dart';
 import 'plans_page.dart';
 import 'renew_page.dart';
@@ -266,6 +267,23 @@ class _ManagerHomeState extends State<ManagerHome> {
                 ),
                 onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => ServicesPage(ctx: ctx))),
+              ),
+            if (sess.isOwner)
+              tile(
+                icon: Icons.rule_folder_rounded,
+                title: _x(lang, 'قوانین و زمان رزرو', 'Booking rules',
+                    'قواعد الحجز'),
+                desc: _x(
+                    lang,
+                    'بازهٔ رزرو، روز تعطیل، تعطیلی‌های آینده، نوع آرایشگاه و خدمات پیشنهادی',
+                    'Booking range, days off, planned closures, shop type and suggested services',
+                    'فترة الحجز والعطل والإغلاقات المخطط لها ونوع الصالون والخدمات المقترحة'),
+                gradient: const LinearGradient(
+                  colors: [AppColors.blue, AppColors.green],
+                ),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) =>
+                        BookingRulesPage(SettingsScope.of(context)))),
               ),
             if (sess.isOwner)
               tile(

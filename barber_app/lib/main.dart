@@ -1,3 +1,4 @@
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app/app_header.dart';
@@ -23,6 +24,24 @@ Future<void> main() async {
   runApp(SettingsScope(settings: settings, child: const BarberApp()));
 }
 
+/// اسکرول سر جاش می‌ماند، فقط نوار اسکرول دیده نمی‌شود
+class _NoBarScroll extends MaterialScrollBehavior {
+  const _NoBarScroll();
+
+  @override
+  Widget buildScrollbar(
+          BuildContext context, Widget child, ScrollableDetails details) =>
+      child;
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.trackpad,
+      };
+}
+
 class BarberApp extends StatelessWidget {
   const BarberApp({super.key});
 
@@ -39,6 +58,7 @@ class BarberApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       navigatorKey: kNavKey,
       title: S(st.lang).t('app_name'),
+      scrollBehavior: const _NoBarScroll(),
       theme: buildTheme(Brightness.light, look),
       darkTheme: buildTheme(Brightness.dark, look),
       themeMode: st.themeMode,

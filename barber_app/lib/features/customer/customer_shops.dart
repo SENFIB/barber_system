@@ -1,7 +1,5 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-
 import '../../app/fmt.dart';
 import '../../app/registry.dart';
 import '../../app/settings.dart';
@@ -10,18 +8,17 @@ import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../manager/booking_common.dart';
 import 'customer_api.dart';
+import 'customer_filters.dart';
 import 'customer_shop_page.dart';
-
+String _x(String l, String fa, String en, String ar) =>
+    l == 'fa' ? fa : (l == 'ar' ? ar : en);
 class ShopsTab extends StatefulWidget {
   const ShopsTab({super.key, required this.api, required this.onBooked});
-
   final CustomerApi api;
   final VoidCallback onBooked;
-
   @override
   State<ShopsTab> createState() => _ShopsTabState();
 }
-
 class _ShopsTabState extends State<ShopsTab> {
   final _q = TextEditingController();
   Timer? _timer;
@@ -29,8 +26,9 @@ class _ShopsTabState extends State<ShopsTab> {
   int _seq = 0;
   bool _loading = true;
   Object? _err;
+  SearchFilters _f = SearchFilters();
+  List<String> _cities = <String>[];
   List<Map<String, dynamic>> _shops = <Map<String, dynamic>>[];
-
   @override
   void initState() {
     super.initState();
@@ -39,7 +37,6 @@ class _ShopsTabState extends State<ShopsTab> {
       if (mounted) _load();
     });
   }
-
   @override
   void dispose() {
     _timer?.cancel();
@@ -47,7 +44,6 @@ class _ShopsTabState extends State<ShopsTab> {
     _q.dispose();
     super.dispose();
   }
-
   void _onText() {
     final v = _q.text.trim();
     if (v == _last) return;
@@ -57,7 +53,13 @@ class _ShopsTabState extends State<ShopsTab> {
       if (mounted) _load();
     });
   }
-
+  SearchFilters _current() => SearchFilters(
+        q: _q.text.trim(),
+        city: _f.city,
+        gender: _f.gender,
+        cat: _f.cat,
+        sort: _f.sort,
+      );
   Future<void> _load() async {
     final seq = ++_seq;
     setState(() {
@@ -65,10 +67,15 @@ class _ShopsTabState extends State<ShopsTab> {
       _err = null;
     });
     try {
-      final r = await widget.api.shopSearch(_q.text.trim());
+      final f = _current();
+      final r = await CustomerSearch.run(widget.api.st, f);
       if (!mounted || seq != _seq) return;
       setState(() {
-        _shops = bFirstList(r, ['shops']);
+        _shops = [
+          for (final e in r.shops) Map<String, dynamic>.from(e as Map),
+        ];
+        final cs = <String>[for (final c in r.cities) c.toString()];
+        if (cs.isNotEmpty || _cities.isEmpty) _cities = cs;
         _loading = false;
       });
     } catch (e) {
@@ -79,7 +86,6 @@ class _ShopsTabState extends State<ShopsTab> {
       });
     }
   }
-
   Future<void> _open(Map<String, dynamic> shop) async {
     // آرایشگاه‌های سرورهای دیگر با سرور خودشان کار می‌کنند
     final server = bStr(shop['_server']);
@@ -96,7 +102,6 @@ class _ShopsTabState extends State<ShopsTab> {
       if (mounted) widget.onBooked();
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final t = T6(SettingsScope.of(context).lang);
@@ -106,9 +111,18 @@ class _ShopsTabState extends State<ShopsTab> {
         label: t.t('cu_search'),
         icon: Icons.search_rounded,
       ),
+      const SizedBox(height: 10),
+      SearchFilterBar(
+        lang: t.lang,
+        filters: _f,
+        cities: _cities,
+        onChanged: (nf) {
+          setState(() => _f = nf);
+          _load();
+        },
+      ),
       const SizedBox(height: 14),
     ];
-
     if (_loading && _shops.isEmpty) {
       children.add(const Padding(
         padding: EdgeInsets.only(top: 50),
@@ -160,7 +174,6 @@ class _ShopsTabState extends State<ShopsTab> {
       }
     }
     children.add(const SizedBox(height: 30));
-
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -170,7 +183,6 @@ class _ShopsTabState extends State<ShopsTab> {
       ),
     );
   }
-
   Widget _card(Map<String, dynamic> s, T6 t) {
     final avg = cDouble(s['rating_avg']);
     final count = bInt(s['rating_count']);
@@ -178,6 +190,9 @@ class _ShopsTabState extends State<ShopsTab> {
     final place = [bStr(s['city']), bStr(s['address'])]
         .where((e) => e.isNotEmpty)
         .join(sep);
+    final gender = bStr(s['gender']);
+    final priceFrom = bInt(s['price_from']);
+    final showPrice = _f.cat.isNotEmpty && priceFrom > 0;
     return Glass(
       onTap: () => _open(s),
       child: Row(
@@ -201,22 +216,45 @@ class _ShopsTabState extends State<ShopsTab> {
                       style: TextStyle(color: muted(context), fontSize: 12.5)),
                 ],
                 const SizedBox(height: 6),
-                if (count > 0)
-                  Row(
-                    children: [
-                      const Icon(Icons.star_rounded,
-                          size: 18, color: AppColors.amber),
-                      const SizedBox(width: 3),
-                      Text(localDigits(avg.toStringAsFixed(1), t.lang),
-                          style: const TextStyle(fontWeight: FontWeight.w800)),
-                      const SizedBox(width: 6),
-                      Text(t.t('cu_reviews', {'n': fmtNum(count, t.lang)}),
-                          style: TextStyle(
-                              color: muted(context), fontSize: 12)),
-                    ],
-                  )
-                else
-                  Wrap(children: [Pill(t.t('cu_new'))]),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (count > 0)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star_rounded,
+                              size: 18, color: AppColors.amber),
+                          const SizedBox(width: 3),
+                          Text(localDigits(avg.toStringAsFixed(1), t.lang),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800)),
+                          const SizedBox(width: 6),
+                          Text(
+                              t.t('cu_reviews', {'n': fmtNum(count, t.lang)}),
+                              style: TextStyle(
+                                  color: muted(context), fontSize: 12)),
+                        ],
+                      )
+                    else
+                      Pill(t.t('cu_new')),
+                    if (gender == 'men')
+                      Pill(_x(t.lang, 'مردانه', 'Men', 'رجالي')),
+                    if (gender == 'women')
+                      Pill(_x(t.lang, 'زنانه', 'Women', 'نسائي')),
+                  ],
+                ),
+                if (showPrice) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_x(t.lang, 'از', 'From', 'من')} ${fmtNum(priceFrom, t.lang)} ${bStr(s['currency'])}'
+                        .trim(),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                ],
               ],
             ),
           ),

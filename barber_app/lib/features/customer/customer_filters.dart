@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../app/biz_icons.dart';
 import '../../app/biz_text.dart';
 import '../../app/business_types.dart';
 import '../../app/config.dart';
@@ -285,12 +286,11 @@ class SearchFilterBar extends StatelessWidget {
       final bt = bizTypeByKey(f.type);
       if (bt == null || bt.group != f.group) f.type = '';
     }
-    // خدمت و جنسیت فقط برای گروه آرایش و زیبایی معنی دارد
+    // جنسیت فقط برای گروه آرایش و زیبایی معنی دارد
     if (f.group.isNotEmpty && f.group != 'beauty') {
-      f.cat = '';
       f.gender = '';
     }
-    final items = catalogFor(f.gender);
+    final items = catalogForGroup(f.group, f.gender);
     if (f.cat.isNotEmpty && !items.any((c) => c.key == f.cat)) f.cat = '';
     if (f.cat.isEmpty && (f.sort == 'price_asc' || f.sort == 'price_desc')) {
       f.sort = 'rating';
@@ -304,10 +304,46 @@ class SearchFilterBar extends StatelessWidget {
         border: const OutlineInputBorder(),
       );
 
+  Widget _iconText(IconData icon, String text) => Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 8),
+          Flexible(child: Text(text, overflow: TextOverflow.ellipsis)),
+        ],
+      );
+
+  List<DropdownMenuItem<String>> _serviceItems(List<CatalogItem> items) {
+    final out = <DropdownMenuItem<String>>[
+      DropdownMenuItem<String>(value: '', child: Text(_t('all_svc'))),
+    ];
+    if (filters.group.isNotEmpty) {
+      for (final c in items) {
+        out.add(DropdownMenuItem<String>(
+            value: c.key, child: Text(c.name(lang))));
+      }
+      return out;
+    }
+    for (final g in kBizGroups) {
+      final gi = items.where((c) => c.group == g.key).toList();
+      if (gi.isEmpty) continue;
+      out.add(DropdownMenuItem<String>(
+        value: '__g_${g.key}',
+        enabled: false,
+        child: Text(g.name(lang),
+            style: const TextStyle(fontWeight: FontWeight.w800)),
+      ));
+      for (final c in gi) {
+        out.add(DropdownMenuItem<String>(
+            value: c.key, child: Text(c.name(lang))));
+      }
+    }
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     final bt = BT(lang);
-    final items = catalogFor(filters.gender);
+    final items = catalogForGroup(filters.group, filters.gender);
     final catValue = items.any((c) => c.key == filters.cat) ? filters.cat : '';
     final cityValue =
         (filters.city.isEmpty || cities.contains(filters.city))
@@ -317,8 +353,8 @@ class SearchFilterBar extends StatelessWidget {
     final group = filters.group;
     final beauty = group.isEmpty || group == 'beauty';
     final types = group.isEmpty ? <BizType>[] : bizTypesOf(group);
-    final typeValue = types.any((t) => t.key == filters.type) ? filters.type : '';
-
+    final typeValue =
+        types.any((t) => t.key == filters.type) ? filters.type : '';
     final cityBox = DropdownButtonFormField<String>(
       value: cityValue,
       isExpanded: true,
@@ -330,7 +366,6 @@ class SearchFilterBar extends StatelessWidget {
       ],
       onChanged: (v) => _set(city: v ?? ''),
     );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -339,9 +374,13 @@ class SearchFilterBar extends StatelessWidget {
           isExpanded: true,
           decoration: _dec(bt.t('f_group')),
           items: [
-            DropdownMenuItem<String>(value: '', child: Text(bt.t('f_all'))),
+            DropdownMenuItem<String>(
+                value: '',
+                child: _iconText(Icons.apps_rounded, bt.t('f_all'))),
             for (final g in kBizGroups)
-              DropdownMenuItem<String>(value: g.key, child: Text(g.name(lang))),
+              DropdownMenuItem<String>(
+                  value: g.key,
+                  child: _iconText(bizGroupIcon(g.key), g.name(lang))),
           ],
           onChanged: (v) => _set(group: v ?? ''),
         ),
@@ -356,26 +395,20 @@ class SearchFilterBar extends StatelessWidget {
                   value: '', child: Text(bt.t('f_all_types'))),
               for (final tp in types)
                 DropdownMenuItem<String>(
-                    value: tp.key, child: Text(tp.name(lang))),
+                    value: tp.key,
+                    child: _iconText(bizTypeIcon(tp.key), tp.name(lang))),
             ],
             onChanged: (v) => _set(type: v ?? ''),
           ),
         ],
-        if (beauty) ...[
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            value: catValue,
-            isExpanded: true,
-            decoration: _dec(_t('svc')),
-            items: [
-              DropdownMenuItem<String>(value: '', child: Text(_t('all_svc'))),
-              for (final c in items)
-                DropdownMenuItem<String>(
-                    value: c.key, child: Text(c.name(lang))),
-            ],
-            onChanged: (v) => _set(cat: v ?? ''),
-          ),
-        ],
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          value: catValue,
+          isExpanded: true,
+          decoration: _dec(_t('svc')),
+          items: _serviceItems(items),
+          onChanged: (v) => _set(cat: v ?? ''),
+        ),
         const SizedBox(height: 10),
         if (beauty)
           Row(
@@ -417,21 +450,19 @@ class SearchFilterBar extends StatelessWidget {
               selected: filters.sort == 'most',
               onSelected: (_) => _set(sort: 'most'),
             ),
-            if (beauty) ...[
-              ChoiceChip(
-                label: Text(_t('s_low')),
-                selected: filters.sort == 'price_asc',
-                onSelected: hasCat ? (_) => _set(sort: 'price_asc') : null,
-              ),
-              ChoiceChip(
-                label: Text(_t('s_high')),
-                selected: filters.sort == 'price_desc',
-                onSelected: hasCat ? (_) => _set(sort: 'price_desc') : null,
-              ),
-            ],
+            ChoiceChip(
+              label: Text(_t('s_low')),
+              selected: filters.sort == 'price_asc',
+              onSelected: hasCat ? (_) => _set(sort: 'price_asc') : null,
+            ),
+            ChoiceChip(
+              label: Text(_t('s_high')),
+              selected: filters.sort == 'price_desc',
+              onSelected: hasCat ? (_) => _set(sort: 'price_desc') : null,
+            ),
           ],
         ),
-        if (beauty && !hasCat)
+        if (!hasCat)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(_t('price_hint'), style: const TextStyle(fontSize: 12)),

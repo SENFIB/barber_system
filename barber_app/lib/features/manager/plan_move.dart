@@ -121,9 +121,9 @@ const Map<String, Map<String, String>> _tx = {
   'fa': {
     'title': 'تغییر پلن',
     'intro':
-        'اطلاعات آرایشگاه (آرایشگرها، خدمات، رزروها و رمزها) به پلن جدید منتقل می‌شود و همان نام کاربری و رمز قبلی کار می‌کند. روزهای باقی‌مانده به اشتراک جدید اضافه می‌شود.',
+        'اطلاعات کسب‌وکار (پرسنل، خدمات، رزروها و رمزها) به پلن جدید منتقل می‌شود و همان نام کاربری و رمز قبلی کار می‌کند. روزهای باقی‌مانده به اشتراک جدید اضافه می‌شود.',
     'note':
-        'اگر پلن جدید محدودتر باشد، آرایشگرها و شیفت‌های اضافه کم می‌شوند؛ عکس و پیام‌های اختصاصی فقط پنهان می‌شوند.',
+        'اگر پلن جدید محدودتر باشد، پرسنل و شیفت‌های اضافه کم می‌شوند؛ عکس و پیام‌های اختصاصی فقط پنهان می‌شوند.',
     'plan': 'پلن جدید',
     'basic': 'پایه',
     'pro': 'پرو',
@@ -131,33 +131,34 @@ const Map<String, Map<String, String>> _tx = {
     'personal': 'شخصی',
     'license': 'لایسنس پلن جدید',
     'code': 'کد فعال‌سازی',
+    'hint': 'کد فعال‌سازی را همان‌طور که دریافت کرده‌اید (یک رشته‌ی کامل) اینجا بچسبانید.',
     'go': 'انتقال و تغییر پلن',
-    'confirm': 'آرایشگاه به پلن جدید منتقل می‌شود. ادامه می‌دهید؟',
+    'confirm': 'کسب‌وکار به پلن جدید منتقل می‌شود. ادامه می‌دهید؟',
     'yes': 'ادامه',
     'no': 'انصراف',
     'done': 'پلن تغییر کرد ✅',
-    'trim': 'آرایشگر کم‌شده: {a} | شیفت کوتاه‌شده: {b}',
+    'trim': 'پرسنل کم‌شده: {a} | شیفت کوتاه‌شده: {b}',
     'bad_code': 'کد واردشده درست نیست',
     'need_license': 'کد را وارد کنید',
     'need_code': 'کد فعال‌سازی کامل نیست',
     'LICENSE_INVALID': 'لایسنس معتبر نیست یا قبلاً استفاده شده است',
     'PLAN_MISMATCH': 'این لایسنس برای پلن دیگری است',
     'USERNAME_TAKEN': 'این نام کاربری روی پلن جدید گرفته شده است',
-    'ALREADY_HERE': 'این آرایشگاه قبلاً در پلن جدید ثبت شده است',
+    'ALREADY_HERE': 'این کسب‌وکار قبلاً در پلن جدید ثبت شده است',
     'UNKNOWN_ACTION': 'این سرویس هنوز آماده‌ی انتقال نیست',
     'TOO_MANY': 'تلاش زیاد بود، کمی بعد دوباره امتحان کنید',
     'BUSY': 'سرور شلوغ است، دوباره تلاش کنید',
     'UNAUTHORIZED': 'دوباره وارد شوید',
-    'FORBIDDEN': 'این کار فقط برای صاحب آرایشگاه است',
+    'FORBIDDEN': 'این کار فقط برای صاحب کسب‌وکار است',
     'NETWORK': 'اتصال برقرار نشد. اینترنت را بررسی کنید',
     'other': 'خطا؛ دوباره تلاش کنید',
   },
   'en': {
     'title': 'Change plan',
     'intro':
-        'Your shop data (barbers, services, bookings and passwords) moves to the new plan and your current username and password keep working. Remaining days are added to the new subscription.',
+        'Your business data (staff, services, bookings and passwords) moves to the new plan and your current username and password keep working. Remaining days are added to the new subscription.',
     'note':
-        'If the new plan is more limited, extra barbers and shifts are reduced; photo and custom messages are only hidden.',
+        'If the new plan is more limited, extra staff and shifts are reduced; photo and custom messages are only hidden.',
     'plan': 'New plan',
     'basic': 'Basic',
     'pro': 'Pro',
@@ -165,33 +166,34 @@ const Map<String, Map<String, String>> _tx = {
     'personal': 'Personal',
     'license': 'License of the new plan',
     'code': 'Activation code',
+    'hint': 'Paste the activation code exactly as you received it (one full string).',
     'go': 'Move and change plan',
-    'confirm': 'Your shop will be moved to the new plan. Continue?',
+    'confirm': 'Your business will be moved to the new plan. Continue?',
     'yes': 'Continue',
     'no': 'Cancel',
     'done': 'Plan changed ✅',
-    'trim': 'Barbers reduced: {a} | Shifts shortened: {b}',
+    'trim': 'Staff reduced: {a} | Shifts shortened: {b}',
     'bad_code': 'The code is not valid',
     'need_license': 'Enter the code',
     'need_code': 'The activation code is incomplete',
     'LICENSE_INVALID': 'The license is invalid or already used',
     'PLAN_MISMATCH': 'This license belongs to another plan',
     'USERNAME_TAKEN': 'This username is already taken on the new plan',
-    'ALREADY_HERE': 'This shop is already registered on the new plan',
+    'ALREADY_HERE': 'This business is already registered on the new plan',
     'UNKNOWN_ACTION': 'This service is not ready for moving yet',
     'TOO_MANY': 'Too many attempts, try again later',
     'BUSY': 'Server is busy, try again',
     'UNAUTHORIZED': 'Please sign in again',
-    'FORBIDDEN': 'Only the shop owner can do this',
+    'FORBIDDEN': 'Only the business owner can do this',
     'NETWORK': 'Could not connect. Check your internet',
     'other': 'Error; please try again',
   },
   'ar': {
     'title': 'تغيير الخطة',
     'intro':
-        'تُنقل بيانات الصالون (الحلاقون والخدمات والحجوزات وكلمات المرور) إلى الخطة الجديدة ويبقى اسم المستخدم وكلمة المرور كما هما. تُضاف الأيام المتبقية إلى الاشتراك الجديد.',
+        'تُنقل بيانات النشاط التجاري (الموظفون والخدمات والحجوزات وكلمات المرور) إلى الخطة الجديدة ويبقى اسم المستخدم وكلمة المرور كما هما. تُضاف الأيام المتبقية إلى الاشتراك الجديد.',
     'note':
-        'إذا كانت الخطة الجديدة أقل حدًا، يُخفَّض عدد الحلاقين والورديات الزائدة؛ أما الصورة والرسائل الخاصة فتُخفى فقط.',
+        'إذا كانت الخطة الجديدة أقل حدًا، يُخفَّض عدد الموظفين والورديات الزائدة؛ أما الصورة والرسائل الخاصة فتُخفى فقط.',
     'plan': 'الخطة الجديدة',
     'basic': 'الأساسية',
     'pro': 'برو',
@@ -199,24 +201,25 @@ const Map<String, Map<String, String>> _tx = {
     'personal': 'الشخصية',
     'license': 'ترخيص الخطة الجديدة',
     'code': 'رمز التفعيل',
+    'hint': 'الصق رمز التفعيل كما استلمته تمامًا (سطر واحد كامل).',
     'go': 'نقل وتغيير الخطة',
-    'confirm': 'سيتم نقل الصالون إلى الخطة الجديدة. هل تتابع؟',
+    'confirm': 'سيتم نقل النشاط التجاري إلى الخطة الجديدة. هل تتابع؟',
     'yes': 'متابعة',
     'no': 'إلغاء',
     'done': 'تم تغيير الخطة ✅',
-    'trim': 'حلاقون تم تقليلهم: {a} | ورديات تم تقصيرها: {b}',
+    'trim': 'موظفون تم تقليلهم: {a} | ورديات تم تقصيرها: {b}',
     'bad_code': 'الرمز المُدخل غير صحيح',
     'need_license': 'أدخل الرمز',
     'need_code': 'رمز التفعيل غير مكتمل',
     'LICENSE_INVALID': 'الترخيص غير صالح أو مستخدم سابقًا',
     'PLAN_MISMATCH': 'هذا الترخيص لخطة أخرى',
     'USERNAME_TAKEN': 'اسم المستخدم هذا مأخوذ في الخطة الجديدة',
-    'ALREADY_HERE': 'هذا الصالون مسجّل مسبقًا في الخطة الجديدة',
+    'ALREADY_HERE': 'هذا النشاط مسجّل مسبقًا في الخطة الجديدة',
     'UNKNOWN_ACTION': 'هذه الخدمة غير جاهزة للنقل بعد',
     'TOO_MANY': 'محاولات كثيرة، حاول لاحقًا',
     'BUSY': 'الخادم مشغول، حاول مجددًا',
     'UNAUTHORIZED': 'سجّل الدخول من جديد',
-    'FORBIDDEN': 'هذا الإجراء لمالك الصالون فقط',
+    'FORBIDDEN': 'هذا الإجراء لمالك النشاط فقط',
     'NETWORK': 'تعذر الاتصال. تحقق من الإنترنت',
     'other': 'خطأ، حاول مجددًا',
   },
@@ -233,26 +236,20 @@ class _PlanMovePageState extends State<PlanMovePage> {
   final _lic = TextEditingController();
   String _plan = 'pro';
   bool _busy = false;
-
   AppSettings get _st => widget.settings;
-
   String _t(String k) {
     final m = _tx[_st.lang] ?? _tx['fa']!;
     return m[k] ?? _tx['fa']![k] ?? k;
   }
-
   @override
   void dispose() {
     _lic.dispose();
     super.dispose();
   }
-
   void _snack(String s) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s)));
   }
-
   bool get _needsCode => _plan == 'special' || _plan == 'personal';
-
   Future<void> _go() async {
     if (_busy) return;
     final raw = _lic.text.trim();
@@ -301,10 +298,7 @@ class _PlanMovePageState extends State<PlanMovePage> {
       final r = await PlanMover.move(st: _st, targetUrl: target, license: lic, plan: _plan);
       var msg = _t('done');
       if (r.trimmedStaff > 0 || r.trimmedShifts > 0) {
-        msg += '\n' +
-            _t('trim')
-                .replaceAll('{a}', '${r.trimmedStaff}')
-                .replaceAll('{b}', '${r.trimmedShifts}');
+        msg += '\n${_t('trim').replaceAll('{a}', '${r.trimmedStaff}').replaceAll('{b}', '${r.trimmedShifts}')}';
       }
       messenger.showSnackBar(SnackBar(content: Text(msg)));
       nav.popUntil((route) => route.isFirst);
@@ -324,7 +318,6 @@ class _PlanMovePageState extends State<PlanMovePage> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final plans = ['basic', 'pro', 'special', 'personal'];
@@ -359,6 +352,10 @@ class _PlanMovePageState extends State<PlanMovePage> {
               icon: Icons.key_rounded,
               ltr: true,
             ),
+            if (_needsCode) ...[
+              const SizedBox(height: 6),
+              Text(_t('hint'), style: Theme.of(context).textTheme.bodySmall),
+            ],
             const SizedBox(height: 20),
             GradientButton(
               label: _t('go'),

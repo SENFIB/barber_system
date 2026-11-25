@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/cal_fmt.dart';
 import '../../app/fmt.dart';
 import '../../app/reminders.dart';
 import '../../app/settings.dart';
@@ -32,16 +33,11 @@ class ManagerHome extends StatefulWidget {
 class _ManagerHomeState extends State<ManagerHome> {
   String _synced = '';
 
-  String _date(String? d, String lang) {
-    if (d == null || d.isEmpty) return '—';
-    final s = d.length >= 10 ? d.substring(0, 10) : d;
-    return localDigits(s, lang);
-  }
-
   @override
   Widget build(BuildContext context) {
     final ctx = widget.ctx;
-    final lang = SettingsScope.of(context).lang;
+    final settings = SettingsScope.of(context);
+    final lang = settings.lang;
     final s = S(lang);
     final t3 = T3(lang);
     final t5 = T5(lang);
@@ -110,11 +106,10 @@ class _ManagerHomeState extends State<ManagerHome> {
 
     final roleText = s.t(sess.isOwner ? 'role_owner' : 'role_staff');
     final planText = s.has(planKey) ? s.t(planKey) : shop.plan;
-
     final pills = <Widget>[
       Pill(roleText),
     ];
-    if (shop.plan.isNotEmpty) {
+    if (sess.isOwner && shop.plan.isNotEmpty) {
       pills.add(Pill(planText, color: AppColors.blue));
     }
 
@@ -177,7 +172,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         ],
       ),
     ];
-
     if (!sub.free) {
       subRows.add(const SizedBox(height: 12));
       subRows.add(
@@ -186,7 +180,7 @@ class _ManagerHomeState extends State<ManagerHome> {
             Text('${s.t('sub_expires')}: ',
                 style: TextStyle(color: muted(context))),
             Text(
-              _date(sub.expiresAt, lang),
+              CalFmt.date(sub.expiresAt, settings.calendarKey, lang),
               textDirection: TextDirection.ltr,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
@@ -232,8 +226,10 @@ class _ManagerHomeState extends State<ManagerHome> {
       headerCard,
       const SizedBox(height: 14),
     ];
-    if (sub.expiringSoon) items.add(warnCard());
-    items.add(subCard);
+    if (sess.isOwner) {
+      if (sub.expiringSoon) items.add(warnCard());
+      items.add(subCard);
+    }
     items.add(const SizedBox(height: 18));
 
     items.add(tile(
@@ -247,13 +243,32 @@ class _ManagerHomeState extends State<ManagerHome> {
           .push(MaterialPageRoute(builder: (_) => BookingsPage(ctx))),
     ));
 
-    items.add(tile(
-      icon: Icons.groups_rounded,
-      title: s.t(sess.isOwner ? 'manage_barbers' : 'staff_mine'),
-      desc: s.t(sess.isOwner ? 'manage_barbers_desc' : 'staff_mine_desc'),
-      onTap: () => Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => StaffPage(ctx))),
-    ));
+    if (sess.isOwner) {
+      items.add(tile(
+        icon: Icons.groups_rounded,
+        title: s.t('manage_barbers'),
+        desc: s.t('manage_barbers_desc'),
+        onTap: () => Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => StaffPage(ctx))),
+      ));
+    } else {
+      items.add(tile(
+        icon: Icons.schedule_rounded,
+        title: _x(lang, 'ساعت کار و روزهای تعطیل من',
+            'My hours and days off', 'ساعات عملي وأيام عطلتي'),
+        desc: _x(
+          lang,
+          'ساعت کاری و روزهای تعطیل خودت را تنظیم و تغییر بده',
+          'Set and change your own working hours and days off',
+          'حدّد وعدّل ساعات عملك وأيام عطلتك',
+        ),
+        gradient: const LinearGradient(
+          colors: [AppColors.blue, AppColors.green],
+        ),
+        onTap: () => Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => StaffPage(ctx))),
+      ));
+    }
 
     if (sess.isOwner) {
       items.add(tile(
@@ -266,7 +281,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         onTap: () => Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => ServicesPage(ctx: ctx))),
       ));
-
       items.add(tile(
         icon: Icons.rule_folder_rounded,
         title: _x(lang, 'قوانین و زمان رزرو', 'Booking rules', 'قواعد الحجز'),
@@ -285,7 +299,6 @@ class _ManagerHomeState extends State<ManagerHome> {
               builder: (_) => BookingRulesPage(settings: st)));
         },
       ));
-
       items.add(tile(
         icon: Icons.event_busy_rounded,
         title: t3.t('b_timeoff'),
@@ -296,7 +309,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         onTap: () => Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => TimeOffPage(ctx))),
       ));
-
       items.add(tile(
         icon: Icons.favorite_rounded,
         title: _x(lang, 'پیام اختصاصی آرایشگاه', 'Custom shop message',
@@ -313,7 +325,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         onTap: () => Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => WinbackPage(ctx))),
       ));
-
       items.add(tile(
         icon: Icons.workspace_premium_rounded,
         title: t5.t('pl_tile'),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../app/cal_fmt.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
@@ -10,6 +11,22 @@ import 'manual_booking_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
 import 'timeoff_page.dart';
+
+const Map<String, String> _appCustomer = {
+  'fa': 'مشتری (از برنامه)',
+  'en': 'App customer',
+  'ar': 'زبون من التطبيق',
+};
+
+/// اگر «نام» در واقع یک شناسه‌ی فنی باشد (مثل c_83hd92kd01) نشان داده نمی‌شود
+String _niceName(String n, String lang) {
+  final s = n.trim();
+  if (s.isEmpty) return '—';
+  final looksId = RegExp(r'^[A-Za-z0-9_\-]{10,}$').hasMatch(s) &&
+      RegExp(r'[0-9_\-]').hasMatch(s);
+  if (looksId) return _appCustomer[lang] ?? _appCustomer['fa']!;
+  return s;
+}
 
 class BookingsPage extends StatefulWidget {
   const BookingsPage(this.ctx, {super.key});
@@ -27,10 +44,8 @@ class _BookingsPageState extends State<BookingsPage> {
   List<Map<String, dynamic>> _rows = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _staff = <Map<String, dynamic>>[];
   String _staffFilter = '';
-
   bool get _owner => widget.ctx.session.isOwner;
   T6 _tr() => T6(SettingsScope.read(context).lang);
-
   @override
   void initState() {
     super.initState();
@@ -38,7 +53,6 @@ class _BookingsPageState extends State<BookingsPage> {
       if (mounted) _load();
     });
   }
-
   bool _lost(Object e) {
     if (isSessionLost(e)) {
       if (mounted) Navigator.of(context).pop();
@@ -47,7 +61,6 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     return false;
   }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -102,7 +115,6 @@ class _BookingsPageState extends State<BookingsPage> {
       });
     }
   }
-
   Future<void> _act(String action, Map<String, dynamic> params) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -119,7 +131,6 @@ class _BookingsPageState extends State<BookingsPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
   Future<void> _confirmAct({
     required String message,
     required String yes,
@@ -139,14 +150,12 @@ class _BookingsPageState extends State<BookingsPage> {
     if (ok != true || !mounted) return;
     await _act(action, params);
   }
-
   void _shift(int n) {
     final d = bParse(_date ?? '');
     if (d == null) return;
     setState(() => _date = bIso(DateTime(d.year, d.month, d.day + n)));
     _load();
   }
-
   Future<void> _pick() async {
     final cur = bParse(_date ?? '') ?? DateTime.now();
     final d = await showDatePicker(
@@ -159,7 +168,6 @@ class _BookingsPageState extends State<BookingsPage> {
     setState(() => _date = bIso(d));
     _load();
   }
-
   Future<void> _newManual() async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -168,7 +176,6 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     if (ok == true && mounted) _load();
   }
-
   List<List<Map<String, dynamic>>> _groups() {
     final map = <String, List<Map<String, dynamic>>>{};
     for (final b in _rows) {
@@ -186,7 +193,6 @@ class _BookingsPageState extends State<BookingsPage> {
         .compareTo(bMin(bStr(b.first['start_time']))));
     return list;
   }
-
   bool _started(Map<String, dynamic> b) {
     final today = bStr(_now['date']);
     final d = bStr(b['date']);
@@ -198,7 +204,6 @@ class _BookingsPageState extends State<BookingsPage> {
         : bInt(_now['min']);
     return bMin(bStr(b['start_time'])) <= nm;
   }
-
   Color _stColor(String s) {
     switch (s) {
       case 'booked':
@@ -214,7 +219,6 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     return muted(context);
   }
-
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
@@ -321,12 +325,14 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
-
   Widget _dayBar(T6 t) {
+    final st = SettingsScope.read(context);
     final day = _date;
     final dt = day == null ? null : bParse(day);
     final wd = dt == null ? '' : t.t('d_${dt.weekday % 7}');
     final isToday = day != null && day == bStr(_now['date']);
+    final dateText =
+        day == null ? '—' : CalFmt.date(day, st.calendarKey, t.lang);
     // فلش‌ها خودشان در RTL برعکس می‌شوند؛ دستی برعکس نکن
     return Glass(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
@@ -358,8 +364,8 @@ class _BookingsPageState extends State<BookingsPage> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(day == null ? '—' : localDigits(day, t.lang),
-                        textDirection: TextDirection.ltr,
+                    Text(dateText,
+                        textAlign: TextAlign.center,
                         style: TextStyle(color: muted(context))),
                   ],
                 ),
@@ -374,7 +380,6 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
-
   Widget _filterBar(T6 t) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -407,10 +412,9 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
-
   Widget _groupCard(List<Map<String, dynamic>> g, T6 t) {
     final first = g.first;
-    final name = bStr(first['customer_name']);
+    final name = _niceName(bStr(first['customer_name']), t.lang);
     final phone = bStr(first['customer_phone']);
     final manual = g.any((b) => bStr(b['source']) == 'manual');
     var endMin = 0;
@@ -448,7 +452,7 @@ class _BookingsPageState extends State<BookingsPage> {
               Icon(Icons.person_rounded, size: 18, color: muted(context)),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(name.isEmpty ? '—' : name,
+                child: Text(name,
                     style: const TextStyle(
                         fontSize: 15.5, fontWeight: FontWeight.w700)),
               ),
@@ -505,7 +509,6 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     return allDead ? Opacity(opacity: 0.6, child: card) : card;
   }
-
   Widget _line(Map<String, dynamic> b, T6 t) {
     final status = bStr(b['status']);
     final canDone = status == 'booked' || status == 'checked_in';

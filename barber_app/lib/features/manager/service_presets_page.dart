@@ -1,23 +1,19 @@
 import 'package:flutter/material.dart';
+import '../../app/business_types.dart';
 import '../../app/service_catalog.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
 import 'shop_raw.dart';
-
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
-
 class ServicePresetsPage extends StatefulWidget {
   const ServicePresetsPage({super.key, required this.settings});
-
   final AppSettings settings;
-
   @override
   State<ServicePresetsPage> createState() => _ServicePresetsPageState();
 }
-
 class _ServicePresetsPageState extends State<ServicePresetsPage> {
   bool _loading = true;
   bool _saving = false;
@@ -25,15 +21,12 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
   final Set<String> _on = {};
   final Map<String, TextEditingController> _dur = {};
   final Map<String, TextEditingController> _price = {};
-
   String get _lang => widget.settings.lang;
-
   @override
   void initState() {
     super.initState();
     _load();
   }
-
   @override
   void dispose() {
     for (final c in _dur.values) {
@@ -44,18 +37,20 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
     }
     super.dispose();
   }
-
   Future<void> _load() async {
     var g = 'both';
+    var group = 'beauty';
     try {
       final me = await ShopRaw(widget.settings).call('me');
       final shop = me['shop'];
       if (shop is Map) {
+        final bz = bizTypeByKey('${shop['biz_type'] ?? ''}');
+        if (bz != null) group = bz.group;
         final v = '${shop['gender'] ?? ''}';
-        if (v == 'men' || v == 'women') g = v;
+        if (group == 'beauty' && (v == 'men' || v == 'women')) g = v;
       }
     } catch (_) {}
-    final list = catalogFor(g);
+    final list = catalogForGroup(group, g);
     for (final it in list) {
       _dur[it.key] = TextEditingController(text: '${it.minutes}');
       _price[it.key] = TextEditingController();
@@ -66,12 +61,10 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       _loading = false;
     });
   }
-
   int? _num(String t) {
     final d = normalizeDigits(t).replaceAll(RegExp(r'[^0-9]'), '');
     return d.isEmpty ? null : int.tryParse(d);
   }
-
   Future<void> _save() async {
     if (_saving) return;
     final lang = _lang;
@@ -122,7 +115,6 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       toast(context, T6(lang).error(e));
     }
   }
-
   Widget _row(CatalogItem it) {
     final lang = _lang;
     final on = _on.contains(it.key);
@@ -176,7 +168,6 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final lang = _lang;

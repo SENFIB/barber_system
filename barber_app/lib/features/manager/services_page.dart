@@ -6,12 +6,15 @@ import '../../app/strings_m.dart';
 import '../../app/theme.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
+import 'service_presets_page.dart';
 import 'shop_api.dart';
+
+String _x(String l, String fa, String en, String ar) =>
+    l == 'fa' ? fa : (l == 'ar' ? ar : en);
 
 class ServicesPage extends StatefulWidget {
   const ServicesPage({super.key, required this.ctx});
   final ShopCtx ctx;
-
   @override
   State<ServicesPage> createState() => _ServicesPageState();
 }
@@ -21,9 +24,7 @@ class _ServicesPageState extends State<ServicesPage> {
   bool _busy = false;
   String? _err;
   List<Map<String, dynamic>> _list = [];
-
   M get _m => M(SettingsScope.read(context).lang);
-
   @override
   void initState() {
     super.initState();
@@ -83,6 +84,14 @@ class _ServicesPageState extends State<ServicesPage> {
       setState(() => _busy = false);
       await _load();
     }
+  }
+
+  Future<void> _presets() async {
+    final st = SettingsScope.read(context);
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ServicePresetsPage(settings: st)),
+    );
+    if (ok == true && mounted) await _load();
   }
 
   Future<void> _edit([Map<String, dynamic>? ex]) async {
@@ -192,7 +201,8 @@ class _ServicesPageState extends State<ServicesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final m = M(SettingsScope.of(context).lang);
+    final lang = SettingsScope.of(context).lang;
+    final m = M(lang);
     Widget content;
     if (_loading) {
       content = const Center(child: CircularProgressIndicator());
@@ -224,6 +234,17 @@ class _ServicesPageState extends State<ServicesPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
           children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: GradientButton(
+                outlined: true,
+                compact: true,
+                icon: Icons.playlist_add_check_rounded,
+                label: _x(lang, 'افزودن از خدمات پیشنهادی',
+                    'Add from suggested services', 'إضافة من الخدمات المقترحة'),
+                onPressed: _busy ? null : _presets,
+              ),
+            ),
             if (_list.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(30),
@@ -254,8 +275,6 @@ class _ServicesPageState extends State<ServicesPage> {
   }
 }
 
-// ───────────────────────── دیالوگ افزودن / ویرایش خدمت ─────────────────────────
-
 class _SvcResult {
   const _SvcResult(this.name, this.duration, this.price, this.combinable);
   final String name;
@@ -273,7 +292,6 @@ class _ServiceDialog extends StatefulWidget {
   final M m;
   final List<Map<String, dynamic>> others;
   final Map<String, dynamic>? existing;
-
   @override
   State<_ServiceDialog> createState() => _ServiceDialogState();
 }
@@ -286,7 +304,6 @@ class _ServiceDialogState extends State<_ServiceDialog> {
   late final TextEditingController _price = TextEditingController(
       text: widget.existing == null ? '' : '${widget.existing!['price'] ?? 0}');
   final Set<String> _comb = {};
-
   @override
   void initState() {
     super.initState();

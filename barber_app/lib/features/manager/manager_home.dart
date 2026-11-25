@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/biz_panel.dart';
 import '../../app/cal_fmt.dart';
 import '../../app/fmt.dart';
 import '../../app/reminders.dart';
@@ -8,13 +9,13 @@ import '../../app/strings_s3.dart';
 import '../../app/strings_s5.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
-import '../settings/settings_page.dart';
 import 'booking_rules_page.dart';
 import 'bookings_page.dart';
 import 'plans_page.dart';
 import 'renew_page.dart';
 import 'services_page.dart';
 import 'shop_api.dart';
+import 'shop_raw.dart';
 import 'staff_page.dart';
 import 'timeoff_page.dart';
 import 'winback_page.dart';
@@ -22,16 +23,45 @@ import 'winback_page.dart';
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
 
+String _subLabel(String lang, String plan, String fallback) {
+  switch (plan) {
+    case 'basic':
+      return _x(lang, 'اشتراک پایه', 'Basic subscription', 'الاشتراك الأساسي');
+    case 'pro':
+      return _x(lang, 'اشتراک پرو', 'Pro subscription', 'اشتراك برو');
+    case 'special':
+      return _x(
+          lang, 'اشتراک ویژه', 'Special subscription', 'الاشتراك المميز');
+    default:
+      return fallback;
+  }
+}
+
 class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key, required this.ctx});
   final ShopCtx ctx;
-
   @override
   State<ManagerHome> createState() => _ManagerHomeState();
 }
 
 class _ManagerHomeState extends State<ManagerHome> {
   String _synced = '';
+  String _bizType = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadType());
+  }
+
+  Future<void> _loadType() async {
+    try {
+      final me = await ShopRaw(SettingsScope.read(context)).call('me');
+      final sh = me['shop'];
+      final k = sh is Map ? '${sh['biz_type'] ?? ''}' : '';
+      if (mounted && k != _bizType) setState(() => _bizType = k);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +75,8 @@ class _ManagerHomeState extends State<ManagerHome> {
     final sub = sess.subscription;
     final shop = sess.shop;
     final planKey = 'plan_${shop.plan}';
-
+    final panel =
+        BizPanel.of(_bizType.isNotEmpty ? _bizType : shop.bizType);
     if (sess.isOwner) {
       final k = '${sub.free}|${sub.expiresAt}|$lang';
       if (k != _synced) {
@@ -112,7 +143,10 @@ class _ManagerHomeState extends State<ManagerHome> {
     if (sess.isOwner && shop.plan.isNotEmpty) {
       pills.add(Pill(planText, color: AppColors.blue));
     }
-
+    final typeText = panel.typeName(lang);
+    if (typeText.isNotEmpty) {
+      pills.add(Pill(typeText, color: AppColors.green));
+    }
     final headerInfo = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -124,12 +158,11 @@ class _ManagerHomeState extends State<ManagerHome> {
         Wrap(spacing: 8, runSpacing: 6, children: pills),
       ],
     );
-
     final headerCard = Glass(
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
-          const GradientIcon(Icons.storefront_rounded, size: 62),
+          GradientIcon(panel.icon, size: 62),
           const SizedBox(width: 16),
           Expanded(child: headerInfo),
         ],
@@ -163,9 +196,12 @@ class _ManagerHomeState extends State<ManagerHome> {
         children: [
           const Icon(Icons.verified_rounded, color: AppColors.green),
           const SizedBox(width: 8),
-          Text(
-            s.t('subscription'),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          Flexible(
+            child: Text(
+              _subLabel(lang, shop.plan, s.t('subscription')),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
           ),
           const Spacer(),
           if (sub.free) Pill(s.t('sub_free'), color: AppColors.green),
@@ -214,7 +250,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         );
       }
     }
-
     final subCard = Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +266,6 @@ class _ManagerHomeState extends State<ManagerHome> {
       items.add(subCard);
     }
     items.add(const SizedBox(height: 18));
-
     items.add(tile(
       icon: Icons.event_available_rounded,
       title: s.t('bookings'),
@@ -242,12 +276,11 @@ class _ManagerHomeState extends State<ManagerHome> {
       onTap: () => Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => BookingsPage(ctx))),
     ));
-
     if (sess.isOwner) {
       items.add(tile(
         icon: Icons.groups_rounded,
-        title: s.t('manage_barbers'),
-        desc: s.t('manage_barbers_desc'),
+        title: panel.staffTitle(lang),
+        desc: panel.staffDesc(lang),
         onTap: () => Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => StaffPage(ctx))),
       ));
@@ -269,7 +302,6 @@ class _ManagerHomeState extends State<ManagerHome> {
             .push(MaterialPageRoute(builder: (_) => StaffPage(ctx))),
       ));
     }
-
     if (sess.isOwner) {
       items.add(tile(
         icon: Icons.design_services_rounded,
@@ -286,9 +318,9 @@ class _ManagerHomeState extends State<ManagerHome> {
         title: _x(lang, 'قوانین و زمان رزرو', 'Booking rules', 'قواعد الحجز'),
         desc: _x(
           lang,
-          'بازهٔ رزرو، روز تعطیل، تعطیلی‌های آینده، نوع آرایشگاه و خدمات پیشنهادی',
-          'Booking range, days off, planned closures, shop type and suggested services',
-          'فترة الحجز والعطل والإغلاقات المخطط لها ونوع الصالون والخدمات المقترحة',
+          'بازهٔ رزرو، روز تعطیل، تعطیلی‌های آینده و خدمات پیشنهادی',
+          'Booking range, days off, planned closures and suggested services',
+          'فترة الحجز والعطل والإغلاقات المخطط لها والخدمات المقترحة',
         ),
         gradient: const LinearGradient(
           colors: [AppColors.blue, AppColors.green],
@@ -311,8 +343,7 @@ class _ManagerHomeState extends State<ManagerHome> {
       ));
       items.add(tile(
         icon: Icons.favorite_rounded,
-        title: _x(lang, 'پیام اختصاصی آرایشگاه', 'Custom shop message',
-            'رسالة خاصة بالصالون'),
+        title: panel.msgTitle(lang),
         desc: _x(
           lang,
           'متن پیام‌ها و فاصلهٔ زمانی ارسال برای مشتری‌ها',
@@ -341,11 +372,6 @@ class _ManagerHomeState extends State<ManagerHome> {
       title: s.t('app_name'),
       actions: [
         IconButton(
-          icon: const Icon(Icons.settings_rounded),
-          onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
-        ),
-        IconButton(
           icon: const Icon(Icons.logout_rounded),
           onPressed: () async {
             final ok = await confirmDialog(
@@ -364,7 +390,10 @@ class _ManagerHomeState extends State<ManagerHome> {
         ),
       ],
       body: RefreshIndicator(
-        onRefresh: ctx.reload,
+        onRefresh: () async {
+          await ctx.reload();
+          await _loadType();
+        },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),

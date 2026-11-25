@@ -185,6 +185,16 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _switch(String title, String sub, bool value, void Function(bool) onChanged) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      value: value,
+      onChanged: onChanged,
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(sub, style: TextStyle(color: muted(context), fontSize: 12.5)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
@@ -235,6 +245,40 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
               value: st.themeKey,
               onChanged: st.setThemeKey,
+            ),
+          ),
+          SectionLabel(_x3(st.lang, 'نوار بالای برنامه', 'Top bar', 'الشريط العلوي')),
+          Glass(
+            child: Column(
+              children: [
+                _switch(
+                  _x3(st.lang, 'نمایش تاریخ و ساعت', 'Show date and time',
+                      'إظهار التاريخ والوقت'),
+                  _x3(
+                      st.lang,
+                      'مطابق زبان: تهران، مکه یا لندن',
+                      'Matches the language: Tehran, Makkah or London',
+                      'حسب اللغة: طهران أو مكة أو لندن'),
+                  st.showHdrClock,
+                  st.setHdrClock,
+                ),
+                _switch(
+                  _x3(st.lang, 'دکمه‌ی زبان', 'Language button', 'زر اللغة'),
+                  _x3(st.lang, 'تغییر زبان از نوار بالا', 'Change language from the top bar',
+                      'تغيير اللغة من الشريط العلوي'),
+                  st.showHdrLang,
+                  st.setHdrLang,
+                ),
+                _switch(
+                  _x3(st.lang, 'دکمه‌های ساعت، تقویم و قوانین',
+                      'Time, calendar and rules buttons', 'أزرار الوقت والتقويم والقوانين'),
+                  _x3(st.lang, 'منبع ساعت، نوع تقویم و قوانین',
+                      'Time source, calendar type and rules',
+                      'مصدر الوقت ونوع التقويم والقوانين'),
+                  st.showHdrBtns,
+                  st.setHdrBtns,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 18),

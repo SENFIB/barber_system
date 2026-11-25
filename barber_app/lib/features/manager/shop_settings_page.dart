@@ -12,11 +12,13 @@ import 'ads_section.dart';
 import 'plans_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
+import 'store_section.dart';
 
 /// تنظیمات آرایشگاه (فقط مدیر)
 class ShopSettingsPage extends StatefulWidget {
   const ShopSettingsPage(this.ctx, {super.key});
   final ShopCtx ctx;
+
   @override
   State<ShopSettingsPage> createState() => _ShopSettingsPageState();
 }
@@ -603,6 +605,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
             loading: _busy,
             onPressed: _save,
           ),
+          StoreSection(st: st, plan: _plan),
           const SizedBox(height: 8),
           const AdsSection(),
         ],

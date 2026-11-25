@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 
 /// آدرس فهرست سرورها. خالی = خاموش (فقط سرور اصلی).
-const String kRegistryUrl = '';
+const String kRegistryUrl = 'https://script.google.com/macros/s/AKfycbxR0G1ac1CUmUXhwsCQZhvDM8tLpLBrDPtzSpuuWDNOswoInekG6WZN3DpvfhcyUV4Z/exec';
 
 const String _kSaved = 'cust_servers';
 

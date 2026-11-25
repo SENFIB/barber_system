@@ -1,5 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../app/biz_text.dart';
+import '../../app/business_types.dart';
 import '../../app/config.dart';
 import '../../app/extra_http.dart';
 import '../../app/registry.dart' show kRegistryUrl;
@@ -12,11 +14,26 @@ class SearchFilters {
   String city;
   String gender; // '' | men | women
   String cat; // '' یا کلید خدمت
-  String sort; // rating | price_asc | price_desc
-  SearchFilters({this.q = '', this.city = '', this.gender = '', this.cat = '', this.sort = 'rating'});
-
-  SearchFilters copy() =>
-      SearchFilters(q: q, city: city, gender: gender, cat: cat, sort: sort);
+  String sort; // rating | most | price_asc | price_desc
+  String group; // '' یا گروه کسب‌وکار
+  String type; // '' یا نوع کسب‌وکار
+  SearchFilters({
+    this.q = '',
+    this.city = '',
+    this.gender = '',
+    this.cat = '',
+    this.sort = 'rating',
+    this.group = '',
+    this.type = '',
+  });
+  SearchFilters copy() => SearchFilters(
+      q: q,
+      city: city,
+      gender: gender,
+      cat: cat,
+      sort: sort,
+      group: group,
+      type: type);
 }
 
 class SearchResult {
@@ -44,7 +61,9 @@ class CustomerSearch {
   static Future<List<String>> _registryServers() async {
     if (kRegistryUrl.isEmpty) return <String>[];
     final at = _regAt;
-    if (_reg != null && at != null && DateTime.now().difference(at).inMinutes < 10) {
+    if (_reg != null &&
+        at != null &&
+        DateTime.now().difference(at).inMinutes < 10) {
       return _reg!;
     }
     try {
@@ -68,7 +87,8 @@ class CustomerSearch {
     }
   }
 
-  static Future<SearchResult> run(AppSettings st, SearchFilters f) async {
+  /// فهرست همه‌ی سرورهایی که اپ باید از آن‌ها بخواند (جستجو و تبلیغ)
+  static Future<List<String>> servers(AppSettings st) async {
     final urls = <String>[];
     void add(String u) {
       if (u.startsWith('https://') && !urls.contains(u)) urls.add(u);
@@ -80,30 +100,35 @@ class CustomerSearch {
     for (final u in await _registryServers()) {
       add(u);
     }
+    return urls;
+  }
 
+  static Future<SearchResult> run(AppSettings st, SearchFilters f) async {
+    final urls = await servers(st);
     final body = <String, dynamic>{
       'q': f.q.trim(),
       'city': f.city,
       'gender': f.gender,
       'cat': f.cat,
       'sort': f.sort,
+      'biz_group': f.group,
+      'biz_type': f.type,
     };
     final parts = await Future.wait(urls.map((u) async {
       try {
-        final d = await extraPublic(u, 'shop_search', body).timeout(const Duration(seconds: 25));
+        final d = await extraPublic(u, 'shop_search', body)
+            .timeout(const Duration(seconds: 25));
         return _Part(u, d, null);
       } catch (e) {
         return _Part(u, null, e);
       }
     }));
-
     final okParts = parts.where((p) => p.data != null).toList();
     if (okParts.isEmpty) {
       final e = parts.isNotEmpty ? parts.first.error : null;
       if (e is ExtraError) throw e;
       throw ExtraError('NETWORK', 'no server');
     }
-
     final all = <Map<String, dynamic>>[];
     final seen = <String>{};
     final cities = <String>{};
@@ -126,19 +151,31 @@ class CustomerSearch {
         if (p.url != kDefaultApiUrl) m['_server'] = p.url;
         // اگر سرور هنوز فیلترها را نمی‌شناسد، سمت اپ هم فیلتر می‌کنیم
         if (f.city.isNotEmpty &&
-            '${m['city'] ?? ''}'.trim().toLowerCase() != f.city.trim().toLowerCase()) {
+            '${m['city'] ?? ''}'.trim().toLowerCase() !=
+                f.city.trim().toLowerCase()) {
           continue;
         }
         final g = '${m['gender'] ?? ''}';
-        if (f.gender.isNotEmpty && g.isNotEmpty && g != 'both' && g != f.gender) continue;
+        if (f.gender.isNotEmpty &&
+            g.isNotEmpty &&
+            g != 'both' &&
+            g != f.gender) {
+          continue;
+        }
+        final bk = bizKeyOf(m);
+        if (f.type.isNotEmpty && bk != f.type) continue;
+        if (f.group.isNotEmpty && bizTypeByKey(bk)?.group != f.group) {
+          continue;
+        }
         if (f.cat.isNotEmpty && _num(m['price_from']) == null) continue;
         all.add(m);
       }
     }
-
     final rnd = Random();
     final keyed = [for (final s in all) MapEntry(s, rnd.nextDouble())];
     double rating(Map<String, dynamic> m) => _num(m['rating_avg']) ?? 0;
+    double count(Map<String, dynamic> m) =>
+        _num(f.cat.isNotEmpty ? m['cat_count'] : m['svc_count']) ?? 0;
     int cmpPrice(Map<String, dynamic> a, Map<String, dynamic> b, bool asc) {
       final pa = _num(a['price_from']);
       final pb = _num(b['price_from']);
@@ -154,12 +191,13 @@ class CustomerSearch {
         c = cmpPrice(a.key, b.key, true);
       } else if (f.cat.isNotEmpty && f.sort == 'price_desc') {
         c = cmpPrice(a.key, b.key, false);
+      } else if (f.sort == 'most') {
+        c = count(b.key).compareTo(count(a.key));
       }
       if (c == 0) c = rating(b.key).compareTo(rating(a.key));
       if (c != 0) return c;
       return a.value.compareTo(b.value);
     });
-
     final list = cities.toList()..sort();
     return SearchResult([for (final e in keyed.take(80)) e.key], list);
   }
@@ -218,7 +256,6 @@ class SearchFilterBar extends StatelessWidget {
     required this.cities,
     required this.onChanged,
   });
-
   final String lang;
   final SearchFilters filters;
   final List<String> cities;
@@ -226,15 +263,38 @@ class SearchFilterBar extends StatelessWidget {
 
   String _t(String k) => (_tx[lang] ?? _tx['fa']!)[k] ?? _tx['fa']![k] ?? k;
 
-  void _set({String? city, String? gender, String? cat, String? sort}) {
+  void _set({
+    String? city,
+    String? gender,
+    String? cat,
+    String? sort,
+    String? group,
+    String? type,
+  }) {
     final f = filters.copy();
     if (city != null) f.city = city;
     if (gender != null) f.gender = gender;
     if (cat != null) f.cat = cat;
     if (sort != null) f.sort = sort;
+    if (group != null) {
+      f.group = group;
+      f.type = '';
+    }
+    if (type != null) f.type = type;
+    if (f.group.isNotEmpty && f.type.isNotEmpty) {
+      final bt = bizTypeByKey(f.type);
+      if (bt == null || bt.group != f.group) f.type = '';
+    }
+    // خدمت و جنسیت فقط برای گروه آرایش و زیبایی معنی دارد
+    if (f.group.isNotEmpty && f.group != 'beauty') {
+      f.cat = '';
+      f.gender = '';
+    }
     final items = catalogFor(f.gender);
     if (f.cat.isNotEmpty && !items.any((c) => c.key == f.cat)) f.cat = '';
-    if (f.cat.isEmpty && f.sort != 'rating') f.sort = 'rating';
+    if (f.cat.isEmpty && (f.sort == 'price_asc' || f.sort == 'price_desc')) {
+      f.sort = 'rating';
+    }
     onChanged(f);
   }
 
@@ -246,55 +306,102 @@ class SearchFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bt = BT(lang);
     final items = catalogFor(filters.gender);
     final catValue = items.any((c) => c.key == filters.cat) ? filters.cat : '';
-    final cityValue = (filters.city.isEmpty || cities.contains(filters.city)) ? filters.city : '';
+    final cityValue =
+        (filters.city.isEmpty || cities.contains(filters.city))
+            ? filters.city
+            : '';
     final hasCat = catValue.isNotEmpty;
+    final group = filters.group;
+    final beauty = group.isEmpty || group == 'beauty';
+    final types = group.isEmpty ? <BizType>[] : bizTypesOf(group);
+    final typeValue = types.any((t) => t.key == filters.type) ? filters.type : '';
+
+    final cityBox = DropdownButtonFormField<String>(
+      value: cityValue,
+      isExpanded: true,
+      decoration: _dec(_t('city')),
+      items: [
+        DropdownMenuItem<String>(value: '', child: Text(_t('all_city'))),
+        for (final c in cities)
+          DropdownMenuItem<String>(value: c, child: Text(c)),
+      ],
+      onChanged: (v) => _set(city: v ?? ''),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          value: catValue,
+          value: group,
           isExpanded: true,
-          decoration: _dec(_t('svc')),
+          decoration: _dec(bt.t('f_group')),
           items: [
-            DropdownMenuItem<String>(value: '', child: Text(_t('all_svc'))),
-            for (final c in items)
-              DropdownMenuItem<String>(value: c.key, child: Text(c.name(lang))),
+            DropdownMenuItem<String>(value: '', child: Text(bt.t('f_all'))),
+            for (final g in kBizGroups)
+              DropdownMenuItem<String>(value: g.key, child: Text(g.name(lang))),
           ],
-          onChanged: (v) => _set(cat: v ?? ''),
+          onChanged: (v) => _set(group: v ?? ''),
         ),
+        if (group.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            value: typeValue,
+            isExpanded: true,
+            decoration: _dec(bt.t('f_type')),
+            items: [
+              DropdownMenuItem<String>(
+                  value: '', child: Text(bt.t('f_all_types'))),
+              for (final tp in types)
+                DropdownMenuItem<String>(
+                    value: tp.key, child: Text(tp.name(lang))),
+            ],
+            onChanged: (v) => _set(type: v ?? ''),
+          ),
+        ],
+        if (beauty) ...[
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            value: catValue,
+            isExpanded: true,
+            decoration: _dec(_t('svc')),
+            items: [
+              DropdownMenuItem<String>(value: '', child: Text(_t('all_svc'))),
+              for (final c in items)
+                DropdownMenuItem<String>(
+                    value: c.key, child: Text(c.name(lang))),
+            ],
+            onChanged: (v) => _set(cat: v ?? ''),
+          ),
+        ],
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: cityValue,
-                isExpanded: true,
-                decoration: _dec(_t('city')),
-                items: [
-                  DropdownMenuItem<String>(value: '', child: Text(_t('all_city'))),
-                  for (final c in cities) DropdownMenuItem<String>(value: c, child: Text(c)),
-                ],
-                onChanged: (v) => _set(city: v ?? ''),
+        if (beauty)
+          Row(
+            children: [
+              Expanded(child: cityBox),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: filters.gender,
+                  isExpanded: true,
+                  decoration: _dec(_t('gender')),
+                  items: [
+                    DropdownMenuItem<String>(
+                        value: '', child: Text(_t('all'))),
+                    DropdownMenuItem<String>(
+                        value: 'men', child: Text(_t('men'))),
+                    DropdownMenuItem<String>(
+                        value: 'women', child: Text(_t('women'))),
+                  ],
+                  onChanged: (v) => _set(gender: v ?? ''),
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: filters.gender,
-                isExpanded: true,
-                decoration: _dec(_t('gender')),
-                items: [
-                  DropdownMenuItem<String>(value: '', child: Text(_t('all'))),
-                  DropdownMenuItem<String>(value: 'men', child: Text(_t('men'))),
-                  DropdownMenuItem<String>(value: 'women', child: Text(_t('women'))),
-                ],
-                onChanged: (v) => _set(gender: v ?? ''),
-              ),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          cityBox,
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -306,18 +413,25 @@ class SearchFilterBar extends StatelessWidget {
               onSelected: (_) => _set(sort: 'rating'),
             ),
             ChoiceChip(
-              label: Text(_t('s_low')),
-              selected: filters.sort == 'price_asc',
-              onSelected: hasCat ? (_) => _set(sort: 'price_asc') : null,
+              label: Text(bt.t('s_most')),
+              selected: filters.sort == 'most',
+              onSelected: (_) => _set(sort: 'most'),
             ),
-            ChoiceChip(
-              label: Text(_t('s_high')),
-              selected: filters.sort == 'price_desc',
-              onSelected: hasCat ? (_) => _set(sort: 'price_desc') : null,
-            ),
+            if (beauty) ...[
+              ChoiceChip(
+                label: Text(_t('s_low')),
+                selected: filters.sort == 'price_asc',
+                onSelected: hasCat ? (_) => _set(sort: 'price_asc') : null,
+              ),
+              ChoiceChip(
+                label: Text(_t('s_high')),
+                selected: filters.sort == 'price_desc',
+                onSelected: hasCat ? (_) => _set(sort: 'price_desc') : null,
+              ),
+            ],
           ],
         ),
-        if (!hasCat)
+        if (beauty && !hasCat)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(_t('price_hint'), style: const TextStyle(fontSize: 12)),

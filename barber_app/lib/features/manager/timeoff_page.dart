@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/date_pick.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s3.dart';
 import '../../app/theme.dart';
@@ -81,6 +82,11 @@ class _TimeOffPageState extends State<TimeOffPage> {
       if (bStr(s['staff_id']) == id) return bStr(s['name']);
     }
     return id;
+  }
+
+  String _d(String iso) {
+    final s = SettingsScope.of(context);
+    return fmtPickIso(iso, s.calendarKey, s.lang);
   }
 
   Future<void> _add() async {
@@ -188,7 +194,6 @@ class _TimeOffPageState extends State<TimeOffPage> {
       }
     }
     children.add(const SizedBox(height: 90));
-
     return GlassScaffold(
       title: t.t('t_title'),
       maxWidth: 600,
@@ -217,6 +222,8 @@ class _TimeOffPageState extends State<TimeOffPage> {
     final en = bStr(b['end_time']);
     final allDay = st.isEmpty || en.isEmpty;
     final reason = bStr(b['reason']);
+    final dateText =
+        from == to || to.isEmpty ? _d(from) : '${_d(from)} → ${_d(to)}';
     return Glass(
       child: Row(
         children: [
@@ -226,7 +233,7 @@ class _TimeOffPageState extends State<TimeOffPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(from == to || to.isEmpty ? from : '$from → $to',
+                Text(dateText,
                     textDirection: TextDirection.ltr,
                     style: const TextStyle(
                         fontSize: 15.5, fontWeight: FontWeight.w800)),
@@ -300,14 +307,22 @@ class _TimeOffAddPageState extends State<_TimeOffAddPage> {
     super.dispose();
   }
 
+  String _show(DateTime d) {
+    final s = SettingsScope.of(context);
+    return fmtPickDate(d, s.calendarKey, s.lang);
+  }
+
   Future<void> _pickDate(bool isFrom) async {
     final n = DateTime.now();
     final today = DateTime(n.year, n.month, n.day);
-    final d = await showDatePicker(
-      context: context,
-      initialDate: isFrom ? _from : _to,
-      firstDate: today.subtract(const Duration(days: 1)),
-      lastDate: today.add(const Duration(days: 730)),
+    final s = SettingsScope.read(context);
+    final d = await pickLocalDate(
+      context,
+      initial: isFrom ? _from : _to,
+      first: today.subtract(const Duration(days: 1)),
+      last: today.add(const Duration(days: 730)),
+      calKey: s.calendarKey,
+      lang: s.lang,
     );
     if (d == null || !mounted) return;
     setState(() {
@@ -421,10 +436,10 @@ class _TimeOffAddPageState extends State<_TimeOffAddPage> {
             ],
           ),
           const SizedBox(height: 6),
-          _pickTile(Icons.event_rounded, t.t('t_from'), bIso(_from),
+          _pickTile(Icons.event_rounded, t.t('t_from'), _show(_from),
               () => _pickDate(true)),
           const SizedBox(height: 10),
-          _pickTile(Icons.event_rounded, t.t('t_to'), bIso(_to),
+          _pickTile(Icons.event_rounded, t.t('t_to'), _show(_to),
               () => _pickDate(false)),
           const SizedBox(height: 14),
           Glass(

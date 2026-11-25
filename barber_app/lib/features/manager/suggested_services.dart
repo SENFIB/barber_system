@@ -4,7 +4,6 @@ import '../../app/extra_http.dart';
 import '../../app/service_catalog.dart';
 import '../../app/settings.dart';
 import '../../app/widgets.dart';
-
 const Map<String, Map<String, String>> _tx = {
   'fa': {
     'title': 'خدمات پیشنهادی',
@@ -43,16 +42,6 @@ const Map<String, Map<String, String>> _tx = {
     'retry': 'حاول مجددًا',
   },
 };
-
-const List<String> _groupKeys = <String>[
-  'beauty',
-  'wellness',
-  'auto',
-  'pro',
-  'edu',
-  'pets',
-];
-
 const Map<String, Map<String, String>> _groupNames = {
   'beauty': {'fa': 'زیبایی و آرایش', 'en': 'Beauty & grooming', 'ar': 'التجميل والعناية'},
   'wellness': {'fa': 'سلامت و آرامش', 'en': 'Wellness & relaxation', 'ar': 'الصحة والاسترخاء'},
@@ -61,7 +50,8 @@ const Map<String, Map<String, String>> _groupNames = {
   'edu': {'fa': 'آموزش و ورزش', 'en': 'Training & sports', 'ar': 'التعليم والرياضة'},
   'pets': {'fa': 'حیوانات خانگی', 'en': 'Pets', 'ar': 'الحيوانات الأليفة'},
 };
-
+/// فقط خدمات پیشنهادیِ دسته‌ی همین کسب‌وکار نشان داده می‌شود
+/// (گروه زیبایی بر اساس مردانه/زنانه)
 class SuggestedServicesPage extends StatefulWidget {
   const SuggestedServicesPage({
     super.key,
@@ -75,42 +65,36 @@ class SuggestedServicesPage extends StatefulWidget {
   @override
   State<SuggestedServicesPage> createState() => _SuggestedServicesPageState();
 }
-
 class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
   bool _loading = true;
   bool _saving = false;
   String? _error;
   Set<String> _have = <String>{};
-  final Map<String, List<CatalogItem>> _byGroup = {};
   final List<CatalogItem> _items = [];
   final Map<String, bool> _sel = {};
   final Map<String, TextEditingController> _min = {};
   final Map<String, TextEditingController> _price = {};
-
   AppSettings get _st => widget.settings;
   String get _lang => _st.lang;
   String _t(String k) => (_tx[_lang] ?? _tx['fa']!)[k] ?? _tx['fa']![k] ?? k;
   String _gName(String g) =>
       (_groupNames[g] ?? const <String, String>{})[_lang] ?? g;
-
   @override
   void initState() {
     super.initState();
-    for (final g in _groupKeys) {
-      final list = catalogForGroup(g, widget.gender);
-      if (list.isEmpty) continue;
-      _byGroup[g] = list;
-      for (final c in list) {
-        if (_sel.containsKey(c.key)) continue;
-        _items.add(c);
-        _sel[c.key] = false;
-        _min[c.key] = TextEditingController(text: '${c.minutes}');
-        _price[c.key] = TextEditingController();
-      }
+    final g = _groupNames.containsKey(widget.initialGroup)
+        ? widget.initialGroup
+        : 'beauty';
+    final gender = g == 'beauty' ? widget.gender : 'both';
+    for (final c in catalogForGroup(g, gender)) {
+      if (_sel.containsKey(c.key)) continue;
+      _items.add(c);
+      _sel[c.key] = false;
+      _min[c.key] = TextEditingController(text: '${c.minutes}');
+      _price[c.key] = TextEditingController();
     }
     _load();
   }
-
   @override
   void dispose() {
     for (final c in _min.values) {
@@ -121,7 +105,6 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
     }
     super.dispose();
   }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -145,7 +128,6 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
     }
     if (mounted) setState(() => _loading = false);
   }
-
   Future<void> _save() async {
     if (_saving) return;
     final out = <Map<String, dynamic>>[];
@@ -181,7 +163,6 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
       }
     }
   }
-
   Widget _num(TextEditingController c, String label) {
     return TextField(
       controller: c,
@@ -193,7 +174,6 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
       ),
     );
   }
-
   Widget _row(CatalogItem c) {
     final have = _have.contains(c.key);
     final on = _sel[c.key] == true && !have;
@@ -228,35 +208,6 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
       ),
     );
   }
-
-  Widget _groupTile(String g) {
-    final list = _byGroup[g]!;
-    var picked = 0;
-    for (final c in list) {
-      if (_sel[c.key] == true && !_have.contains(c.key)) picked++;
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Glass(
-        padding: EdgeInsets.zero,
-        child: Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            key: PageStorageKey<String>('sg_$g'),
-            initiallyExpanded: g == widget.initialGroup,
-            leading: Icon(bizGroupIcon(g)),
-            title: Text(
-              picked > 0 ? '${_gName(g)}  ($picked)' : _gName(g),
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
-            children: [for (final c in list) _row(c)],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     Widget body;
@@ -272,13 +223,27 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
         ],
       );
     } else {
+      final g = _groupNames.containsKey(widget.initialGroup)
+          ? widget.initialGroup
+          : 'beauty';
       body = ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
+          Row(
+            children: [
+              Icon(bizGroupIcon(g)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(_gName(g),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 15)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Text(_t('intro'), style: TextStyle(color: muted(context))),
           const SizedBox(height: 12),
-          for (final g in _groupKeys)
-            if (_byGroup.containsKey(g)) _groupTile(g),
+          for (final c in _items) _row(c),
           const SizedBox(height: 8),
           GradientButton(
             label: _t('save'),

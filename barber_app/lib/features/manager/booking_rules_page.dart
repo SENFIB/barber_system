@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../app/biz_words.dart';
+import '../../app/business_types.dart';
 import '../../app/cal_names.dart';
 import '../../app/extra_http.dart';
 import '../../app/settings.dart';
 import '../../app/widgets.dart';
 import 'closure_picker.dart';
 import 'suggested_services.dart';
-
 const Map<String, Map<String, String>> _tx = {
   'fa': {
     'title': 'نوبت‌دهی و تعطیلی',
@@ -18,10 +19,10 @@ const Map<String, Map<String, String>> _tx = {
     'custom': 'عدد دلخواه',
     'days_label': 'تعداد روز (۱ تا ۳۰)',
     'range_note':
-        'هفته مطابق تقویم آرایشگاه است. روز تعطیل جزو نوبت‌گیری حساب نمی‌شود.',
-    'off_h': 'روز تعطیل هفتگی آرایشگاه',
+        'هفته مطابق تقویم {shop} است. روز تعطیل جزو نوبت‌گیری حساب نمی‌شود.',
+    'off_h': 'روز تعطیل هفتگی',
     'off_none': 'ندارد',
-    'off_note': 'برای همه‌ی آرایشگرها اعمال می‌شود. هر آرایشگر روز تعطیل خودش را هم دارد.',
+    'off_note': 'برای همه‌ی {staffs} اعمال می‌شود. هر {staff} روز تعطیل خودش را هم دارد.',
     'gender_h': 'آرایشگاه برای چه کسانی است؟',
     'men': 'مردانه',
     'women': 'زنانه',
@@ -52,10 +53,10 @@ const Map<String, Map<String, String>> _tx = {
     'custom': 'Custom number',
     'days_label': 'Number of days (1 to 30)',
     'range_note':
-        'The week follows the shop calendar. The closed day is not counted for booking.',
-    'off_h': 'Weekly closed day of the shop',
+        'The week follows the {shop} calendar. The closed day is not counted for booking.',
+    'off_h': 'Weekly closed day',
     'off_none': 'None',
-    'off_note': 'Applies to all barbers. Each barber also keeps their own day off.',
+    'off_note': 'Applies to all {staffs}. Each {staff} also keeps their own day off.',
     'gender_h': 'Who is the shop for?',
     'men': 'Men',
     'women': 'Women',
@@ -85,10 +86,10 @@ const Map<String, Map<String, String>> _tx = {
     'd30': '٣٠ يومًا قادمة',
     'custom': 'رقم مخصص',
     'days_label': 'عدد الأيام (من ١ إلى ٣٠)',
-    'range_note': 'الأسبوع حسب تقويم الصالون. يوم العطلة لا يُحتسب في الحجز.',
-    'off_h': 'يوم العطلة الأسبوعي للصالون',
+    'range_note': 'الأسبوع حسب تقويم {shop}. يوم العطلة لا يُحتسب في الحجز.',
+    'off_h': 'يوم العطلة الأسبوعي',
     'off_none': 'لا يوجد',
-    'off_note': 'يسري على كل الحلاقين. ولكل حلاق عطلته الخاصة أيضًا.',
+    'off_note': 'يسري على {staffs}. ولكل {staff} عطلته الخاصة أيضًا.',
     'gender_h': 'لمن هذا الصالون؟',
     'men': 'رجالي',
     'women': 'نسائي',
@@ -109,14 +110,12 @@ const Map<String, Map<String, String>> _tx = {
     'to': 'إلى',
   },
 };
-
 const Map<String, List<String>> _wdFull = {
   // index 0 = Sunday
   'fa': ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'],
   'en': ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   'ar': ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
 };
-
 class _Block {
   final String id;
   final String from;
@@ -124,43 +123,48 @@ class _Block {
   final String reason;
   _Block(this.id, this.from, this.to, this.reason);
 }
-
 class BookingRulesPage extends StatefulWidget {
   const BookingRulesPage({super.key, required this.settings});
   final AppSettings settings;
-
   @override
   State<BookingRulesPage> createState() => _BookingRulesPageState();
 }
-
 class _BookingRulesPageState extends State<BookingRulesPage> {
   bool _loading = true;
   bool _busy = false;
   String? _error;
   String _gender = 'both';
+  String _type = 'barber';
   String _cal = 'jalali';
   String _preset = 'd30';
   int _weeklyOff = -1;
   final _daysC = TextEditingController(text: '10');
   List<_Block> _blocks = <_Block>[];
   final Map<String, String> _lab = {};
-
   AppSettings get _st => widget.settings;
   String get _lang => _st.lang;
-  String _t(String k) => (_tx[_lang] ?? _tx['fa']!)[k] ?? _tx['fa']![k] ?? k;
-
+  bool get _beauty => bwBeauty(_type);
+  String _t(String k) {
+    var s = (_tx[_lang] ?? _tx['fa']!)[k] ?? _tx['fa']![k] ?? k;
+    if (s.contains('{shop}') || s.contains('{staff')) {
+      String f(String v) => _lang == 'en' ? v.toLowerCase() : v;
+      s = s
+          .replaceAll('{shop}', f(bwShop(_type, _lang)))
+          .replaceAll('{staffs}', f(bwStaffs(_type, _lang)))
+          .replaceAll('{staff}', f(bwStaff(_type, _lang)));
+    }
+    return s;
+  }
   @override
   void initState() {
     super.initState();
     _load();
   }
-
   @override
   void dispose() {
     _daysC.dispose();
     super.dispose();
   }
-
   void _applyLoaded(String mode, int n) {
     if (mode == 'week') {
       _preset = 'week';
@@ -181,7 +185,6 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       _preset = 'd30';
     }
   }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -194,6 +197,8 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
         final Map sh = shop;
         final g = '${sh['gender'] ?? ''}';
         _gender = (g == 'men' || g == 'women') ? g : 'both';
+        final b = '${sh['biz_type'] ?? ''}'.trim();
+        _type = bizTypeByKey(b) != null ? b : (g == 'women' ? 'salon' : 'barber');
         final c = '${sh['calendar'] ?? ''}';
         _cal = (c == 'gregorian' || c == 'hijri') ? c : 'jalali';
         final n = int.tryParse('${sh['book_days'] ?? ''}') ?? 30;
@@ -207,12 +212,10 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     if (mounted) setState(() => _loading = false);
   }
-
   String _todayIso() {
     final n = DateTime.now();
     return '${n.year.toString().padLeft(4, '0')}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
   }
-
   Future<void> _loadBlocks() async {
     final r = await extraManager(_st, 'timeoff_list');
     final list = r['blocks'];
@@ -230,7 +233,7 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     out.sort((a, b) => a.from.compareTo(b.from));
     _blocks = out;
-    // برچسب تاریخ‌ها به تقویم آرایشگاه (اگر نشد، همان تاریخ میلادی)
+    // برچسب تاریخ‌ها به تقویم کسب‌وکار (اگر نشد، همان تاریخ میلادی)
     _lab.clear();
     if (_cal != 'gregorian' && out.isNotEmpty) {
       try {
@@ -256,9 +259,7 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       } catch (_) {}
     }
   }
-
   String _labelOf(String iso) => _lab[iso] ?? iso;
-
   Future<void> _save() async {
     if (_busy) return;
     var mode = 'days';
@@ -290,12 +291,14 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     setState(() => _busy = true);
     try {
-      final r = await extraManager(_st, 'shop_update', {
-        'gender': _gender,
+      final fields = <String, dynamic>{
         'book_mode': mode,
         'book_days': days,
         'weekly_off': _weeklyOff < 0 ? '' : _weeklyOff,
-      });
+      };
+      // مردانه/زنانه فقط برای گروه زیبایی معنی دارد
+      if (_beauty) fields['gender'] = _gender;
+      final r = await extraManager(_st, 'shop_update', fields);
       final shop = r['shop'];
       if (!mounted) return;
       if (shop is Map && shop.containsKey('gender')) {
@@ -308,7 +311,6 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     if (mounted) setState(() => _busy = false);
   }
-
   Future<void> _addClosure() async {
     if (_busy) return;
     final res = await Navigator.of(context).push<ClosureResult>(
@@ -337,7 +339,6 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     if (mounted) setState(() => _busy = false);
   }
-
   Future<void> _removeBlock(_Block b) async {
     if (_busy) return;
     final ok = await showDialog<bool>(
@@ -360,22 +361,23 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     if (mounted) setState(() => _busy = false);
   }
-
   Future<void> _openSuggested() async {
     await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => SuggestedServicesPage(settings: _st, gender: _gender),
+        builder: (_) => SuggestedServicesPage(
+          settings: _st,
+          gender: _beauty ? _gender : 'both',
+          initialGroup: bwGroup(_type),
+        ),
       ),
     );
   }
-
   Widget _head(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(text, style: Theme.of(context).textTheme.titleSmall),
     );
   }
-
   Widget _chip(String label, bool selected, VoidCallback onTap) {
     return ChoiceChip(
       label: Text(label),
@@ -383,7 +385,6 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       onSelected: _busy ? null : (_) => onTap(),
     );
   }
-
   Widget _card(List<Widget> children) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -393,7 +394,6 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     Widget body;
@@ -456,17 +456,18 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
             const SizedBox(height: 10),
             Text(_t('off_note'), style: TextStyle(color: muted(context), fontSize: 12)),
           ]),
-          _card([
-            _head(_t('gender_h')),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final g in const ['men', 'women', 'both'])
-                  _chip(_t(g), _gender == g, () => setState(() => _gender = g)),
-              ],
-            ),
-          ]),
+          if (_beauty)
+            _card([
+              _head(_t('gender_h')),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final g in const ['men', 'women', 'both'])
+                    _chip(_t(g), _gender == g, () => setState(() => _gender = g)),
+                ],
+              ),
+            ]),
           GradientButton(
             label: _t('save'),
             icon: Icons.check_rounded,

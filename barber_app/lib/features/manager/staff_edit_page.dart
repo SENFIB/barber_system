@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import '../../app/biz_panel.dart';
+import '../../app/biz_words.dart';
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
@@ -9,18 +10,17 @@ import '../../app/widgets.dart';
 import 'shifts_editor.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
-
-/// ویرایش یک آرایشگر: نام، تخصص، خدمات، شیفت‌ها، روز تعطیل، اضافه‌کار
+String _x(String l, String fa, String en, String ar) =>
+    l == 'fa' ? fa : (l == 'ar' ? ar : en);
+/// ویرایش یک نفر از پرسنل: نام، تخصص/شرح کار، خدمات، شیفت‌ها، روز تعطیل، اضافه‌کار
 class StaffEditPage extends StatefulWidget {
   const StaffEditPage(this.ctx, this.staff, {super.key, required this.isOwner});
   final ShopCtx ctx;
   final Map<String, dynamic> staff;
   final bool isOwner;
-
   @override
   State<StaffEditPage> createState() => _StaffEditPageState();
 }
-
 class _StaffEditPageState extends State<StaffEditPage> {
   final _name = TextEditingController();
   final _spec = TextEditingController();
@@ -35,18 +35,17 @@ class _StaffEditPageState extends State<StaffEditPage> {
   bool _loading = true;
   String? _err;
   bool _busy = false;
-
+  String _type = '';
   String get _lang => SettingsScope.read(context).lang;
-
   @override
   void initState() {
     super.initState();
     final s = widget.staff;
+    _type = '${widget.ctx.session.shop.bizType}';
     _name.text = jStr(s['name']);
     _spec.text = jStr(s['specialty']);
     _shifts = shiftsOfStaff(s);
     _unset = scheduleUnset(s);
-
     // روزهای تعطیل
     if (s['days_off_list'] is List) {
       for (final v in (s['days_off_list'] as List)) {
@@ -59,7 +58,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
         if (n != null && n >= 0 && n <= 6) _off.add(n);
       }
     }
-
     // خدمات
     if (s['service_id_list'] is List) {
       for (final v in (s['service_id_list'] as List)) {
@@ -72,15 +70,15 @@ class _StaffEditPageState extends State<StaffEditPage> {
       }
     }
     _all = _svc.isEmpty;
-
     // اضافه‌کار
     final ot = jInt(s['overtime_min']);
     _otDefault = ot == null;
     _ot.text = ot == null ? '' : '$ot';
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadServices());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadType();
+      _loadServices();
+    });
   }
-
   @override
   void dispose() {
     _name.dispose();
@@ -88,7 +86,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
     _ot.dispose();
     super.dispose();
   }
-
   bool _lost(Object e) {
     if (isSessionLost(e)) {
       Navigator.of(context).pop();
@@ -97,7 +94,17 @@ class _StaffEditPageState extends State<StaffEditPage> {
     }
     return false;
   }
-
+  /// نوع کسب‌وکار برای متن‌ها و آیکون (اگر نشد، همان مقدار نشست)
+  Future<void> _loadType() async {
+    try {
+      final me = await ShopRaw(SettingsScope.read(context)).call('me');
+      final sh = me['shop'];
+      if (sh is Map) {
+        final b = jStr(sh['biz_type']).trim();
+        if (b.isNotEmpty && mounted) setState(() => _type = b);
+      }
+    } catch (_) {}
+  }
   Future<void> _loadServices() async {
     setState(() {
       _loading = true;
@@ -131,7 +138,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
       });
     }
   }
-
   Future<void> _save() async {
     final x = T6(_lang);
     final name = _name.text.trim();
@@ -193,7 +199,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
   Widget _unsetBox(T6 x) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -224,7 +229,6 @@ class _StaffEditPageState extends State<StaffEditPage> {
       ),
     );
   }
-
   Widget _servicesBox(T6 x) {
     return Glass(
       child: Column(
@@ -286,17 +290,20 @@ class _StaffEditPageState extends State<StaffEditPage> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
     final x = T6(st.lang);
+    final lang = st.lang;
+    final staffWord = bwStaff(_type, lang);
+    final beauty = bwBeauty(_type);
+    final panel = BizPanel.of(_type);
     final days = st.lang == 'en'
         ? const [0, 1, 2, 3, 4, 5, 6]
         : const [6, 0, 1, 2, 3, 4, 5];
     final cap = shiftCapForPlan(widget.ctx.session.shop.plan);
     return GlassScaffold(
-      title: x.t('ed_title'),
+      title: '${_x(lang, 'ویرایش', 'Edit', 'تعديل')} $staffWord',
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
         children: [
@@ -306,14 +313,18 @@ class _StaffEditPageState extends State<StaffEditPage> {
               children: [
                 GlassField(
                   controller: _name,
-                  label: x.t('barber_name'),
+                  label: _x(lang, 'نام $staffWord', '$staffWord name',
+                      'اسم $staffWord'),
                   icon: Icons.person_rounded,
                 ),
                 const SizedBox(height: 12),
                 GlassField(
                   controller: _spec,
-                  label: x.t('ed_specialty'),
-                  icon: Icons.content_cut_rounded,
+                  label: beauty
+                      ? x.t('ed_specialty')
+                      : _x(lang, 'شرح کار (اختیاری)', 'Role (optional)',
+                          'الوظيفة (اختياري)'),
+                  icon: panel.staffIcon,
                 ),
               ],
             ),

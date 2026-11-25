@@ -1,5 +1,6 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+import '../../app/biz_panel.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
 import '../../app/strings_m.dart';
@@ -8,6 +9,7 @@ import '../../app/util.dart';
 import '../../app/widgets.dart';
 import 'service_presets_page.dart';
 import 'shop_api.dart';
+import 'shop_raw.dart';
 
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
@@ -24,11 +26,15 @@ class _ServicesPageState extends State<ServicesPage> {
   bool _busy = false;
   String? _err;
   List<Map<String, dynamic>> _list = [];
+  late BizPanel _panel;
+
   M get _m => M(SettingsScope.read(context).lang);
+
   @override
   void initState() {
     super.initState();
-    _load();
+    _panel = BizPanel.of(widget.ctx.session.shop.bizType);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   bool _lost(ApiException e) => const {
@@ -39,11 +45,19 @@ class _ServicesPageState extends State<ServicesPage> {
       }.contains(e.code);
 
   Future<void> _load() async {
+    final raw = ShopRaw(SettingsScope.read(context));
     setState(() {
       _loading = true;
       _err = null;
     });
     try {
+      try {
+        final me = await raw.call('me');
+        final sh = me['shop'];
+        if (sh is Map && '${sh['biz_type'] ?? ''}'.isNotEmpty) {
+          _panel = BizPanel.of('${sh['biz_type']}');
+        }
+      } catch (_) {}
       final l = await widget.ctx.api.serviceList();
       if (!mounted) return;
       setState(() {
@@ -101,6 +115,7 @@ class _ServicesPageState extends State<ServicesPage> {
       context: context,
       builder: (_) => _ServiceDialog(
         m: m,
+        icon: _panel.icon,
         existing: ex,
         others:
             _list.where((e) => '${e['service_id']}' != exId).toList(),
@@ -156,7 +171,7 @@ class _ServicesPageState extends State<ServicesPage> {
         onTap: _busy ? null : () => _edit(sv),
         child: Row(
           children: [
-            const GradientIcon(Icons.content_cut_rounded, size: 46),
+            GradientIcon(_panel.icon, size: 46),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -286,10 +301,12 @@ class _SvcResult {
 class _ServiceDialog extends StatefulWidget {
   const _ServiceDialog({
     required this.m,
+    required this.icon,
     required this.others,
     this.existing,
   });
   final M m;
+  final IconData icon;
   final List<Map<String, dynamic>> others;
   final Map<String, dynamic>? existing;
   @override
@@ -304,6 +321,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
   late final TextEditingController _price = TextEditingController(
       text: widget.existing == null ? '' : '${widget.existing!['price'] ?? 0}');
   final Set<String> _comb = {};
+
   @override
   void initState() {
     super.initState();
@@ -363,7 +381,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
               GlassField(
                 controller: _name,
                 label: m.t('svc_name'),
-                icon: Icons.content_cut_rounded,
+                icon: widget.icon,
               ),
               const SizedBox(height: 12),
               Row(

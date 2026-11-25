@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
+import '../../app/cal_fmt.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
@@ -11,11 +11,9 @@ import 'shop_raw.dart';
 import 'shop_settings_page.dart';
 import 'staff_edit_page.dart';
 
-/// آرایشگرها: مدیر همه را می‌بیند؛ آرایشگر فقط خودش را
 class StaffPage extends StatefulWidget {
   const StaffPage(this.ctx, {super.key});
   final ShopCtx ctx;
-
   @override
   State<StaffPage> createState() => _StaffPageState();
 }
@@ -77,7 +75,6 @@ class _StaffPageState extends State<StaffPage> {
     }
   }
 
-  /// اجرای یک کار با قفل دکمه‌ها؛ در صورت موفقیت لیست دوباره خوانده می‌شود
   Future<bool> _act(Future<void> Function() fn, [String? okMsg]) async {
     if (_busy) return false;
     setState(() => _busy = true);
@@ -140,11 +137,8 @@ class _StaffPageState extends State<StaffPage> {
       ),
     );
     if (name == null || name.isEmpty) return;
-
     var newId = '';
     final ok = await _act(() async {
-      // ساعتِ موقت برای سرورهای قدیمی؛ سرور جدید آرایشگر را «تنظیم‌نشده»
-      // ثبت می‌کند و تا خودش ساعت را ذخیره نکند مشتری وقت نمی‌بیند.
       final r = await _raw.call('staff_add', {
         'name': name,
         'work_start': '09:00',
@@ -188,7 +182,6 @@ class _StaffPageState extends State<StaffPage> {
       if (!yes) return;
     }
     final ok = await _act(() async {
-      // چند اسم برای یک مقدار؛ سرور همان که می‌شناسد را می‌خواند
       await _raw.call('owner_barber', {
         'is_barber': v,
         'owner_is_barber': v,
@@ -238,7 +231,6 @@ class _StaffPageState extends State<StaffPage> {
     );
   }
 
-  /// هشدار بالای صفحه: آرایشگری که ساعتش را تنظیم نکرده
   Widget _unsetBanner(T6 x) {
     final unset = _staff.where(scheduleUnset).toList();
     if (unset.isEmpty) return const SizedBox.shrink();
@@ -280,7 +272,9 @@ class _StaffPageState extends State<StaffPage> {
     }
     final code = jStr(inv['code']);
     final exp = jStr(inv['expires_at']);
-    final date = exp.length >= 10 ? exp.substring(0, 10) : exp;
+    final date = exp.isEmpty
+        ? ''
+        : CalFmt.date(exp, SettingsScope.read(context).calendarKey, _lang);
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Container(
@@ -359,7 +353,6 @@ class _StaffPageState extends State<StaffPage> {
     final inv = r['invite'] is Map
         ? Map<String, dynamic>.from(r['invite'] as Map)
         : null;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Glass(

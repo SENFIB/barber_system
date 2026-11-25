@@ -1,3 +1,4 @@
+// barber_app/lib/features/manager/manager_home.dart
 import 'package:flutter/material.dart';
 import '../../app/fmt.dart';
 import '../../app/reminders.dart';
@@ -282,8 +283,8 @@ class _ManagerHomeState extends State<ManagerHome> {
                   colors: [AppColors.blue, AppColors.green],
                 ),
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) =>
-                        BookingRulesPage(SettingsScope.of(context)))),
+                    builder: (_) => BookingRulesPage(
+                        settings: SettingsScope.of(context)))),
               ),
             if (sess.isOwner)
               tile(

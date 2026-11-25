@@ -29,7 +29,8 @@ class _ShopsTabState extends State<ShopsTab> {
   Timer? _timer;
   String _last = '';
   int _seq = 0;
-  bool _loading = true;
+  bool _loading = false;
+  bool _typeChosen = false;
   Object? _err;
   SearchFilters _f = SearchFilters();
   List<String> _cities = <String>[];
@@ -39,9 +40,6 @@ class _ShopsTabState extends State<ShopsTab> {
   void initState() {
     super.initState();
     _q.addListener(_onText);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _load();
-    });
   }
 
   @override
@@ -72,7 +70,38 @@ class _ShopsTabState extends State<ShopsTab> {
         type: _f.type,
       );
 
+  void _reset() {
+    _seq++;
+    _timer?.cancel();
+    _q.text = '';
+    _last = '';
+    setState(() {
+      _f = SearchFilters();
+      _typeChosen = false;
+      _shops = <Map<String, dynamic>>[];
+      _cities = <String>[];
+      _err = null;
+      _loading = false;
+    });
+  }
+
+  void _pickGroup(String g) {
+    setState(() {
+      _f = SearchFilters(group: g);
+      _typeChosen = false;
+    });
+  }
+
+  void _pickType(String type) {
+    setState(() {
+      _f.type = type;
+      _typeChosen = true;
+    });
+    _load();
+  }
+
   Future<void> _load() async {
+    if (_f.group.isEmpty || !_typeChosen) return;
     final seq = ++_seq;
     setState(() {
       _loading = true;
@@ -116,10 +145,163 @@ class _ShopsTabState extends State<ShopsTab> {
     }
   }
 
+  // ---------- مرحله ۱: انتخاب دسته ----------
+  Widget _groupView(String lang) {
+    final sep = lang == 'en' ? ', ' : '، ';
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 30),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text(
+              _x(lang, 'دنبال چی هستی؟', 'What are you looking for?',
+                  'عن ماذا تبحث؟'),
+              style:
+                  const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Text(
+              _x(lang, 'اول دسته‌ی مورد نظرت را انتخاب کن',
+                  'First, choose a category', 'اختر الفئة أولاً'),
+              style: TextStyle(color: muted(context))),
+        ),
+        for (final g in kBizGroups)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Glass(
+              onTap: () => _pickGroup(g.key),
+              child: Row(
+                children: [
+                  GradientIcon(bizGroupIcon(g.key), size: 48),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(g.name(lang),
+                            style: const TextStyle(
+                                fontSize: 16.5, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 3),
+                        Text(
+                            bizTypesOf(g.key)
+                                .take(3)
+                                .map((e) => e.name(lang))
+                                .join(sep),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: muted(context), fontSize: 12.5)),
+                      ],
+                    ),
+                  ),
+                  Icon(chevron(context), color: muted(context)),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ---------- مرحله ۲: انتخاب نوع داخل دسته ----------
+  Widget _typeView(String lang) {
+    final g = bizGroupByKey(_f.group);
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+      children: [
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            onPressed: _reset,
+            icon: const Icon(Icons.category_rounded, size: 18),
+            label: Text(_x(lang, 'تغییر دسته', 'Change category',
+                'تغيير الفئة')),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Text(g?.name(lang) ?? '',
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Glass(
+            onTap: () => _pickType(''),
+            child: Row(
+              children: [
+                GradientIcon(bizGroupIcon(_f.group), size: 44),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                      _x(lang, 'همه‌ی این دسته', 'Everything in this category',
+                          'كل هذه الفئة'),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800)),
+                ),
+                Icon(chevron(context), color: muted(context)),
+              ],
+            ),
+          ),
+        ),
+        for (final tp in bizTypesOf(_f.group))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Glass(
+              onTap: () => _pickType(tp.key),
+              child: Row(
+                children: [
+                  GradientIcon(bizTypeIcon(tp.key), size: 44),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(tp.name(lang),
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
+                  ),
+                  Icon(chevron(context), color: muted(context)),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = T6(SettingsScope.of(context).lang);
+    if (_f.group.isEmpty) return _groupView(t.lang);
+    if (!_typeChosen) return _typeView(t.lang);
+
+    final gName = bizGroupByKey(_f.group)?.name(t.lang) ?? '';
+    final tName =
+        _f.type.isEmpty ? '' : (bizTypeByKey(_f.type)?.name(t.lang) ?? '');
     final children = <Widget>[
+      Row(
+        children: [
+          Icon(
+              _f.type.isEmpty ? bizGroupIcon(_f.group) : bizTypeIcon(_f.type),
+              size: 20,
+              color: muted(context)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(tName.isEmpty ? gName : '$gName • $tName',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800)),
+          ),
+          TextButton.icon(
+            onPressed: _reset,
+            icon: const Icon(Icons.category_rounded, size: 18),
+            label: Text(_x(t.lang, 'تغییر دسته', 'Change category',
+                'تغيير الفئة')),
+          ),
+        ],
+      ),
+      const SizedBox(height: 6),
       GlassField(
         controller: _q,
         label: _x(t.lang, 'دنبال چی هستی؟', 'What are you looking for?',
@@ -234,6 +416,7 @@ class _ShopsTabState extends State<ShopsTab> {
     final showPrice = _f.cat.isNotEmpty && priceFrom > 0;
     final bk = bizKeyOf(s);
     final typeName = bizTypeByKey(bk)?.name(t.lang) ?? '';
+    final isBeauty = bizTypeByKey(bk)?.group == 'beauty';
     return Glass(
       onTap: () => _open(s),
       child: Row(
@@ -297,9 +480,9 @@ class _ShopsTabState extends State<ShopsTab> {
                       )
                     else
                       Pill(t.t('cu_new')),
-                    if (gender == 'men')
+                    if (isBeauty && gender == 'men')
                       Pill(_x(t.lang, 'مردانه', 'Men', 'رجالي')),
-                    if (gender == 'women')
+                    if (isBeauty && gender == 'women')
                       Pill(_x(t.lang, 'زنانه', 'Women', 'نسائي')),
                   ],
                 ),

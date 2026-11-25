@@ -1,16 +1,77 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../app/biz_text.dart';
 import '../../app/look.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/strings_ex.dart';
+import '../../app/strings_s2.dart';
+import '../../app/theme.dart';
 import '../../app/widgets.dart';
 
+/// صفحه‌ی ظاهرسازی.
+/// بدون پارامتر: ظاهر خود برنامه. با [onSave]: ظاهر اختصاصی صفحه‌ی آرایشگاه (پلن ویژه).
 class AppearancePage extends StatefulWidget {
-  const AppearancePage({super.key});
+  const AppearancePage({super.key, this.initial, this.onSave, this.title});
+  final AppLook? initial;
+  final Future<void> Function(AppLook look)? onSave;
+  final String? title;
   @override
   State<AppearancePage> createState() => _AppearancePageState();
+}
+
+class _AppearancePageState extends State<AppearancePage> {
+  late AppLook _look = widget.initial ?? const AppLook();
+  bool? _darkSel;
+  bool _saving = false;
+
+  bool get _shop => widget.onSave != null;
+
+  Future<void> _save() async {
+    final st = SettingsScope.read(context);
+    setState(() => _saving = true);
+    try {
+      await widget.onSave!(_look);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      toast(context, T2(st.lang).error(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final st = SettingsScope.of(context);
+    final base = Theme.of(context);
+    final dark = _darkSel ?? (base.brightness == Brightness.dark);
+    Widget body = _AppearanceBody(
+      look: _shop ? _look : st.look,
+      shop: _shop,
+      title: widget.title,
+      previewDark: dark,
+      saving: _saving,
+      onChange: (l) {
+        if (_shop) {
+          setState(() => _look = l);
+        } else {
+          st.setLook(l);
+        }
+      },
+      onPreviewDark: (v) => setState(() => _darkSel = v),
+      onSaveTap: _save,
+    );
+    if (_shop) {
+      body = Theme(
+        data: buildTheme(dark ? Brightness.dark : Brightness.light, _look),
+        child: body,
+      );
+    }
+    return body;
+  }
 }
 
 class _CR {
@@ -23,8 +84,33 @@ class _CR {
   final bool alpha;
 }
 
-class _AppearancePageState extends State<AppearancePage> {
+class _AppearanceBody extends StatefulWidget {
+  const _AppearanceBody({
+    required this.look,
+    required this.shop,
+    required this.title,
+    required this.previewDark,
+    required this.saving,
+    required this.onChange,
+    required this.onPreviewDark,
+    required this.onSaveTap,
+  });
+  final AppLook look;
+  final bool shop;
+  final String? title;
+  final bool previewDark;
+  final bool saving;
+  final void Function(AppLook look) onChange;
+  final void Function(bool dark) onPreviewDark;
+  final VoidCallback onSaveTap;
+  @override
+  State<_AppearanceBody> createState() => _AppearanceBodyState();
+}
+
+class _AppearanceBodyState extends State<_AppearanceBody> {
   bool _busy = false;
+
+  AppLook get look => widget.look;
 
   Future<void> _pickImage() async {
     final st = SettingsScope.read(context);
@@ -50,12 +136,11 @@ class _AppearancePageState extends State<AppearancePage> {
   }
 
   Future<void> _setMode(String m) async {
-    final st = SettingsScope.read(context);
-    if (m == 'image' && !st.look.hasImage) {
+    if (m == 'image' && !look.hasImage) {
       await _pickImage();
       return;
     }
-    await st.setLook(st.look.copyWith(bgMode: m));
+    widget.onChange(look.copyWith(bgMode: m));
   }
 
   Future<void> _editColor(_CR r, String key, String title) async {
@@ -73,7 +158,7 @@ class _AppearancePageState extends State<AppearancePage> {
       ),
     );
     if (res == null) return;
-    await st.setLook(st.look.withColor(key, res.reset ? null : res.color));
+    widget.onChange(look.withColor(key, res.reset ? null : res.color));
   }
 
   Future<void> _resetAll() async {
@@ -87,15 +172,19 @@ class _AppearancePageState extends State<AppearancePage> {
       cancelLabel: x.t('pk_cancel'),
       danger: true,
     );
-    if (ok) await st.resetLook();
+    if (!ok) return;
+    if (widget.shop) {
+      widget.onChange(const AppLook());
+    } else {
+      await st.resetLook();
+    }
   }
 
   Widget _preset(LookPreset p, bool sel, String name) {
-    final st = SettingsScope.read(context);
     final onS = Theme.of(context).colorScheme.onSurface;
     return GestureDetector(
       onTap: () =>
-          st.setLook(st.look.copyWith(preset: p.id, colors: const {})),
+          widget.onChange(look.copyWith(preset: p.id, colors: const {})),
       child: SizedBox(
         width: 74,
         child: Column(
@@ -145,7 +234,6 @@ class _AppearancePageState extends State<AppearancePage> {
     final key = r.perMode ? '${r.key}${l.dark ? '_d' : '_l'}' : r.key;
     final overridden = look.colors.containsKey(key);
     final title = x.t(r.labelKey);
-    final st = SettingsScope.read(context);
     return InkWell(
       onTap: () => _editColor(r, key, title),
       borderRadius: BorderRadius.circular(12),
@@ -171,7 +259,7 @@ class _AppearancePageState extends State<AppearancePage> {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 icon: Icon(Icons.restart_alt_rounded, color: muted(context)),
-                onPressed: () => st.setLook(st.look.withColor(key, null)),
+                onPressed: () => widget.onChange(look.withColor(key, null)),
               ),
             Icon(chevron(context), color: muted(context)),
           ],
@@ -185,10 +273,10 @@ class _AppearancePageState extends State<AppearancePage> {
     final st = SettingsScope.of(context);
     final s = S(st.lang);
     final x = X(st.lang);
-    final look = st.look;
+    final bt = BT(st.lang);
+    final shop = widget.shop;
     final l = lk(context);
     final scheme = Theme.of(context).colorScheme;
-
     final rows = <_CR>[
       _CR('primary', false, 'c_primary', l.primary),
       _CR('secondary', false, 'c_secondary', l.secondary),
@@ -200,7 +288,6 @@ class _AppearancePageState extends State<AppearancePage> {
       _CR('card', true, 'c_card', l.cardBase, alpha: true),
       _CR('text', true, 'c_text', l.text ?? scheme.onSurface),
     ];
-
     final bgLabels = <String, String>{
       'blobs': x.t('bg_blobs'),
       'gradient': x.t('bg_gradient'),
@@ -210,9 +297,12 @@ class _AppearancePageState extends State<AppearancePage> {
       'solid': x.t('bg_solid'),
       'image': x.t('bg_image'),
     };
-
+    final modes = [
+      for (final m in kBgModes)
+        if (!(shop && m == 'image')) m
+    ];
     return GlassScaffold(
-      title: x.t('ap_title'),
+      title: widget.title ?? x.t('ap_title'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
         children: [
@@ -252,21 +342,28 @@ class _AppearancePageState extends State<AppearancePage> {
               ],
             ),
           ),
-
           // ----- پوسته (تیره/روشن) -----
-          SectionLabel(s.t('theme')),
+          SectionLabel(shop ? bt.t('th_mode') : s.t('theme')),
           Glass(
-            child: SegmentPicker<String>(
-              options: [
-                MapEntry('system', s.t('theme_system')),
-                MapEntry('light', s.t('theme_light')),
-                MapEntry('dark', s.t('theme_dark')),
-              ],
-              value: st.themeKey,
-              onChanged: st.setThemeKey,
-            ),
+            child: shop
+                ? SegmentPicker<String>(
+                    options: [
+                      MapEntry('light', s.t('theme_light')),
+                      MapEntry('dark', s.t('theme_dark')),
+                    ],
+                    value: widget.previewDark ? 'dark' : 'light',
+                    onChanged: (v) => widget.onPreviewDark(v == 'dark'),
+                  )
+                : SegmentPicker<String>(
+                    options: [
+                      MapEntry('system', s.t('theme_system')),
+                      MapEntry('light', s.t('theme_light')),
+                      MapEntry('dark', s.t('theme_dark')),
+                    ],
+                    value: st.themeKey,
+                    onChanged: st.setThemeKey,
+                  ),
           ),
-
           // ----- طرح‌های آماده -----
           SectionLabel(x.t('ap_presets')),
           Glass(
@@ -291,7 +388,6 @@ class _AppearancePageState extends State<AppearancePage> {
               ],
             ),
           ),
-
           // ----- پس‌زمینه -----
           SectionLabel(x.t('ap_background')),
           Glass(
@@ -302,7 +398,7 @@ class _AppearancePageState extends State<AppearancePage> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final m in kBgModes)
+                    for (final m in modes)
                       _Opt(
                         label: bgLabels[m] ?? m,
                         selected: look.bgMode == m,
@@ -311,7 +407,7 @@ class _AppearancePageState extends State<AppearancePage> {
                       ),
                   ],
                 ),
-                if (look.bgMode == 'image' && look.hasImage) ...[
+                if (!shop && look.bgMode == 'image' && look.hasImage) ...[
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -343,7 +439,7 @@ class _AppearancePageState extends State<AppearancePage> {
                     max: 20,
                     divisions: 20,
                     fmt: (v) => v.round().toString(),
-                    onEnd: (v) => st.setLook(st.look.copyWith(bgBlur: v)),
+                    onEnd: (v) => widget.onChange(look.copyWith(bgBlur: v)),
                   ),
                   _SliderRow(
                     label: x.t('ap_dim'),
@@ -352,13 +448,12 @@ class _AppearancePageState extends State<AppearancePage> {
                     max: 0.8,
                     divisions: 16,
                     fmt: (v) => '${(v * 100).round()}%',
-                    onEnd: (v) => st.setLook(st.look.copyWith(bgDim: v)),
+                    onEnd: (v) => widget.onChange(look.copyWith(bgDim: v)),
                   ),
                 ],
               ],
             ),
           ),
-
           // ----- رنگ‌ها -----
           SectionLabel(x.t('ap_colors')),
           Glass(
@@ -367,8 +462,12 @@ class _AppearancePageState extends State<AppearancePage> {
               children: [
                 Row(
                   children: [
-                    Icon(l.dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                        size: 18, color: l.primary),
+                    Icon(
+                        l.dark
+                            ? Icons.dark_mode_rounded
+                            : Icons.light_mode_rounded,
+                        size: 18,
+                        color: l.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -380,8 +479,8 @@ class _AppearancePageState extends State<AppearancePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(x.t('ap_editing_hint'),
-                    style:
-                        TextStyle(color: muted(context), fontSize: 12, height: 1.6)),
+                    style: TextStyle(
+                        color: muted(context), fontSize: 12, height: 1.6)),
                 const SizedBox(height: 8),
                 for (final r in rows) _colorRow(r, look, l, x),
                 const SizedBox(height: 10),
@@ -392,12 +491,11 @@ class _AppearancePageState extends State<AppearancePage> {
                   compact: true,
                   onPressed: look.colors.isEmpty
                       ? null
-                      : () => st.setLook(st.look.copyWith(colors: const {})),
+                      : () => widget.onChange(look.copyWith(colors: const {})),
                 ),
               ],
             ),
           ),
-
           // ----- فونت -----
           SectionLabel(x.t('ap_font')),
           Glass(
@@ -412,14 +510,14 @@ class _AppearancePageState extends State<AppearancePage> {
                       _Opt(
                         label: f.isEmpty ? x.t('f_system') : f,
                         selected: look.font == f,
-                        onTap: () => st.setLook(st.look.copyWith(font: f)),
+                        onTap: () => widget.onChange(look.copyWith(font: f)),
                       ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Text(x.t('ap_font_hint'),
-                    style:
-                        TextStyle(color: muted(context), fontSize: 12, height: 1.6)),
+                    style: TextStyle(
+                        color: muted(context), fontSize: 12, height: 1.6)),
                 _SliderRow(
                   label: x.t('ap_font_size'),
                   value: look.fontScale,
@@ -427,12 +525,11 @@ class _AppearancePageState extends State<AppearancePage> {
                   max: 1.3,
                   divisions: 9,
                   fmt: (v) => '${(v * 100).round()}%',
-                  onEnd: (v) => st.setLook(st.look.copyWith(fontScale: v)),
+                  onEnd: (v) => widget.onChange(look.copyWith(fontScale: v)),
                 ),
               ],
             ),
           ),
-
           // ----- شیشه و گوشه‌ها -----
           SectionLabel(x.t('ap_glass')),
           Glass(
@@ -445,7 +542,7 @@ class _AppearancePageState extends State<AppearancePage> {
                   max: 30,
                   divisions: 30,
                   fmt: (v) => v.round().toString(),
-                  onEnd: (v) => st.setLook(st.look.copyWith(glassBlur: v)),
+                  onEnd: (v) => widget.onChange(look.copyWith(glassBlur: v)),
                 ),
                 _SliderRow(
                   label: x.t('ap_glass_opacity'),
@@ -454,7 +551,8 @@ class _AppearancePageState extends State<AppearancePage> {
                   max: 1.6,
                   divisions: 13,
                   fmt: (v) => '${(v * 100).round()}%',
-                  onEnd: (v) => st.setLook(st.look.copyWith(glassOpacity: v)),
+                  onEnd: (v) =>
+                      widget.onChange(look.copyWith(glassOpacity: v)),
                 ),
                 _SliderRow(
                   label: x.t('ap_radius'),
@@ -463,13 +561,21 @@ class _AppearancePageState extends State<AppearancePage> {
                   max: 34,
                   divisions: 26,
                   fmt: (v) => v.round().toString(),
-                  onEnd: (v) => st.setLook(st.look.copyWith(radius: v)),
+                  onEnd: (v) => widget.onChange(look.copyWith(radius: v)),
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 22),
+          if (shop) ...[
+            GradientButton(
+              icon: Icons.check_rounded,
+              label: bt.t('th_save'),
+              loading: widget.saving,
+              onPressed: widget.onSaveTap,
+            ),
+            const SizedBox(height: 12),
+          ],
           GradientButton(
             danger: true,
             icon: Icons.restart_alt_rounded,
@@ -597,7 +703,6 @@ class _SliderRowState extends State<_SliderRow> {
 }
 
 // ======================= انتخابگر رنگ =======================
-
 class _PickResult {
   const _PickResult(this.color, {this.reset = false});
   final Color color;
@@ -696,11 +801,9 @@ class _PickerSheetState extends State<_PickerSheet> {
     final h = _hsv.hue;
     final color = _hsv.toColor();
     final opaque = _hsv.withAlpha(1).toColor();
-
     final hueColors = [
       for (var i = 0; i <= 6; i++) HSVColor.fromAHSV(1, i * 60.0, 1, 1).toColor()
     ];
-
     return Container(
       decoration: BoxDecoration(
         color: bg,

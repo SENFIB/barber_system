@@ -137,10 +137,11 @@ jobs:
           flutter pub add flutter_local_notifications:^17.2.4 timezone:^0.9.4
           flutter pub get
           flutter build apk --release --obfuscate --split-debug-info=build/symbols --build-name=1.0.$PATCH --build-number=$GITHUB_RUN_NUMBER
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/ESMAIRO.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: barber_app/build/app/outputs/flutter-apk/app-release.apk
+          name: ESMAIRO-android
+          path: barber_app/build/app/outputs/flutter-apk/ESMAIRO.apk
   windows:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'windows' || inputs.target == 'both' }}
     runs-on: windows-2022
@@ -195,7 +196,8 @@ jobs:
           flutter pub add flutter_local_notifications:^17.2.4 timezone:^0.9.4
           flutter pub get
           flutter build windows --release --obfuscate --split-debug-info=build/symbols --build-name=1.0.$PATCH --build-number=$GITHUB_RUN_NUMBER
+          mv build/windows/x64/runner/Release/barber_app.exe build/windows/x64/runner/Release/ESMAIRO.exe
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-app
+          name: ESMAIRO-windows
           path: barber_app/build/windows/x64/runner/Release

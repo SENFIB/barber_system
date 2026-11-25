@@ -1,5 +1,7 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+import '../../app/biz_words.dart' show bwRole;
+import '../../app/date_pick.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
@@ -12,6 +14,7 @@ class ManualBookingPage extends StatefulWidget {
   const ManualBookingPage(this.ctx, {super.key, this.initialDate});
   final ShopCtx ctx;
   final String? initialDate;
+
   @override
   State<ManualBookingPage> createState() => _ManualBookingPageState();
 }
@@ -148,11 +151,14 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
   Future<void> _pickDate() async {
     final n = DateTime.now();
     final today = DateTime(n.year, n.month, n.day);
-    final d = await showDatePicker(
-      context: context,
-      initialDate: _day,
-      firstDate: today,
-      lastDate: today.add(Duration(days: _maxAdvance + 1)),
+    final s = SettingsScope.read(context);
+    final d = await pickLocalDate(
+      context,
+      initial: _day,
+      first: today,
+      last: today.add(Duration(days: _maxAdvance + 1)),
+      calKey: s.calendarKey,
+      lang: s.lang,
     );
     if (d == null || !mounted) return;
     setState(() {
@@ -253,6 +259,16 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
             style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
       );
 
+  String _chooseRole(String lang) {
+    final type = '${widget.ctx.session.shop.bizType}';
+    final r = bwRole(type);
+    final i = lang == 'fa' ? 0 : (lang == 'ar' ? 2 : 1);
+    final w = '${r[i]}';
+    if (lang == 'fa') return 'انتخاب $w';
+    if (lang == 'ar') return 'اختيار $w';
+    return 'Choose $w';
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = T6(SettingsScope.of(context).lang);
@@ -292,6 +308,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
   }
 
   Widget _form(T6 t) {
+    final st = SettingsScope.of(context);
     final services = _visibleServices();
     final slots = _slots;
     return ListView(
@@ -325,7 +342,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
             ),
         ],
         if (_owner && _picked.isNotEmpty) ...[
-          _label(t.t('m_barber')),
+          _label(_chooseRole(t.lang)),
           for (final sid in _picked)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -342,7 +359,7 @@ class _ManualBookingPageState extends State<ManualBookingPage> {
               Text(t.t('d_${_day.weekday % 7}'),
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(width: 10),
-              Text(localDigits(bIso(_day), t.lang),
+              Text(fmtPickDate(_day, st.calendarKey, st.lang),
                   textDirection: TextDirection.ltr,
                   style: TextStyle(color: muted(context))),
             ],

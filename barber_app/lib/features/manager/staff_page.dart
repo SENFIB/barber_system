@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../app/biz_panel.dart';
 import '../../app/cal_fmt.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
@@ -26,6 +27,7 @@ class _StaffPageState extends State<StaffPage> {
   String _myId = '';
   int _max = 0;
   List<Map<String, dynamic>> _staff = [];
+  late BizPanel _panel;
 
   String get _lang => SettingsScope.read(context).lang;
   ShopRaw get _raw => ShopRaw(SettingsScope.read(context));
@@ -33,6 +35,7 @@ class _StaffPageState extends State<StaffPage> {
   @override
   void initState() {
     super.initState();
+    _panel = BizPanel.of(widget.ctx.session.shop.bizType);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -57,11 +60,15 @@ class _StaffPageState extends State<StaffPage> {
       final me = await raw.call('me');
       final d = await raw.call('staff_list');
       if (!mounted) return;
+      final sh = me['shop'];
       setState(() {
         _owner = jStr(me['role']) == 'owner';
         _myId = jStr(me['staff_id']);
         _staff = jRows(d['staff']);
         _max = jInt(d['max_staff']) ?? 0;
+        if (sh is Map && '${sh['biz_type'] ?? ''}'.isNotEmpty) {
+          _panel = BizPanel.of('${sh['biz_type']}');
+        }
         _loading = false;
         _err = null;
       });
@@ -105,17 +112,18 @@ class _StaffPageState extends State<StaffPage> {
 
   Future<void> _add() async {
     final x = T6(_lang);
+    final lang = _lang;
     final c = TextEditingController();
     final name = await showDialog<String>(
       context: context,
       builder: (dc) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: Text(x.t('add_barber')),
+        title: Text(_panel.addStaff(lang)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(x.t('ed_add_hint'),
+            Text(_panel.addHint(lang),
                 style: TextStyle(color: muted(dc), fontSize: 13, height: 1.6)),
             const SizedBox(height: 14),
             TextField(
@@ -123,7 +131,7 @@ class _StaffPageState extends State<StaffPage> {
               autofocus: true,
               textInputAction: TextInputAction.done,
               onSubmitted: (v) => Navigator.pop(dc, v.trim()),
-              decoration: InputDecoration(labelText: x.t('barber_name')),
+              decoration: InputDecoration(labelText: _panel.staffName(lang)),
             ),
           ],
         ),
@@ -173,8 +181,8 @@ class _StaffPageState extends State<StaffPage> {
     if (!v) {
       final yes = await confirmDialog(
         context,
-        title: x.t('stop_barber'),
-        message: x.t('stop_barber_confirm'),
+        title: _panel.stopSelf(_lang),
+        message: _panel.stopSelfConfirm(_lang),
         okLabel: x.t('ok'),
         cancelLabel: x.t('cancel'),
         danger: true,
@@ -362,7 +370,7 @@ class _StaffPageState extends State<StaffPage> {
           children: [
             Row(
               children: [
-                const GradientIcon(Icons.content_cut_rounded, size: 46),
+                GradientIcon(_panel.staffIcon, size: 46),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -414,7 +422,7 @@ class _StaffPageState extends State<StaffPage> {
                   _info(Icons.more_time_rounded,
                       x.t('sp_overtime', {'n': ot})),
                 _info(
-                    Icons.content_cut_rounded,
+                    _panel.icon,
                     svcN == 0
                         ? x.t('sp_all_services')
                         : x.t('sp_services_n', {'n': svcN})),
@@ -433,7 +441,7 @@ class _StaffPageState extends State<StaffPage> {
                   alignment: AlignmentDirectional.centerEnd,
                   child: TextButton(
                     onPressed: _busy ? null : () => _ownerBarber(false),
-                    child: Text(x.t('stop_barber')),
+                    child: Text(_panel.stopSelf(lang)),
                   ),
                 )
               else
@@ -493,7 +501,8 @@ class _StaffPageState extends State<StaffPage> {
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text(
-                        x.t('capacity', {'n': _staff.length, 'max': _max}),
+                        _panel.capacity(lang, fmtNum(_staff.length, lang),
+                            fmtNum(_max, lang)),
                         style: const TextStyle(
                             fontSize: 15.5, fontWeight: FontWeight.w700),
                       ),
@@ -503,7 +512,7 @@ class _StaffPageState extends State<StaffPage> {
               ),
             const SizedBox(height: 14),
             GradientButton(
-              label: x.t('add_barber'),
+              label: _panel.addStaff(lang),
               icon: Icons.person_add_rounded,
               onPressed: _busy ? null : _add,
             ),
@@ -515,17 +524,17 @@ class _StaffPageState extends State<StaffPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(x.t('become_barber'),
+                      Text(_panel.becomeSelf(lang),
                           style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 4),
-                      Text(x.t('become_barber_desc'),
+                      Text(_panel.becomeSelfDesc(lang),
                           style: TextStyle(
                               color: muted(context), fontSize: 13, height: 1.5)),
                       const SizedBox(height: 12),
                       GradientButton(
-                        label: x.t('become_barber'),
-                        icon: Icons.content_cut_rounded,
+                        label: _panel.becomeSelf(lang),
+                        icon: _panel.staffIcon,
                         compact: true,
                         outlined: true,
                         onPressed: _busy ? null : () => _ownerBarber(true),
@@ -539,7 +548,7 @@ class _StaffPageState extends State<StaffPage> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
               child: Center(
-                child: Text(x.t('no_staff'),
+                child: Text(_panel.noStaff(lang),
                     style: TextStyle(color: muted(context))),
               ),
             )
@@ -555,7 +564,9 @@ class _StaffPageState extends State<StaffPage> {
     final st = SettingsScope.of(context);
     final x = T6(st.lang);
     return GlassScaffold(
-      title: x.t(_owner || _loading ? 'staff_title' : 'staff_mine'),
+      title: (_owner || _loading)
+          ? _panel.staffTitle(st.lang)
+          : _panel.staffMine(st.lang),
       actions: [
         if (_owner)
           IconButton(

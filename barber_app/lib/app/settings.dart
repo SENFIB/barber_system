@@ -1,11 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'config.dart';
 import 'look.dart';
 
@@ -18,6 +16,9 @@ const _kToken = 'shop_token';
 const _kLook = 'look';
 const _kTime = 'time_mode';
 const _kCal = 'calendar_mode';
+const _kHdrClock = 'hdr_clock';
+const _kHdrLang = 'hdr_lang';
+const _kHdrBtns = 'hdr_btns';
 
 String _newDeviceId() {
   final r = Random.secure();
@@ -75,13 +76,12 @@ class AppSettings extends ChangeNotifier {
   String get deviceId => _p.getString(_kDevice) ?? '';
   bool get hasCustomApiUrl => (_get(_kApi) ?? '').trim().isNotEmpty;
   String get apiUrl => hasCustomApiUrl ? _get(_kApi)!.trim() : kDefaultApiUrl;
-
   String? get shopToken => _get(_kToken);
   bool get hasShopToken => shopToken != null;
 
   // ---------- ساعت و تقویم ----------
 
-  /// 'shop' = ساعت و تاریخ مغازه | 'phone' = ساعت و تاریخ گوشی
+  /// 'shop' = ساعت و تاریخ منطقه‌ی زبان (تهران / مکه / لندن) | 'phone' = ساعت و تاریخ دستگاه
   String get timeMode => _get(_kTime) ?? 'shop';
   bool get usePhoneTime => timeMode == 'phone';
 
@@ -97,6 +97,11 @@ class AppSettings extends ChangeNotifier {
     if (lang == 'ar') return 'hijri';
     return 'gregorian';
   }
+
+  // ---------- نمایش هدر ----------
+  bool get showHdrClock => _get(_kHdrClock) != '0';
+  bool get showHdrLang => _get(_kHdrLang) != '0';
+  bool get showHdrBtns => _get(_kHdrBtns) != '0';
 
   // ---------- ظاهر ----------
   String? _lookRaw;
@@ -127,6 +132,9 @@ class AppSettings extends ChangeNotifier {
   Future<void> setLook(AppLook l) => _set(_kLook, jsonEncode(l.toJson()));
   Future<void> setTimeMode(String v) => _set(_kTime, v);
   Future<void> setCalendarKey(String v) => _set(_kCal, v);
+  Future<void> setHdrClock(bool v) => _set(_kHdrClock, v ? '1' : '0');
+  Future<void> setHdrLang(bool v) => _set(_kHdrLang, v ? '1' : '0');
+  Future<void> setHdrBtns(bool v) => _set(_kHdrBtns, v ? '1' : '0');
 
   /// عکس انتخابی را در حافظه‌ی خصوصی برنامه کپی می‌کند و به‌عنوان پس‌زمینه می‌گذارد
   Future<void> setBackgroundImage(String sourcePath) async {

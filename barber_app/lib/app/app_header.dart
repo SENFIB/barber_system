@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-
 import '../features/legal/privacy_gate.dart';
 import 'brand.dart';
+import 'clock.dart';
 import 'settings.dart';
-import 'strings.dart';
 import 'widgets.dart';
 
 /// کلید ناوبری برنامه: هدر بالای Navigator است و برای باز کردن پنجره‌ها
@@ -29,7 +28,7 @@ void _openRules(AppSettings st) {
   openAppPolicy(ctx, st.lang);
 }
 
-/// هدر ثابت برنامه: نام، زبان، ساعت (مغازه/دستگاه)، تقویم و قوانین
+/// هدر ثابت برنامه: لوگو و نام (همیشه) + ساعت و تاریخ + دکمه‌ها (قابل مخفی‌شدن از تنظیمات)
 class AppHeader extends StatelessWidget {
   const AppHeader({super.key});
 
@@ -43,7 +42,6 @@ class AppHeader extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final base = Color.alphaBlend(
         l.primary.withOpacity(l.dark ? 0.12 : 0.08), l.bg[0]);
-
     final langCode = lang == 'fa' ? 'فا' : (lang == 'ar' ? 'ع' : 'EN');
     final calName = () {
       switch (st.calendar) {
@@ -56,6 +54,47 @@ class AppHeader extends StatelessWidget {
       }
     }();
 
+    final buttons = <Widget>[];
+    if (st.showHdrLang) {
+      buttons.add(_HBtn(
+        semantic: _tr(lang, 'زبان', 'Language', 'اللغة'),
+        icon: Icons.language_rounded,
+        label: langCode,
+        onTap: () => _langSheet(st),
+      ));
+    }
+    if (st.showHdrBtns) {
+      buttons.add(_HBtn(
+        semantic: _tr(lang, 'ساعت', 'Time', 'الوقت'),
+        icon: st.usePhoneTime ? Icons.smartphone_rounded : Icons.public_rounded,
+        label: compact
+            ? null
+            : (st.usePhoneTime
+                ? _tr(lang, 'دستگاه', 'Device', 'الجهاز')
+                : zoneCity(lang)),
+        active: st.usePhoneTime,
+        onTap: () => _timeSheet(st),
+      ));
+      buttons.add(_HBtn(
+        semantic: _tr(lang, 'تقویم', 'Calendar', 'التقويم'),
+        icon: Icons.calendar_month_rounded,
+        label: compact ? null : calName,
+        onTap: () => _calSheet(st),
+      ));
+      buttons.add(_HBtn(
+        semantic: _tr(
+            lang, 'قوانین و مقررات', 'Terms and policy', 'القوانين والأحكام'),
+        icon: Icons.gavel_rounded,
+        label: compact ? null : _tr(lang, 'قوانین', 'Rules', 'القوانين'),
+        onTap: () => _openRules(st),
+      ));
+    }
+    final spaced = <Widget>[];
+    for (var i = 0; i < buttons.length; i++) {
+      if (i > 0) spaced.add(const SizedBox(width: 6));
+      spaced.add(buttons[i]);
+    }
+
     final bar = Material(
       color: base,
       child: Container(
@@ -66,70 +105,48 @@ class AppHeader extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
-            child: SizedBox(
-              height: 54,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: EsmairoMark(size: 30),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        S(lang).t('app_name'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: onSurface,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.4,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 54,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: EsmairoMark(size: 30),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            appNameFor(lang),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: onSurface,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                        ...spaced,
+                      ],
                     ),
-                    _HBtn(
-                      semantic: _tr(lang, 'زبان', 'Language', 'اللغة'),
-                      icon: Icons.language_rounded,
-                      label: langCode,
-                      onTap: () => _langSheet(st),
-                    ),
-                    const SizedBox(width: 6),
-                    _HBtn(
-                      semantic: _tr(lang, 'ساعت', 'Time', 'الوقت'),
-                      icon: st.usePhoneTime
-                          ? Icons.devices_rounded
-                          : Icons.storefront_rounded,
-                      label: compact
-                          ? null
-                          : (st.usePhoneTime
-                              ? _tr(lang, 'دستگاه', 'Device', 'الجهاز')
-                              : _tr(lang, 'مغازه', 'Shop', 'المحل')),
-                      active: st.usePhoneTime,
-                      onTap: () => _timeSheet(st),
-                    ),
-                    const SizedBox(width: 6),
-                    _HBtn(
-                      semantic: _tr(lang, 'تقویم', 'Calendar', 'التقويم'),
-                      icon: Icons.calendar_month_rounded,
-                      label: compact ? null : calName,
-                      onTap: () => _calSheet(st),
-                    ),
-                    const SizedBox(width: 6),
-                    _HBtn(
-                      semantic: _tr(lang, 'قوانین و مقررات',
-                          'Terms and policy', 'القوانين والأحكام'),
-                      icon: Icons.gavel_rounded,
-                      label: compact
-                          ? null
-                          : _tr(lang, 'قوانین', 'Rules', 'القوانين'),
-                      onTap: () => _openRules(st),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                if (st.showHdrClock)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 7),
+                    child: HeaderClock(
+                      lang: lang,
+                      calendar: st.calendar,
+                      phone: st.usePhoneTime,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -168,7 +185,6 @@ class _HBtn extends StatelessWidget {
     this.label,
     this.active = false,
   });
-
   final IconData icon;
   final String? label;
   final String semantic;
@@ -344,15 +360,19 @@ Future<void> _timeSheet(AppSettings st) {
     options: [
       _Opt(
         'shop',
-        _tr(lang, 'ساعت مغازه', 'Shop time', 'وقت المحل'),
-        _tr(lang, 'ساعت و تاریخ بر اساس منطقه‌ی زمانی آرایشگاه',
-            'Based on the barber shop time zone', 'حسب المنطقة الزمنية للمحل'),
+        _tr(lang, 'ساعت منطقه‌ی زبان', 'Language region time',
+            'وقت منطقة اللغة'),
+        _tr(lang, 'فارسی: تهران • English: لندن • عربی: مکه',
+            'Persian: Tehran • English: London • Arabic: Makkah',
+            'الفارسية: طهران • الإنجليزية: لندن • العربية: مكة'),
       ),
       _Opt(
         'phone',
-        _tr(lang, 'ساعت دستگاه', 'Device time', 'وقت الجهاز'),
-        _tr(lang, 'ساعت و تاریخ بر اساس ساعت همین دستگاه',
-            'Based on this device clock', 'حسب ساعة هذا الجهاز'),
+        _tr(lang, 'ساعت و تاریخ دستگاه', 'Device time and date',
+            'وقت وتاريخ الجهاز'),
+        _tr(lang, 'از ساعت همین دستگاه، با هر زبانی',
+            'From this device clock, in any language',
+            'من ساعة هذا الجهاز، بأي لغة'),
       ),
     ],
     onPick: st.setTimeMode,

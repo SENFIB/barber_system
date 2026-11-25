@@ -10,28 +10,16 @@ import '../../app/strings_s6.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
+import 'activation_code.dart';
 import 'server_code.dart';
 import 'shifts_editor.dart';
 import 'shop_api.dart';
+
 typedef SessionCallback = Future<void> Function(ManagerSession session);
-// متن سه‌زبانه‌ی محلی برای بخش‌های جدید همین صفحه
+
 String _x(String lang, String fa, String en, String ar) =>
     lang == 'fa' ? fa : (lang == 'ar' ? ar : en);
-/// کد واردشده را به آدرس کامل تبدیل می‌کند؛ اگر معتبر نبود null
-String? _normCode(String raw) {
-  final t = raw.trim().replaceAll(RegExp(r'\s'), '');
-  if (RegExp(r'^https://script\.google\.com/macros/s/[A-Za-z0-9_\-]+/exec$')
-      .hasMatch(t)) {
-    return t;
-  }
-  if (RegExp(r'^[A-Za-z0-9_\-]{20,}$').hasMatch(t)) {
-    return 'https://script.google.com/macros/s/$t/exec';
-  }
-  return null;
-}
-/// ذخیره‌ی نوع آرایشگاه (مردانه/زنانه) بلافاصله بعد از ثبت‌نام.
-/// «هر دو» پیش‌فرض سرور است و چیزی ارسال نمی‌شود. خطا بی‌صدا رد می‌شود
-/// (بعداً در «قوانین و زمان رزرو» قابل تغییر است).
+
 Future<void> _saveGender(
     AppSettings st, String gender, String plan, String? serverUrl) async {
   if (gender != 'men' && gender != 'women') return;
@@ -52,7 +40,7 @@ Future<void> _saveGender(
     });
   } catch (_) {}
 }
-// ───────────────────────── صفحه‌ی ورود (اول) ─────────────────────────
+
 class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
@@ -60,6 +48,7 @@ class ShopAuthPage extends StatefulWidget {
   @override
   State<ShopAuthPage> createState() => _ShopAuthPageState();
 }
+
 class _ShopAuthPageState extends State<ShopAuthPage> {
   final _user = TextEditingController();
   final _pass = TextEditingController();
@@ -71,6 +60,7 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
     _pass.dispose();
     super.dispose();
   }
+
   Future<void> _login() async {
     final s = T6(SettingsScope.read(context).lang);
     if (_user.text.trim().isEmpty || _pass.text.isEmpty) {
@@ -91,6 +81,7 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
@@ -211,12 +202,13 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
     );
   }
 }
-// ───────────────────────── انتخاب نوع ثبت‌نام ─────────────────────────
+
 class SignupChoicePage extends StatelessWidget {
   const SignupChoicePage(
       {super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
+
   @override
   Widget build(BuildContext context) {
     final s = T6(SettingsScope.of(context).lang);
@@ -246,6 +238,7 @@ class SignupChoicePage extends StatelessWidget {
         ),
       );
     }
+
     return GlassScaffold(
       title: s.t('signup_title'),
       body: ListView(
@@ -273,7 +266,7 @@ class SignupChoicePage extends StatelessWidget {
     );
   }
 }
-// ───────────────────────── مرحله‌ی ۱ ثبت‌نام صاحب: انتخاب پلن ─────────────────────────
+
 String _planName(String lang, String key) {
   switch (key) {
     case 'basic':
@@ -286,6 +279,7 @@ String _planName(String lang, String key) {
       return _x(lang, 'پلن شخصی', 'Personal plan', 'الخطة الشخصية');
   }
 }
+
 IconData _planIcon(String key) {
   switch (key) {
     case 'basic':
@@ -298,6 +292,7 @@ IconData _planIcon(String key) {
       return Icons.dns_rounded;
   }
 }
+
 String _planPrice(String lang, PlanDef p) {
   final toman = _x(lang, 'تومان', 'Toman', 'تومان');
   if (p.key == 'personal' || p.oneTime > 0) {
@@ -307,6 +302,7 @@ String _planPrice(String lang, PlanDef p) {
   final perMonth = _x(lang, '/ ماه', '/ month', '/ شهر');
   return '${fmtNum(p.monthly, lang)} $toman $perMonth';
 }
+
 List<String> _planFeatures(String lang, PlanDef p) {
   final booking = _x(lang, 'رزرو آنلاین مشتری', 'Online customer booking',
       'حجز العملاء عبر الإنترنت');
@@ -366,17 +362,18 @@ List<String> _planFeatures(String lang, PlanDef p) {
             'تفعيل خاص برمز الإعداد'),
       ];
     default:
-      // پلن شخصی: فقط همین یک خط
       return [
         _x(lang, 'راه‌اندازی توسط خود آرایشگاه', 'Set up by the shop itself',
             'الإعداد يتولاه الصالون بنفسه'),
       ];
   }
 }
+
 class OwnerPlanPage extends StatelessWidget {
   const OwnerPlanPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
+
   @override
   Widget build(BuildContext context) {
     final lang = SettingsScope.of(context).lang;
@@ -412,12 +409,14 @@ class OwnerPlanPage extends StatelessWidget {
     );
   }
 }
+
 class _PlanCard extends StatelessWidget {
   const _PlanCard(
       {required this.plan, required this.lang, required this.onTap});
   final PlanDef plan;
   final String lang;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     final feats = _planFeatures(lang, plan);
@@ -469,7 +468,7 @@ class _PlanCard extends StatelessWidget {
     );
   }
 }
-// ───────────────────────── مرحله‌ی ۲ ثبت‌نام صاحب آرایشگاه ─────────────────────────
+
 class OwnerSignupPage extends StatefulWidget {
   const OwnerSignupPage(
       {super.key,
@@ -482,9 +481,9 @@ class OwnerSignupPage extends StatefulWidget {
   @override
   State<OwnerSignupPage> createState() => _OwnerSignupPageState();
 }
+
 class _OwnerSignupPageState extends State<OwnerSignupPage> {
   final _license = TextEditingController();
-  final _code = TextEditingController();
   final _shop = TextEditingController();
   final _phone = TextEditingController();
   final _ownerName = TextEditingController();
@@ -498,25 +497,28 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   String _gender = 'both';
   late List<Shift> _shifts;
   List<int> _daysOff = <int>[];
+
   bool get _planNeedsCode =>
       widget.plan.key == 'special' || widget.plan.key == 'personal';
+
   @override
   void initState() {
     super.initState();
     _shifts = parseShifts('09:00-13:00|16:00-20:00');
-    // اگر سقف پلن کمتر از شیفت‌های پیش‌فرض است، کوتاهشان کن
     final cap = widget.plan.maxShifts;
     if (_shifts.length > cap) _shifts = _shifts.sublist(0, cap);
   }
+
   @override
   void dispose() {
     for (final c in [
-      _license, _code, _shop, _phone, _ownerName, _address, _city, _user, _pass
+      _license, _shop, _phone, _ownerName, _address, _city, _user, _pass
     ]) {
       c.dispose();
     }
     super.dispose();
   }
+
   String? _validate(T6 s) {
     if (_license.text.trim().isEmpty ||
         _shop.text.trim().isEmpty ||
@@ -536,6 +538,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     }
     return null;
   }
+
   Future<void> _submit() async {
     final st = SettingsScope.read(context);
     final lang = st.lang;
@@ -545,22 +548,19 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       toast(context, err);
       return;
     }
-    // باکس «کد» فقط وقتی لازم است که هنوز ذخیره نشده باشد
-    final showCode = _planNeedsCode && !st.hasCustomApiUrl;
+    var licenseText = _license.text.trim();
     String? serverUrl;
-    if (showCode) {
-      if (_code.text.trim().isEmpty) {
-        toast(context, s.t('v_required'));
-        return;
-      }
-      serverUrl = _normCode(_code.text);
-      if (serverUrl == null) {
+    if (_planNeedsCode) {
+      final p = splitActivation(_license.text);
+      if (p.license.isEmpty || (p.url == null && !st.hasCustomApiUrl)) {
         toast(
             context,
-            _x(lang, 'کد واردشده درست نیست', 'The code is not valid',
-                'الرمز المدخل غير صحيح'));
+            _x(lang, 'کد فعال‌سازی درست نیست', 'The activation code is not valid',
+                'رمز التفعيل غير صحيح'));
         return;
       }
+      licenseText = p.license;
+      serverUrl = p.url;
     }
     final gender = _gender;
     final planKey = widget.plan.key;
@@ -568,7 +568,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     setState(() => _loading = true);
     try {
       final sess = await widget.api.register(
-        licenseKey: _license.text,
+        licenseKey: licenseText,
         shopName: _shop.text,
         phone: _phone.text,
         username: _user.text,
@@ -585,7 +585,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
       await onSession(sess);
-      // نوع آرایشگاه (مردانه/زنانه) بعد از ورود ذخیره می‌شود
       _saveGender(st, gender, planKey, serverUrl);
     } on ApiException catch (e) {
       if (mounted) toast(context, s.error(e));
@@ -603,7 +602,9 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
   Widget _gap() => const SizedBox(height: 12);
+
   Widget _genderBox(String lang) {
     final opts = <List<String>>[
       [
@@ -654,6 +655,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
@@ -662,13 +664,12 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     final order = lang == 'en'
         ? <int>[0, 1, 2, 3, 4, 5, 6]
         : <int>[6, 0, 1, 2, 3, 4, 5];
-    final showCode = _planNeedsCode && !st.hasCustomApiUrl;
+    final combined = _planNeedsCode && !st.hasCustomApiUrl;
     return GlassScaffold(
       title: s.t('signup_owner'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-          // پلن انتخاب‌شده
           Glass(
             padding: const EdgeInsets.all(14),
             child: Row(
@@ -705,28 +706,24 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               children: [
                 GlassField(
                   controller: _license,
-                  label: s.t('license_key'),
+                  label: combined
+                      ? _x(lang, 'کد فعال‌سازی', 'Activation code',
+                          'رمز التفعيل')
+                      : s.t('license_key'),
                   icon: Icons.vpn_key_rounded,
                   ltr: true,
                 ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                      _x(
-                          lang,
-                          'کد لایسنس باید مخصوص همین پلن باشد',
-                          'The license code must be for this plan',
-                          'يجب أن يكون رمز الترخيص لهذه الباقة'),
-                      style: TextStyle(color: muted(context), fontSize: 12)),
-                ),
-                if (showCode) ...[
-                  _gap(),
-                  GlassField(
-                    controller: _code,
-                    label: _x(lang, 'کد', 'Code', 'الرمز'),
-                    icon: Icons.tag_rounded,
-                    ltr: true,
+                if (!combined) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                        _x(
+                            lang,
+                            'کد لایسنس باید مخصوص همین پلن باشد',
+                            'The license code must be for this plan',
+                            'يجب أن يكون رمز الترخيص لهذه الباقة'),
+                        style: TextStyle(color: muted(context), fontSize: 12)),
                   ),
                 ],
                 _gap(),
@@ -875,7 +872,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     );
   }
 }
-// ───────────────────────── ورود آرایشگر با کد دعوت ─────────────────────────
+
 class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
@@ -883,6 +880,7 @@ class StaffJoinPage extends StatefulWidget {
   @override
   State<StaffJoinPage> createState() => _StaffJoinPageState();
 }
+
 class _StaffJoinPageState extends State<StaffJoinPage> {
   final _code = TextEditingController();
   final _user = TextEditingController();
@@ -896,6 +894,7 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
     _pass.dispose();
     super.dispose();
   }
+
   Future<void> _submit() async {
     final s = T6(SettingsScope.read(context).lang);
     if (_code.text.trim().isEmpty ||
@@ -924,6 +923,7 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final s = T6(SettingsScope.of(context).lang);

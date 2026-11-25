@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../features/legal/privacy_gate.dart';
+import '../features/settings/settings_page.dart';
 import 'brand.dart';
 import 'clock.dart';
 import 'settings.dart';
@@ -28,7 +29,16 @@ void _openRules(AppSettings st) {
   openAppPolicy(ctx, st.lang);
 }
 
-/// هدر ثابت برنامه: لوگو و نام (همیشه) + ساعت و تاریخ + دکمه‌ها (قابل مخفی‌شدن از تنظیمات)
+void _openSettings() {
+  if (_pickerOpen.value) return;
+  kNavKey.currentState?.push(
+    MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
+  );
+}
+
+/// هدر ثابت برنامه
+/// ردیف بالا: لوگو و نام (یک طرف) | تنظیمات، تم، زبان (طرف مقابل)
+/// ردیف پایین: ساعت و تاریخ با ثانیه | ساعت، تقویم، قوانین
 class AppHeader extends StatelessWidget {
   const AppHeader({super.key});
 
@@ -37,63 +47,70 @@ class AppHeader extends StatelessWidget {
     final st = SettingsScope.of(context);
     final l = lk(context);
     final mq = MediaQuery.of(context);
-    final compact = mq.size.width < 420;
     final lang = st.lang;
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = Color.alphaBlend(
         l.primary.withOpacity(l.dark ? 0.12 : 0.08), l.bg[0]);
     final langCode = lang == 'fa' ? 'فا' : (lang == 'ar' ? 'ع' : 'EN');
-    final calName = () {
-      switch (st.calendar) {
-        case 'jalali':
-          return _tr(lang, 'شمسی', 'Jalali', 'شمسي');
-        case 'hijri':
-          return _tr(lang, 'قمری', 'Hijri', 'هجري');
-        default:
-          return _tr(lang, 'میلادی', 'Gregorian', 'ميلادي');
-      }
-    }();
 
-    final buttons = <Widget>[];
+    // ---- ردیف بالا: دکمه‌ها ----
+    final topBtns = <Widget>[
+      _HBtn(
+        semantic: _tr(lang, 'تنظیمات', 'Settings', 'الإعدادات'),
+        icon: Icons.settings_rounded,
+        onTap: _openSettings,
+      ),
+    ];
+    if (st.showHdrBtns) {
+      topBtns.add(_HBtn(
+        semantic: _tr(lang, 'تم روشن و تاریک', 'Light / dark theme',
+            'الوضع الفاتح / الداكن'),
+        icon: isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+        onTap: () => st.setThemeKey(isDark ? 'light' : 'dark'),
+      ));
+    }
     if (st.showHdrLang) {
-      buttons.add(_HBtn(
+      topBtns.add(_HBtn(
         semantic: _tr(lang, 'زبان', 'Language', 'اللغة'),
         icon: Icons.language_rounded,
         label: langCode,
         onTap: () => _langSheet(st),
       ));
     }
+
+    // ---- ردیف پایین: دکمه‌ها ----
+    final bottomBtns = <Widget>[];
     if (st.showHdrBtns) {
-      buttons.add(_HBtn(
+      bottomBtns.add(_HBtn(
         semantic: _tr(lang, 'ساعت', 'Time', 'الوقت'),
         icon: st.usePhoneTime ? Icons.smartphone_rounded : Icons.public_rounded,
-        label: compact
-            ? null
-            : (st.usePhoneTime
-                ? _tr(lang, 'دستگاه', 'Device', 'الجهاز')
-                : zoneCity(lang)),
         active: st.usePhoneTime,
         onTap: () => _timeSheet(st),
       ));
-      buttons.add(_HBtn(
+      bottomBtns.add(_HBtn(
         semantic: _tr(lang, 'تقویم', 'Calendar', 'التقويم'),
         icon: Icons.calendar_month_rounded,
-        label: compact ? null : calName,
         onTap: () => _calSheet(st),
       ));
-      buttons.add(_HBtn(
+      bottomBtns.add(_HBtn(
         semantic: _tr(
             lang, 'قوانین و مقررات', 'Terms and policy', 'القوانين والأحكام'),
         icon: Icons.gavel_rounded,
-        label: compact ? null : _tr(lang, 'قوانین', 'Rules', 'القوانين'),
         onTap: () => _openRules(st),
       ));
     }
-    final spaced = <Widget>[];
-    for (var i = 0; i < buttons.length; i++) {
-      if (i > 0) spaced.add(const SizedBox(width: 6));
-      spaced.add(buttons[i]);
+
+    List<Widget> spaced(List<Widget> src) {
+      final out = <Widget>[];
+      for (var i = 0; i < src.length; i++) {
+        if (i > 0) out.add(const SizedBox(width: 6));
+        out.add(src[i]);
+      }
+      return out;
     }
+
+    final showSecondRow = st.showHdrClock || bottomBtns.isNotEmpty;
 
     final bar = Material(
       color: base,
@@ -109,16 +126,16 @@ class AppHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  height: 54,
+                  height: 60,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: EsmairoMark(size: 30),
+                          borderRadius: BorderRadius.circular(11),
+                          child: EsmairoMark(size: 44),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             appNameFor(lang),
@@ -126,24 +143,34 @@ class AppHeader extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: onSurface,
-                              fontSize: 16,
+                              fontSize: 21,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ),
-                        ...spaced,
+                        ...spaced(topBtns),
                       ],
                     ),
                   ),
                 ),
-                if (st.showHdrClock)
+                if (showSecondRow)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 7),
-                    child: HeaderClock(
-                      lang: lang,
-                      calendar: st.calendar,
-                      phone: st.usePhoneTime,
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: st.showHdrClock
+                              ? HeaderClock(
+                                  lang: lang,
+                                  calendar: st.calendar,
+                                  phone: st.usePhoneTime,
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                        if (bottomBtns.isNotEmpty) const SizedBox(width: 8),
+                        ...spaced(bottomBtns),
+                      ],
                     ),
                   ),
               ],
@@ -239,7 +266,6 @@ class _HBtn extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // پنجره‌های انتخاب
 // ---------------------------------------------------------------------------
-
 class _Opt {
   const _Opt(this.value, this.title, [this.subtitle]);
   final String value;

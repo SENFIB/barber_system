@@ -91,6 +91,7 @@ class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
+
   @override
   State<ShopAuthPage> createState() => _ShopAuthPageState();
 }
@@ -633,12 +634,14 @@ class OwnerSignupPage extends StatefulWidget {
   final SessionCallback onSession;
   final PlanDef plan;
   final String bizType;
+
   @override
   State<OwnerSignupPage> createState() => _OwnerSignupPageState();
 }
 
 class _OwnerSignupPageState extends State<OwnerSignupPage> {
   final _license = TextEditingController();
+  final _link = TextEditingController();
   final _shop = TextEditingController();
   final _phone = TextEditingController();
   final _ownerName = TextEditingController();
@@ -669,7 +672,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   @override
   void dispose() {
     for (final c in [
-      _license, _shop, _phone, _ownerName, _address, _city, _user, _pass
+      _license, _link, _shop, _phone, _ownerName, _address, _city, _user, _pass
     ]) {
       c.dispose();
     }
@@ -708,12 +711,17 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     var licenseText = _license.text.trim();
     String? serverUrl;
     if (_planNeedsCode) {
-      final p = splitActivation(_license.text);
+      final needLink = !st.hasCustomApiUrl;
+      final raw = (needLink && _link.text.trim().isNotEmpty)
+          ? '${_license.text.trim()} ${_link.text.trim()}'
+          : _license.text;
+      final p = splitActivation(raw);
       if (p.license.isEmpty || (p.url == null && !st.hasCustomApiUrl)) {
         toast(
             context,
-            _x(lang, 'کد فعال‌سازی درست نیست', 'The activation code is not valid',
-                'رمز التفعيل غير صحيح'));
+            _x(lang, 'کد یا لینک فعال‌سازی درست نیست',
+                'The activation code or link is not valid',
+                'رمز التفعيل أو الرابط غير صحيح'));
         return;
       }
       licenseText = p.license;
@@ -906,6 +914,29 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                   icon: Icons.vpn_key_rounded,
                   ltr: true,
                 ),
+                if (combined) ...[
+                  const SizedBox(height: 12),
+                  GlassField(
+                    controller: _link,
+                    label: _x(lang, 'لینک فعال‌سازی', 'Activation link',
+                        'رابط التفعيل'),
+                    icon: Icons.link_rounded,
+                    keyboard: TextInputType.url,
+                    ltr: true,
+                  ),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                        _x(
+                            lang,
+                            'کد و لینکی را که همراه هم به شما داده‌ایم در این دو کادر بنویسید. لینک با https شروع می‌شود. می‌توانید هر دو را کنار هم در کادر اول هم بنویسید.',
+                            'Enter the code and the link we gave you together in these two boxes. The link starts with https. You can also paste both side by side in the first box.',
+                            'اكتب الرمز والرابط اللذين أعطيناك إياهما في هذين الحقلين. يبدأ الرابط بـ https. يمكنك أيضًا لصق الاثنين معًا في الحقل الأول.'),
+                        style: TextStyle(
+                            color: muted(context), fontSize: 12, height: 1.5)),
+                  ),
+                ],
                 if (!combined) ...[
                   const SizedBox(height: 6),
                   Align(
@@ -1072,6 +1103,7 @@ class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
   final ShopApi api;
   final SessionCallback onSession;
+
   @override
   State<StaffJoinPage> createState() => _StaffJoinPageState();
 }

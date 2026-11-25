@@ -39,6 +39,7 @@ void _openSettings() {
 /// هدر ثابت برنامه
 /// ردیف بالا: لوگو و نام (یک طرف) | تنظیمات، تم، زبان (طرف مقابل)
 /// ردیف پایین: ساعت و تاریخ با ثانیه | ساعت، تقویم، قوانین
+/// روی صفحه‌ی عریض (ویندوز) تمام‌عرض و بزرگ‌تر است
 class AppHeader extends StatelessWidget {
   const AppHeader({super.key});
 
@@ -54,11 +55,19 @@ class AppHeader extends StatelessWidget {
         l.primary.withOpacity(l.dark ? 0.12 : 0.08), l.bg[0]);
     final langCode = lang == 'fa' ? 'فا' : (lang == 'ar' ? 'ع' : 'EN');
 
+    final wide = mq.size.width >= 700;
+    final logoSize = wide ? 68.0 : 44.0;
+    final rowH = wide ? 90.0 : 60.0;
+    final nameSize = wide ? 32.0 : 21.0;
+    final hPad = wide ? 28.0 : 12.0;
+    final gap = wide ? 10.0 : 6.0;
+
     // ---- ردیف بالا: دکمه‌ها ----
     final topBtns = <Widget>[
       _HBtn(
         semantic: _tr(lang, 'تنظیمات', 'Settings', 'الإعدادات'),
         icon: Icons.settings_rounded,
+        big: wide,
         onTap: _openSettings,
       ),
     ];
@@ -67,6 +76,7 @@ class AppHeader extends StatelessWidget {
         semantic: _tr(lang, 'تم روشن و تاریک', 'Light / dark theme',
             'الوضع الفاتح / الداكن'),
         icon: isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+        big: wide,
         onTap: () => st.setThemeKey(isDark ? 'light' : 'dark'),
       ));
     }
@@ -75,6 +85,7 @@ class AppHeader extends StatelessWidget {
         semantic: _tr(lang, 'زبان', 'Language', 'اللغة'),
         icon: Icons.language_rounded,
         label: langCode,
+        big: wide,
         onTap: () => _langSheet(st),
       ));
     }
@@ -86,17 +97,20 @@ class AppHeader extends StatelessWidget {
         semantic: _tr(lang, 'ساعت', 'Time', 'الوقت'),
         icon: st.usePhoneTime ? Icons.smartphone_rounded : Icons.public_rounded,
         active: st.usePhoneTime,
+        big: wide,
         onTap: () => _timeSheet(st),
       ));
       bottomBtns.add(_HBtn(
         semantic: _tr(lang, 'تقویم', 'Calendar', 'التقويم'),
         icon: Icons.calendar_month_rounded,
+        big: wide,
         onTap: () => _calSheet(st),
       ));
       bottomBtns.add(_HBtn(
         semantic: _tr(
             lang, 'قوانین و مقررات', 'Terms and policy', 'القوانين والأحكام'),
         icon: Icons.gavel_rounded,
+        big: wide,
         onTap: () => _openRules(st),
       ));
     }
@@ -104,7 +118,7 @@ class AppHeader extends StatelessWidget {
     List<Widget> spaced(List<Widget> src) {
       final out = <Widget>[];
       for (var i = 0; i < src.length; i++) {
-        if (i > 0) out.add(const SizedBox(width: 6));
+        if (i > 0) out.add(SizedBox(width: gap));
         out.add(src[i]);
       }
       return out;
@@ -121,21 +135,22 @@ class AppHeader extends StatelessWidget {
         ),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
+            constraints:
+                BoxConstraints(maxWidth: wide ? double.infinity : 560),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  height: 60,
+                  height: rowH,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: EdgeInsets.symmetric(horizontal: hPad),
                     child: Row(
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(11),
-                          child: EsmairoMark(size: 44),
+                          borderRadius: BorderRadius.circular(wide ? 16 : 11),
+                          child: EsmairoMark(size: logoSize),
                         ),
-                        const SizedBox(width: 10),
+                        SizedBox(width: wide ? 16 : 10),
                         Expanded(
                           child: Text(
                             appNameFor(lang),
@@ -143,7 +158,7 @@ class AppHeader extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: onSurface,
-                              fontSize: 21,
+                              fontSize: nameSize,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.5,
                             ),
@@ -156,7 +171,7 @@ class AppHeader extends StatelessWidget {
                 ),
                 if (showSecondRow)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    padding: EdgeInsets.fromLTRB(hPad, 0, hPad, wide ? 12 : 8),
                     child: Row(
                       children: [
                         Expanded(
@@ -211,11 +226,13 @@ class _HBtn extends StatelessWidget {
     required this.semantic,
     this.label,
     this.active = false,
+    this.big = false,
   });
   final IconData icon;
   final String? label;
   final String semantic;
   final bool active;
+  final bool big;
   final VoidCallback onTap;
 
   @override
@@ -230,25 +247,27 @@ class _HBtn extends StatelessWidget {
       label: semantic,
       child: Material(
         color: bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(big ? 14 : 12),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(big ? 14 : 12),
           onTap: onTap,
           child: Container(
-            height: 36,
-            constraints: const BoxConstraints(minWidth: 38),
-            padding: const EdgeInsets.symmetric(horizontal: 9),
+            height: big ? 46 : 36,
+            constraints: BoxConstraints(minWidth: big ? 48 : 38),
+            padding: EdgeInsets.symmetric(horizontal: big ? 13 : 9),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 19, color: active ? l.primary : onSurface),
+                Icon(icon,
+                    size: big ? 25 : 19,
+                    color: active ? l.primary : onSurface),
                 if (label != null) ...[
-                  const SizedBox(width: 5),
+                  SizedBox(width: big ? 7 : 5),
                   Text(
                     label!,
                     style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: big ? 15 : 12.5,
                       fontWeight: FontWeight.w700,
                       color: active ? l.primary : onSurface,
                     ),
@@ -266,6 +285,7 @@ class _HBtn extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // پنجره‌های انتخاب
 // ---------------------------------------------------------------------------
+
 class _Opt {
   const _Opt(this.value, this.title, [this.subtitle]);
   final String value;

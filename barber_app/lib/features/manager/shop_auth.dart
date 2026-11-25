@@ -20,6 +20,49 @@ typedef SessionCallback = Future<void> Function(ManagerSession session);
 String _x(String lang, String fa, String en, String ar) =>
     lang == 'fa' ? fa : (lang == 'ar' ? ar : en);
 
+// متن‌های «کسب‌وکار» که جای واژه‌های قدیمی آرایشگاه می‌نشینند
+const Map<String, List<String>> _ov = {
+  'shop_panel': ['پنل کسب‌وکار', 'Business panel', 'لوحة النشاط التجاري'],
+  'shop_panel_sub': [
+    'برای مدیریت نوبت‌ها وارد شوید',
+    'Sign in to manage your bookings',
+    'سجّل الدخول لإدارة الحجوزات'
+  ],
+  'signup_owner': [
+    'ثبت‌نام کسب‌وکار',
+    'Register a business',
+    'تسجيل نشاط تجاري'
+  ],
+  'signup_owner_desc': [
+    'با کد لایسنس، کسب‌وکار خودت را بساز',
+    'Create your business with a license code',
+    'أنشئ نشاطك التجاري برمز الترخيص'
+  ],
+  'signup_staff': [
+    'ثبت‌نام پرسنل',
+    'Register as staff',
+    'تسجيل موظف'
+  ],
+  'signup_staff_desc': [
+    'با کد دعوتی که صاحب کسب‌وکار به تو داده',
+    'With the invite code from the business owner',
+    'برمز الدعوة من صاحب النشاط التجاري'
+  ],
+  'shop_name': ['نام کسب‌وکار', 'Business name', 'اسم النشاط التجاري'],
+  'i_am_barber': [
+    'خودم هم خدمت می‌دهم',
+    'I also provide services myself',
+    'أقدّم الخدمات بنفسي'
+  ],
+  'create_shop': ['ساخت کسب‌وکار', 'Create business', 'إنشاء النشاط التجاري'],
+};
+
+String _w(String lang, T6 s, String key) {
+  final o = _ov[key];
+  if (o == null) return s.t(key);
+  return lang == 'fa' ? o[0] : (lang == 'ar' ? o[2] : o[1]);
+}
+
 Future<void> _saveGender(
     AppSettings st, String gender, String plan, String? serverUrl) async {
   if (gender != 'men' && gender != 'women') return;
@@ -54,6 +97,7 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
   final _pass = TextEditingController();
   bool _hide = true;
   bool _loading = false;
+
   @override
   void dispose() {
     _user.dispose();
@@ -104,13 +148,13 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
           const Center(child: AppLogo()),
           const SizedBox(height: 18),
           Center(
-            child: Text(s.t('shop_panel'),
+            child: Text(_w(st.lang, s, 'shop_panel'),
                 style:
                     const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(height: 6),
           Center(
-            child: Text(s.t('shop_panel_sub'),
+            child: Text(_w(st.lang, s, 'shop_panel_sub'),
                 style: TextStyle(color: muted(context))),
           ),
           const SizedBox(height: 24),
@@ -211,7 +255,8 @@ class SignupChoicePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = T6(SettingsScope.of(context).lang);
+    final lang = SettingsScope.of(context).lang;
+    final s = T6(lang);
     Widget card(IconData icon, String title, String desc, VoidCallback onTap) {
       return Glass(
         onTap: onTap,
@@ -246,17 +291,17 @@ class SignupChoicePage extends StatelessWidget {
         children: [
           card(
             Icons.storefront_rounded,
-            s.t('signup_owner'),
-            s.t('signup_owner_desc'),
+            _w(lang, s, 'signup_owner'),
+            _w(lang, s, 'signup_owner_desc'),
             () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => OwnerPlanPage(api: api, onSession: onSession),
             )),
           ),
           const SizedBox(height: 14),
           card(
-            Icons.content_cut_rounded,
-            s.t('signup_staff'),
-            s.t('signup_staff_desc'),
+            Icons.badge_rounded,
+            _w(lang, s, 'signup_staff'),
+            _w(lang, s, 'signup_staff_desc'),
             () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => StaffJoinPage(api: api, onSession: onSession),
             )),
@@ -283,7 +328,7 @@ String _planName(String lang, String key) {
 IconData _planIcon(String key) {
   switch (key) {
     case 'basic':
-      return Icons.content_cut_rounded;
+      return Icons.store_rounded;
     case 'pro':
       return Icons.workspace_premium_rounded;
     case 'special':
@@ -308,63 +353,90 @@ List<String> _planFeatures(String lang, PlanDef p) {
       'حجز العملاء عبر الإنترنت');
   final photo = _x(
       lang,
-      'قرار دادن عکس آرایشگاه در صفحهٔ آرایشگاه‌ها',
-      'Your shop photo on the shops page',
-      'وضع صورة صالونك في صفحة الصالونات');
+      'قرار دادن عکس کسب‌وکار در صفحهٔ کسب‌وکارها',
+      'Your business photo on the businesses page',
+      'وضع صورة نشاطك في صفحة الأنشطة التجارية');
   final winback = _x(
       lang,
       'ارسال پیام اختصاصی آرایشگاه در بازه‌های مشخص',
       'Custom shop messages to customers at set intervals',
       'إرسال رسالة خاصة بالصالون للزبائن في فترات محددة');
+  final bizList = _x(
+      lang,
+      'نمایش در جستجوی مشتریان بر اساس نوع کسب‌وکار',
+      'Listed in customer search by business type',
+      'الظهور في بحث العملاء حسب نوع النشاط');
+  final adsPaid = _x(lang, 'تبلیغ در صفحه‌ی سایر کسب‌وکارها (اختیاری، پولی)',
+      'Ads on other businesses’ pages (optional, paid)',
+      'إعلان في صفحات الأنشطة الأخرى (اختياري، مدفوع)');
+  final adsFree = _x(lang, 'تبلیغ رایگان در صفحه‌ی سایر کسب‌وکارها',
+      'Free ads on other businesses’ pages',
+      'إعلان مجاني في صفحات الأنشطة الأخرى');
   final n = fmtNum(p.maxBarbers, lang);
   final sh = fmtNum(p.maxShifts, lang);
-  final barbers = p.maxBarbers == 1
-      ? _x(lang, 'یک آرایشگر', 'One barber', 'حلاق واحد')
+  final staff = p.maxBarbers == 1
+      ? _x(lang, 'یک نفر پرسنل', 'One staff member', 'موظف واحد')
       : p.maxBarbers > 0
-          ? _x(lang, 'تا $n آرایشگر', 'Up to $n barbers', 'حتى $n حلاق')
-          : _x(lang, 'آرایشگر نامحدود', 'Unlimited barbers',
-              'عدد غير محدود من الحلاقين');
+          ? _x(lang, 'تا $n نفر پرسنل', 'Up to $n staff members',
+              'حتى $n موظفين')
+          : _x(lang, 'پرسنل نامحدود', 'Unlimited staff',
+              'عدد غير محدود من الموظفين');
   final shifts = _x(
       lang,
-      'تا $sh شیفت کاری در روز برای هر آرایشگر',
-      'Up to $sh work shifts a day per barber',
-      'حتى $sh فترات عمل يوميًا لكل حلاق');
+      'تا $sh شیفت کاری در روز برای هر نفر',
+      'Up to $sh work shifts a day per person',
+      'حتى $sh فترات عمل يوميًا لكل شخص');
   switch (p.key) {
     case 'basic':
       return [
-        barbers,
+        staff,
         shifts,
         booking,
+        bizList,
+        adsPaid,
         _x(lang, 'پاکسازی هفتگی نوبت‌های گذشته',
             'Past bookings cleaned weekly', 'تنظيف الحجوزات القديمة أسبوعياً'),
       ];
     case 'pro':
       return [
-        barbers,
+        staff,
         shifts,
         booking,
+        bizList,
+        _x(lang, 'دکمه فروشگاه یا سایت با تا ۳ محصول',
+            'Store/website button with up to 3 products',
+            'زر المتجر أو الموقع مع حتى ٣ منتجات'),
+        adsPaid,
         _x(lang, 'پاکسازی نوبت‌های گذشته هر دو هفته',
             'Past bookings cleaned every 2 weeks',
             'تنظيف الحجوزات القديمة كل أسبوعين'),
       ];
     case 'special':
       return [
-        barbers,
+        staff,
         shifts,
         booking,
         photo,
+        _x(lang, 'ظاهر اختصاصی برای صفحه‌ی کسب‌وکار شما',
+            'Custom look for your business page',
+            'مظهر خاص لصفحة نشاطك'),
         winback,
-        _x(lang, 'فضای اختصاصی برای آرایشگاه شما و پشتیبان‌گیری',
-            'Dedicated space for your shop, plus backups',
-            'مساحة خاصة لصالونك ونسخ احتياطي'),
+        _x(lang, 'دکمه فروشگاه یا سایت با تا ۵ محصول (با عکس)',
+            'Store/website button with up to 5 products (with photos)',
+            'زر المتجر أو الموقع مع حتى ٥ منتجات (بصور)'),
+        adsFree,
+        _x(lang, 'فضای اختصاصی برای کسب‌وکار شما و پشتیبان‌گیری',
+            'Dedicated space for your business, plus backups',
+            'مساحة خاصة لنشاطك ونسخ احتياطي'),
         _x(lang, 'فعال‌سازی اختصاصی با کد راه‌اندازی',
             'Dedicated activation with a setup code',
             'تفعيل خاص برمز الإعداد'),
       ];
     default:
       return [
-        _x(lang, 'راه‌اندازی توسط خود آرایشگاه', 'Set up by the shop itself',
-            'الإعداد يتولاه الصالون بنفسه'),
+        _x(lang, 'راه‌اندازی توسط خود کسب‌وکار',
+            'Set up by the business itself',
+            'الإعداد يتولاه النشاط التجاري بنفسه'),
       ];
   }
 }
@@ -387,9 +459,9 @@ class OwnerPlanPage extends StatelessWidget {
             child: Text(
               _x(
                   lang,
-                  'اول پلن آرایشگاهتان را انتخاب کنید',
-                  'First, pick the plan for your shop',
-                  'اختر باقة صالونك أولاً'),
+                  'اول پلن کسب‌وکارتان را انتخاب کنید',
+                  'First, pick the plan for your business',
+                  'اختر باقة نشاطك التجاري أولاً'),
               style: TextStyle(color: muted(context), height: 1.5),
             ),
           ),
@@ -626,8 +698,8 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-              _x(lang, 'آرایشگاه شما برای چه کسانی است؟',
-                  'Who is your shop for?', 'لمن هذا الصالون؟'),
+              _x(lang, 'کسب‌وکار شما برای چه کسانی است؟',
+                  'Who is your business for?', 'لمن هذا النشاط التجاري؟'),
               style:
                   const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
@@ -666,7 +738,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         : <int>[6, 0, 1, 2, 3, 4, 5];
     final combined = _planNeedsCode && !st.hasCustomApiUrl;
     return GlassScaffold(
-      title: s.t('signup_owner'),
+      title: _w(lang, s, 'signup_owner'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
@@ -729,7 +801,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                 _gap(),
                 GlassField(
                   controller: _shop,
-                  label: s.t('shop_name'),
+                  label: _w(lang, s, 'shop_name'),
                   icon: Icons.storefront_rounded,
                 ),
                 _gap(),
@@ -772,7 +844,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                   contentPadding: EdgeInsets.zero,
                   value: _barber,
                   onChanged: (v) => setState(() => _barber = v),
-                  title: Text(s.t('i_am_barber')),
+                  title: Text(_w(lang, s, 'i_am_barber')),
                 ),
               ],
             ),
@@ -862,7 +934,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
           ),
           const SizedBox(height: 20),
           GradientButton(
-            label: s.t('create_shop'),
+            label: _w(lang, s, 'create_shop'),
             icon: Icons.check_circle_outline_rounded,
             loading: _loading,
             onPressed: _submit,
@@ -887,6 +959,7 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
   final _pass = TextEditingController();
   bool _hide = true;
   bool _loading = false;
+
   @override
   void dispose() {
     _code.dispose();

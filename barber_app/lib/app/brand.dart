@@ -2,15 +2,25 @@ import 'package:flutter/material.dart';
 
 /// نام نمایشی برنامه
 const String kAppName = 'ESMAIRO';
-
 const Color kBrandViolet = Color(0xFF7C3AED);
 const Color kBrandPink = Color(0xFFEC4899);
-
 const LinearGradient kBrandGradient = LinearGradient(
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
   colors: [kBrandViolet, kBrandPink],
 );
+
+/// اسم برنامه به سه زبان
+String appNameFor(String lang) {
+  switch (lang) {
+    case 'fa':
+      return 'اِسمایرو';
+    case 'ar':
+      return 'إسمايرو';
+    default:
+      return kAppName;
+  }
+}
 
 /// خط «توسعه‌دهنده» به سه زبان
 String developerLine(String lang) {
@@ -24,52 +34,7 @@ String developerLine(String lang) {
   }
 }
 
-class _MarkPainter extends CustomPainter {
-  final bool tile;
-  const _MarkPainter(this.tile);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.shortestSide;
-    final rect = Rect.fromLTWH(0, 0, s, s);
-
-    if (tile) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(s * 0.22)),
-        Paint()
-          ..isAntiAlias = true
-          ..shader = kBrandGradient.createShader(rect),
-      );
-    }
-
-    final p = Paint()..isAntiAlias = true;
-    if (tile) {
-      p.color = Colors.white;
-    } else {
-      p.shader = kBrandGradient.createShader(rect);
-    }
-
-    RRect r(double l, double t, double rt, double b, double rad) =>
-        RRect.fromLTRBR(l * s, t * s, rt * s, b * s, Radius.circular(rad * s));
-
-    canvas.drawRRect(r(0.26, 0.24, 0.36, 0.76, 0.05), p); // ستون E
-    canvas.drawRRect(r(0.34, 0.24, 0.70, 0.33, 0.045), p); // دندانه‌ی بالا
-    canvas.drawRRect(r(0.34, 0.67, 0.70, 0.76, 0.045), p); // دندانه‌ی پایین
-
-    final blade = Path()
-      ..moveTo(0.34 * s, 0.455 * s)
-      ..lineTo(0.78 * s, 0.50 * s)
-      ..lineTo(0.34 * s, 0.545 * s)
-      ..close(); // تیغه‌ی قیچی
-    canvas.drawPath(blade, p);
-  }
-
-  @override
-  bool shouldRepaint(covariant _MarkPainter old) => old.tile != tile;
-}
-
-/// فقط نشانه‌ی E.
-/// tile=true: داخل مربع گرادیان (مثل آیکن). tile=false: خود E با رنگ گرادیان.
+/// لوگوی خودت (barber_app/assets/logo.png)
 class EsmairoMark extends StatelessWidget {
   final double size;
   final bool tile;
@@ -80,12 +45,18 @@ class EsmairoMark extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(painter: _MarkPainter(tile)),
+      child: Image.asset(
+        'assets/logo.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (_, __, ___) =>
+            Icon(Icons.content_cut_rounded, size: size * 0.6),
+      ),
     );
   }
 }
 
-/// نشانه + نوشته‌ی ESMAIRO
+/// لوگو + اسم برنامه
 class EsmairoLogo extends StatelessWidget {
   final double size;
   final bool showName;
@@ -93,6 +64,8 @@ class EsmairoLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
+    final latin = lang != 'fa' && lang != 'ar';
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -103,12 +76,12 @@ class EsmairoLogo extends StatelessWidget {
             blendMode: BlendMode.srcIn,
             shaderCallback: (b) => kBrandGradient.createShader(b),
             child: Text(
-              kAppName,
-              textDirection: TextDirection.ltr,
+              appNameFor(lang),
+              textDirection: latin ? TextDirection.ltr : null,
               style: TextStyle(
                 fontSize: size * 0.30,
                 fontWeight: FontWeight.w700,
-                letterSpacing: size * 0.06,
+                letterSpacing: latin ? size * 0.06 : 0,
                 color: Colors.white,
               ),
             ),

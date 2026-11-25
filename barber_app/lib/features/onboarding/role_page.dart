@@ -4,7 +4,6 @@ import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
-import '../settings/settings_page.dart';
 
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
@@ -52,13 +51,6 @@ class RolePage extends StatelessWidget {
     }
 
     return GlassScaffold(
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.settings_rounded),
-          onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
-        ),
-      ],
       body: ListView(
         padding: const EdgeInsets.fromLTRB(22, 10, 22, 32),
         children: [
@@ -75,7 +67,6 @@ class RolePage extends StatelessWidget {
                 style: TextStyle(color: muted(context), fontSize: 16)),
           ),
           const SizedBox(height: 30),
-          // اول کسب‌وکار
           card(
             icon: Icons.storefront_rounded,
             gradient: AppColors.gradient,
@@ -88,7 +79,6 @@ class RolePage extends StatelessWidget {
             onTap: () => st.setRole('shop'),
           ),
           const SizedBox(height: 16),
-          // زیرش مشتری
           card(
             icon: Icons.person_rounded,
             gradient: const LinearGradient(

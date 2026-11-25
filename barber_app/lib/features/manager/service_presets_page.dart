@@ -6,14 +6,18 @@ import '../../app/strings_s6.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
 import 'shop_raw.dart';
+
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
+
 class ServicePresetsPage extends StatefulWidget {
   const ServicePresetsPage({super.key, required this.settings});
   final AppSettings settings;
+
   @override
   State<ServicePresetsPage> createState() => _ServicePresetsPageState();
 }
+
 class _ServicePresetsPageState extends State<ServicePresetsPage> {
   bool _loading = true;
   bool _saving = false;
@@ -21,12 +25,15 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
   final Set<String> _on = {};
   final Map<String, TextEditingController> _dur = {};
   final Map<String, TextEditingController> _price = {};
+
   String get _lang => widget.settings.lang;
+
   @override
   void initState() {
     super.initState();
     _load();
   }
+
   @override
   void dispose() {
     for (final c in _dur.values) {
@@ -37,6 +44,7 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
     }
     super.dispose();
   }
+
   Future<void> _load() async {
     var g = 'both';
     var group = 'beauty';
@@ -61,10 +69,24 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       _loading = false;
     });
   }
+
   int? _num(String t) {
     final d = normalizeDigits(t).replaceAll(RegExp(r'[^0-9]'), '');
     return d.isEmpty ? null : int.tryParse(d);
   }
+
+  bool get _allOn => _items.isNotEmpty && _on.length == _items.length;
+
+  void _toggleAll() {
+    setState(() {
+      if (_allOn) {
+        _on.clear();
+      } else {
+        _on.addAll(_items.map((e) => e.key));
+      }
+    });
+  }
+
   Future<void> _save() async {
     if (_saving) return;
     final lang = _lang;
@@ -115,6 +137,7 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       toast(context, T6(lang).error(e));
     }
   }
+
   Widget _row(CatalogItem it) {
     final lang = _lang;
     final on = _on.contains(it.key);
@@ -168,21 +191,43 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final lang = _lang;
     final children = <Widget>[
       Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          _x(
+              lang,
+              'خدمت‌هایی را که دارید تیک بزنید، مدت و قیمت را بنویسید و ذخیره کنید. یا با یک دکمه همه را اضافه کنید. خدمتی که هم‌نام آن را دارید دوباره اضافه نمی‌شود.',
+              'Tick the services you offer, set duration and price, then save, or add them all with one button. A service with the same name is not added twice.',
+              'اختر الخدمات التي تقدمها واكتب المدة والسعر ثم احفظ، أو أضفها كلها بزر واحد. لا تُضاف خدمة بنفس الاسم مرتين.'),
+          style: TextStyle(color: muted(context), height: 1.6),
+        ),
+      ),
+      Padding(
         padding: const EdgeInsets.only(bottom: 14),
         child: Text(
           _x(
               lang,
-              'خدمت‌هایی را که دارید تیک بزنید، مدت و قیمت را بنویسید و ذخیره کنید. خدمتی که هم‌نام آن را دارید دوباره اضافه نمی‌شود.',
-              'Tick the services you offer, set duration and price, then save. A service with the same name is not added twice.',
-              'اختر الخدمات التي تقدمها واكتب المدة والسعر ثم احفظ. لا تُضاف خدمة بنفس الاسم مرتين.'),
-          style: TextStyle(color: muted(context), height: 1.6),
+              'اگر قیمت را ننویسید صفر ثبت می‌شود و بعداً در «خدمات» قابل تغییر است.',
+              'If you leave the price empty it is saved as 0; you can change it later in “Services”.',
+              'إذا تركت السعر فارغًا يُحفظ 0 ويمكن تعديله لاحقًا من «الخدمات».'),
+          style: TextStyle(color: muted(context), fontSize: 12),
         ),
       ),
+      GradientButton(
+        outlined: true,
+        label: _allOn
+            ? _x(lang, 'برداشتن همه', 'Clear all', 'إلغاء تحديد الكل')
+            : _x(lang, 'افزودن همه‌ی موارد', 'Add all items',
+                'إضافة كل العناصر'),
+        icon: _allOn ? Icons.remove_done_rounded : Icons.done_all_rounded,
+        onPressed: _toggleAll,
+      ),
+      const SizedBox(height: 14),
     ];
     for (final it in _items) {
       children.add(_row(it));

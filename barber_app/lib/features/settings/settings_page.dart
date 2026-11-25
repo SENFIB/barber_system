@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -16,7 +15,6 @@ import '../legal/privacy_gate.dart';
 import '../manager/shop_api.dart';
 import 'appearance_page.dart';
 
-// کلیدهای نام و شماره‌ی مشتری که روی دستگاه ذخیره می‌شوند (همان کلیدهای CustomerStore)
 const String _kCustName = 'cust_name';
 const String _kCustPhone = 'cust_phone';
 
@@ -42,7 +40,6 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     PackageInfo.fromPlatform().then((p) {
-      // فقط شماره‌ی نسخه؛ بدون شماره‌ی build
       if (mounted) setState(() => _version = p.version);
     });
     _loadCustomer();
@@ -82,7 +79,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final newUrl = _urlC.text.trim();
     final changed = newUrl != (st.hasCustomApiUrl ? st.apiUrl : '');
     await st.setApiUrl(newUrl.isEmpty ? null : newUrl);
-    if (changed) await st.setShopToken(null); // توکن مال سرور قبلی بود
+    if (changed) await st.setShopToken(null);
     if (mounted) toast(context, s.t('saved'));
   }
 
@@ -153,18 +150,14 @@ class _SettingsPageState extends State<SettingsPage> {
         await ShopApi(st).logout().timeout(const Duration(seconds: 8));
       } catch (_) {}
     }
-    // نام و شماره‌ی ذخیره‌شده‌ی مشتری هم پاک شود
     try {
       final p = await SharedPreferences.getInstance();
       await p.remove(_kCustName);
       await p.remove(_kCustPhone);
     } catch (_) {}
-    // یادآورهای زمان‌بندی‌شده هم لغو شوند
     await LocalWipe.cancelReminders();
-    // در ویندوز پوشه کامل حذف می‌شود، پس شناسه‌ی دستگاه هم پاک می‌شود
     await st.clearAll(resetDeviceId: resetId || isWin);
     if (isWin) {
-      // پوشه‌ی com.barberapp حذف می‌شود و برنامه بسته می‌شود
       await LocalWipe.deleteWindowsFolder();
       return;
     }
@@ -413,7 +406,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
           const SizedBox(height: 28),
-          // توسعه‌دهنده: پایین همه‌چیز و بالای خط نسخه
           Center(
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -440,6 +432,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Text(
                   '${x.t('version')} $_version',
                   style: TextStyle(color: muted(context), fontSize: 13),
+                ),
+              ),
+            ),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _x3(st.lang, 'قدرت‌گرفته از اسماعیل', 'Powered by Esmail',
+                    'بدعم إسماعيل'),
+                style: TextStyle(
+                  color: muted(context).withOpacity(0.8),
+                  fontSize: 12,
+                  letterSpacing: 0.4,
                 ),
               ),
             ),

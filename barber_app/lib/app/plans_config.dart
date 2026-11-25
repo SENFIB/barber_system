@@ -21,10 +21,10 @@ class PlanDef {
   /// قیمت خرید یک‌باره (فقط پلن شخصی)؛ اگر ۰ باشد ماهانه حساب می‌شود
   final int oneTime;
 
-  /// سقف آرایشگر (۰ یعنی نامحدود)
+  /// سقف پرسنل (۰ یعنی نامحدود)
   final int maxBarbers;
 
-  /// سقف شیفت کاری هر آرایشگر در روز
+  /// سقف شیفت کاری هر نفر در روز
   final int maxShifts;
 
   /// کلید متن ویژگی‌ها (در strings_s5.dart)
@@ -41,6 +41,8 @@ const PlanDef _basic = PlanDef(
     'pl_f_barber_one',
     'pl_f_shifts',
     'pl_f_booking',
+    'pl_f_biz',
+    'pl_f_ads_paid',
     'pl_f_cleanup7',
   ],
 );
@@ -55,7 +57,9 @@ const PlanDef _pro = PlanDef(
     'pl_f_barbers',
     'pl_f_shifts',
     'pl_f_booking',
+    'pl_f_biz',
     'pl_f_store_pro',
+    'pl_f_ads_paid',
     'pl_f_cleanup14',
   ],
 );
@@ -71,8 +75,10 @@ const PlanDef _special = PlanDef(
     'pl_f_shifts',
     'pl_f_booking',
     'pl_f_photo',
+    'pl_f_theme',
     'pl_f_winback',
     'pl_f_store_sp',
+    'pl_f_ads_free',
     'pl_f_ownsheet',
     'pl_f_backup',
     'pl_f_cleanup30',
@@ -80,7 +86,7 @@ const PlanDef _special = PlanDef(
 );
 
 // پلن شخصی (خرید کامل برنامه): آخرِ فهرست نمایش داده می‌شود
-// فقط یک ویژگی نمایش داده می‌شود: راه‌اندازی توسط خود آرایشگاه
+// فقط یک ویژگی نمایش داده می‌شود: راه‌اندازی توسط خود کسب‌وکار
 const PlanDef _personal = PlanDef(
   key: 'personal',
   monthly: 0,

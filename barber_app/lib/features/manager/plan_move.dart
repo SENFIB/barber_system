@@ -6,6 +6,7 @@ import '../../app/config.dart';
 import '../../app/servers.dart';
 import '../../app/settings.dart';
 import '../../app/widgets.dart';
+import 'activation_code.dart';
 
 class MoveError implements Exception {
   final String code;
@@ -78,8 +79,6 @@ class PlanMover {
     final oldUrl = st.apiUrl;
     final token = st.shopToken ?? '';
     final dev = st.deviceId;
-
-    // همان سرور (مثلاً ویژه به ویژه): همان تمدید ساده
     if (oldUrl == targetUrl) {
       await _post(oldUrl, {
         'action': 'renew',
@@ -89,7 +88,6 @@ class PlanMover {
       });
       return MoveResult(0, 0);
     }
-
     final bundle = await _post(oldUrl, {
       'action': 'transfer_export',
       'token': token,
@@ -119,16 +117,6 @@ class PlanMover {
   }
 }
 
-String? _normCode(String raw) {
-  final s = raw.trim();
-  final full = RegExp(r'^https://script\.google\.com/macros/s/([A-Za-z0-9_\-]+)/exec$');
-  if (full.hasMatch(s)) return s;
-  if (RegExp(r'^[A-Za-z0-9_\-]{20,}$').hasMatch(s)) {
-    return 'https://script.google.com/macros/s/$s/exec';
-  }
-  return null;
-}
-
 const Map<String, Map<String, String>> _tx = {
   'fa': {
     'title': 'تغییر پلن',
@@ -142,7 +130,7 @@ const Map<String, Map<String, String>> _tx = {
     'special': 'ویژه',
     'personal': 'شخصی',
     'license': 'لایسنس پلن جدید',
-    'code': 'کد',
+    'code': 'کد فعال‌سازی',
     'go': 'انتقال و تغییر پلن',
     'confirm': 'آرایشگاه به پلن جدید منتقل می‌شود. ادامه می‌دهید؟',
     'yes': 'ادامه',
@@ -150,8 +138,8 @@ const Map<String, Map<String, String>> _tx = {
     'done': 'پلن تغییر کرد ✅',
     'trim': 'آرایشگر کم‌شده: {a} | شیفت کوتاه‌شده: {b}',
     'bad_code': 'کد واردشده درست نیست',
-    'need_license': 'لایسنس را وارد کنید',
-    'need_code': 'کد را وارد کنید',
+    'need_license': 'کد را وارد کنید',
+    'need_code': 'کد فعال‌سازی کامل نیست',
     'LICENSE_INVALID': 'لایسنس معتبر نیست یا قبلاً استفاده شده است',
     'PLAN_MISMATCH': 'این لایسنس برای پلن دیگری است',
     'USERNAME_TAKEN': 'این نام کاربری روی پلن جدید گرفته شده است',
@@ -176,7 +164,7 @@ const Map<String, Map<String, String>> _tx = {
     'special': 'Special',
     'personal': 'Personal',
     'license': 'License of the new plan',
-    'code': 'Code',
+    'code': 'Activation code',
     'go': 'Move and change plan',
     'confirm': 'Your shop will be moved to the new plan. Continue?',
     'yes': 'Continue',
@@ -184,8 +172,8 @@ const Map<String, Map<String, String>> _tx = {
     'done': 'Plan changed ✅',
     'trim': 'Barbers reduced: {a} | Shifts shortened: {b}',
     'bad_code': 'The code is not valid',
-    'need_license': 'Enter the license',
-    'need_code': 'Enter the code',
+    'need_license': 'Enter the code',
+    'need_code': 'The activation code is incomplete',
     'LICENSE_INVALID': 'The license is invalid or already used',
     'PLAN_MISMATCH': 'This license belongs to another plan',
     'USERNAME_TAKEN': 'This username is already taken on the new plan',
@@ -210,7 +198,7 @@ const Map<String, Map<String, String>> _tx = {
     'special': 'المميزة',
     'personal': 'الشخصية',
     'license': 'ترخيص الخطة الجديدة',
-    'code': 'الرمز',
+    'code': 'رمز التفعيل',
     'go': 'نقل وتغيير الخطة',
     'confirm': 'سيتم نقل الصالون إلى الخطة الجديدة. هل تتابع؟',
     'yes': 'متابعة',
@@ -218,8 +206,8 @@ const Map<String, Map<String, String>> _tx = {
     'done': 'تم تغيير الخطة ✅',
     'trim': 'حلاقون تم تقليلهم: {a} | ورديات تم تقصيرها: {b}',
     'bad_code': 'الرمز المُدخل غير صحيح',
-    'need_license': 'أدخل الترخيص',
-    'need_code': 'أدخل الرمز',
+    'need_license': 'أدخل الرمز',
+    'need_code': 'رمز التفعيل غير مكتمل',
     'LICENSE_INVALID': 'الترخيص غير صالح أو مستخدم سابقًا',
     'PLAN_MISMATCH': 'هذا الترخيص لخطة أخرى',
     'USERNAME_TAKEN': 'اسم المستخدم هذا مأخوذ في الخطة الجديدة',
@@ -237,14 +225,12 @@ const Map<String, Map<String, String>> _tx = {
 class PlanMovePage extends StatefulWidget {
   final AppSettings settings;
   const PlanMovePage({super.key, required this.settings});
-
   @override
   State<PlanMovePage> createState() => _PlanMovePageState();
 }
 
 class _PlanMovePageState extends State<PlanMovePage> {
   final _lic = TextEditingController();
-  final _code = TextEditingController();
   String _plan = 'pro';
   bool _busy = false;
 
@@ -258,7 +244,6 @@ class _PlanMovePageState extends State<PlanMovePage> {
   @override
   void dispose() {
     _lic.dispose();
-    _code.dispose();
     super.dispose();
   }
 
@@ -270,32 +255,32 @@ class _PlanMovePageState extends State<PlanMovePage> {
 
   Future<void> _go() async {
     if (_busy) return;
-    final lic = _lic.text.trim();
-    if (lic.isEmpty) {
+    final raw = _lic.text.trim();
+    if (raw.isEmpty) {
       _snack(_t('need_license'));
       return;
     }
+    String lic = raw;
     String target;
     if (_plan == 'basic') {
       target = kDefaultApiUrl;
     } else if (_plan == 'pro') {
       target = kProApiUrl;
     } else {
-      final raw = _code.text.trim();
-      if (raw.isEmpty) {
-        if (_st.hasCustomApiUrl) {
-          target = _st.apiUrl;
-        } else {
-          _snack(_t('need_code'));
-          return;
-        }
-      } else {
-        final u = _normCode(raw);
-        if (u == null) {
-          _snack(_t('bad_code'));
-          return;
-        }
+      final p = splitActivation(raw);
+      if (p.license.isEmpty) {
+        _snack(_t('need_license'));
+        return;
+      }
+      lic = p.license;
+      final u = p.url;
+      if (u != null) {
         target = u;
+      } else if (_st.hasCustomApiUrl) {
+        target = _st.apiUrl;
+      } else {
+        _snack(_t('need_code'));
+        return;
       }
     }
     final ok = await showDialog<bool>(
@@ -309,7 +294,6 @@ class _PlanMovePageState extends State<PlanMovePage> {
       ),
     );
     if (ok != true || !mounted) return;
-
     setState(() => _busy = true);
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -371,19 +355,10 @@ class _PlanMovePageState extends State<PlanMovePage> {
             const SizedBox(height: 16),
             GlassField(
               controller: _lic,
-              label: _t('license'),
+              label: _needsCode ? _t('code') : _t('license'),
               icon: Icons.key_rounded,
               ltr: true,
             ),
-            if (_needsCode) ...[
-              const SizedBox(height: 12),
-              GlassField(
-                controller: _code,
-                label: _t('code'),
-                icon: Icons.tag_rounded,
-                ltr: true,
-              ),
-            ],
             const SizedBox(height: 20),
             GradientButton(
               label: _t('go'),

@@ -3,6 +3,7 @@ import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/biz_text.dart';
+import '../../app/biz_words.dart';
 import '../../app/business_types.dart';
 import '../../app/cal_conv.dart';
 import '../../app/config.dart';
@@ -20,12 +21,17 @@ import 'customer_store.dart';
 import 'report_sheet.dart';
 import 'shop_ads.dart';
 import 'store_page.dart';
-
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
-
 bool _truthy(dynamic v) => v == true || '$v' == 'true' || '$v' == '1';
 
+/// اسمی که شبیه شناسه/کد/شماره است (نام واقعی نیست)
+bool _looksId(String s) {
+  final v = s.trim();
+  if (v.isEmpty) return false;
+  if (RegExp(r'^[0-9\s+\-]+$').hasMatch(v)) return true;
+  return !v.contains(' ') && RegExp(r'^[A-Za-z0-9_\-]{14,}$').hasMatch(v);
+}
 class ShopPhoto extends StatelessWidget {
   const ShopPhoto({
     super.key,
@@ -38,7 +44,6 @@ class ShopPhoto extends StatelessWidget {
   final double width;
   final double height;
   final double radius;
-
   @override
   Widget build(BuildContext context) {
     Widget ph() => Container(
@@ -63,21 +68,17 @@ class ShopPhoto extends StatelessWidget {
     );
   }
 }
-
-/// پوسته‌ی صفحه: ظاهر اختصاصی آرایشگاه (فقط پلن ویژه) را با یک دکمه روشن/خاموش می‌کند
+/// پوسته‌ی صفحه: ظاهر اختصاصی کسب‌وکار (فقط پلن ویژه) را با یک دکمه روشن/خاموش می‌کند
 class ShopPage extends StatefulWidget {
   const ShopPage({super.key, required this.api, required this.card});
   final CustomerApi api;
   final Map<String, dynamic> card;
-
   @override
   State<ShopPage> createState() => _ShopPageState();
 }
-
 class _ShopPageState extends State<ShopPage> {
   AppLook? _look;
   bool _on = false;
-
   @override
   Widget build(BuildContext context) {
     final base = Theme.of(context);
@@ -109,7 +110,6 @@ class _ShopPageState extends State<ShopPage> {
     );
   }
 }
-
 class _ShopBody extends StatefulWidget {
   const _ShopBody({
     required this.api,
@@ -125,11 +125,9 @@ class _ShopBody extends StatefulWidget {
   final bool themeOn;
   final void Function(AppLook? look) onLook;
   final VoidCallback onToggle;
-
   @override
   State<_ShopBody> createState() => _ShopBodyState();
 }
-
 class _ShopBodyState extends State<_ShopBody> {
   bool _loading = true;
   bool _busy = false;
@@ -150,10 +148,8 @@ class _ShopBodyState extends State<_ShopBody> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   AppSettings? _stRef;
-
   String get _shopId => bStr(widget.card['shop_id']);
   T6 _tr() => T6(SettingsScope.read(context).lang);
-
   @override
   void initState() {
     super.initState();
@@ -164,26 +160,23 @@ class _ShopBodyState extends State<_ShopBody> {
       if (mounted) _load();
     });
   }
-
   @override
   void dispose() {
     _name.dispose();
     _phone.dispose();
-    // تقویمِ این آرایشگاه فقط تا وقتی در این صفحه‌ایم اعمال می‌شود
+    // تقویمِ این کسب‌وکار فقط تا وقتی در این صفحه‌ایم اعمال می‌شود
     final s = _stRef;
     if (s != null) kCalKind = CalConv.kindOf(s.calendarKey, s.lang);
     super.dispose();
   }
-
-  /// اگر کاربر تقویم دلخواه نزده باشد، تاریخ‌ها با تقویم همین آرایشگاه نمایش داده می‌شوند
+  /// اگر کاربر تقویم دلخواه نزده باشد، تاریخ‌ها با تقویم همین کسب‌وکار نمایش داده می‌شوند
   void _applyShopCal(AppSettings st) {
     _stRef = st;
     if (st.calendarKey != 'auto') return;
     final c = bStr(_shop['calendar']);
     if (c.isNotEmpty) kCalKind = CalConv.kindOf(c, st.lang);
   }
-
-  /// ظاهر اختصاصی آرایشگاه (فقط ویژه/شخصی؛ عکس پس‌زمینه‌ی دستگاهِ صاحب‌کار اینجا معنی ندارد)
+  /// ظاهر اختصاصی (فقط ویژه/شخصی؛ عکس پس‌زمینه‌ی دستگاهِ صاحب‌کار اینجا معنی ندارد)
   AppLook? _parseTheme(Map<String, dynamic> shop) {
     final plan = bStr(shop['plan']);
     if (plan != 'special' && plan != 'personal') return null;
@@ -193,15 +186,13 @@ class _ShopBodyState extends State<_ShopBody> {
     return l.copyWith(
         bgImage: '', bgMode: l.bgMode == 'image' ? 'blobs' : l.bgMode);
   }
-
-  /// روزهای تعطیل هفتگی کل آرایشگاه (۰ = یکشنبه)
+  /// روزهای تعطیل هفتگی کل کسب‌وکار (۰ = یکشنبه)
   Set<int> _parseOff(Map<String, dynamic> shop) {
     final out = <int>{};
     void add(dynamic v) {
       final n = int.tryParse('$v'.trim());
       if (n != null && n >= 0 && n <= 6) out.add(n);
     }
-
     final l = shop['weekly_off_list'];
     if (l is List) {
       for (final e in l) {
@@ -218,9 +209,7 @@ class _ShopBodyState extends State<_ShopBody> {
     }
     return out;
   }
-
   bool _isOff(DateTime d) => _offDays.contains(d.weekday % 7);
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -240,7 +229,7 @@ class _ShopBodyState extends State<_ShopBody> {
         _winback = bRows(r['winback']);
         final ms = bInt(r['max_services'], 3);
         _maxServices = ms < 1 ? 1 : ms;
-        // بازهٔ رزرو را خود آرایشگاه تعیین می‌کند (۰ = فقط امروز)
+        // بازهٔ رزرو را خود کسب‌وکار تعیین می‌کند (۰ = فقط امروز)
         final ma = bInt(r['max_advance_days'], 30);
         _maxAdvance = ma < 0 ? 0 : (ma > 60 ? 60 : ma);
         _offDays = _parseOff(_shop);
@@ -253,7 +242,9 @@ class _ShopBodyState extends State<_ShopBody> {
             break;
           }
         }
-        if (_name.text.isEmpty) _name.text = saved.name;
+        if (_name.text.isEmpty && !_looksId(saved.name)) {
+          _name.text = saved.name;
+        }
         if (_phone.text.isEmpty) _phone.text = saved.phone;
         _loading = false;
       });
@@ -266,31 +257,26 @@ class _ShopBodyState extends State<_ShopBody> {
       });
     }
   }
-
   List<Map<String, dynamic>> _eligible(String sid) {
     return _staff.where((s) {
       final ids = bIds(s['service_ids']);
       return ids.isEmpty || ids.contains(sid);
     }).toList();
   }
-
   Map<String, dynamic> _svc(String id) => _services.firstWhere(
         (s) => bStr(s['service_id']) == id,
         orElse: () => <String, dynamic>{},
       );
-
   String _staffName(String id) {
     for (final s in _staff) {
       if (bStr(s['staff_id']) == id) return bStr(s['name']);
     }
     return id;
   }
-
   void _resetSlots() {
     _slots = null;
     _slotIdx = -1;
   }
-
   void _toggle(String id) {
     if (_picked.contains(id)) {
       setState(() {
@@ -310,7 +296,6 @@ class _ShopBodyState extends State<_ShopBody> {
       _resetSlots();
     });
   }
-
   void _setDay(DateTime d) {
     setState(() {
       _day = d;
@@ -318,7 +303,6 @@ class _ShopBodyState extends State<_ShopBody> {
     });
     if (_picked.isNotEmpty) _loadSlots();
   }
-
   Future<void> _loadSlots() async {
     final t = _tr();
     if (_picked.isEmpty) {
@@ -350,8 +334,7 @@ class _ShopBodyState extends State<_ShopBody> {
       if (mounted) setState(() => _slotsBusy = false);
     }
   }
-
-  /// یادآوری‌های محلی (۲ ساعت و ۱۰ دقیقه قبل) + «پیام اختصاصی آرایشگاه».
+  /// یادآوری‌های محلی (۲ ساعت و ۱۰ دقیقه قبل) + «پیام اختصاصی».
   /// پیام اختصاصی: یک بازهٔ مشترک برای همهٔ متن‌ها؛ اگر چند متن باشد یکی تصادفی انتخاب می‌شود.
   Future<void> _remind(Map<String, dynamic> slot, Map<String, String> choice,
       String lang) async {
@@ -390,7 +373,6 @@ class _ShopBodyState extends State<_ShopBody> {
       }
     } catch (_) {}
   }
-
   Future<void> _book() async {
     final t = _tr();
     if (_picked.isEmpty) {
@@ -405,6 +387,16 @@ class _ShopBodyState extends State<_ShopBody> {
     final name = _name.text.trim();
     if (name.isEmpty) {
       bSnack(context, t.t('cu_need_name'));
+      return;
+    }
+    if (name.length < 2 || _looksId(name)) {
+      bSnack(
+          context,
+          _x(
+              t.lang,
+              'نام واقعی خود را بنویسید (نه شماره یا کد)',
+              'Please enter your real name (not a number or code)',
+              'اكتب اسمك الحقيقي (وليس رقمًا أو رمزًا)'));
       return;
     }
     final phone = bDigits(_phone.text);
@@ -443,7 +435,6 @@ class _ShopBodyState extends State<_ShopBody> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
   String _policy(T6 t) {
     final m = bInt(_shop['cancel_before_min'], 120);
     final txt = (m >= 60 && m % 60 == 0)
@@ -451,11 +442,9 @@ class _ShopBodyState extends State<_ShopBody> {
         : t.t('cu_m', {'n': fmtNum(m, t.lang)});
     return t.t('cu_policy', {'t': txt});
   }
-
   void _openRules(String lang) {
     openShopRules(context, lang, bStr(_shop['name']), bStr(_shop['rules']));
   }
-
   /// باز کردن صفحه‌ی کسب‌وکاری که تبلیغش دیده شده
   void _openAd(Map<String, dynamic> ad) {
     final server = bStr(ad['_server']);
@@ -471,7 +460,6 @@ class _ShopBodyState extends State<_ShopBody> {
       MaterialPageRoute(builder: (_) => ShopPage(api: api, card: card)),
     );
   }
-
   /// برچسب روز: «نام روز + روز/ماه» در تقویم انتخاب‌شده
   String _dayLabel(DateTime d, T6 t) {
     final n = CalConv.numeric(bIso(d), kCalKind, t.lang);
@@ -479,13 +467,11 @@ class _ShopBodyState extends State<_ShopBody> {
     final dm = p.length == 3 ? '${p[1]}/${p[2]}' : n;
     return '${t.t('d_${d.weekday % 7}')} $dm';
   }
-
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(top: 18, bottom: 8),
         child: Text(text,
             style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
       );
-
   @override
   Widget build(BuildContext context) {
     final st0 = SettingsScope.of(context);
@@ -525,7 +511,6 @@ class _ShopBodyState extends State<_ShopBody> {
       body: body,
     );
   }
-
   Widget _header(T6 t) {
     final avg = cDouble(_shop['rating_avg']);
     final count = bInt(_shop['rating_count']);
@@ -538,6 +523,9 @@ class _ShopBodyState extends State<_ShopBody> {
     final hasRules = bStr(_shop['rules']).trim().isNotEmpty;
     final gender = bStr(_shop['gender']);
     final bizT = bizTypeByKey(bStr(_shop['biz_type']));
+    final beauty = bwBeauty(bizKeyOf(_shop));
+    final showGender = beauty && (gender == 'men' || gender == 'women');
+    final sw = bwShop(bizKeyOf(_shop), t.lang);
     return Glass(
       padding: EdgeInsets.zero,
       child: Column(
@@ -575,13 +563,11 @@ class _ShopBodyState extends State<_ShopBody> {
                       Pill(t.t('cu_new')),
                   ],
                 ),
-                if (bizT != null ||
-                    gender == 'men' ||
-                    gender == 'women') ...[
+                if (bizT != null || showGender) ...[
                   const SizedBox(height: 8),
                   Wrap(spacing: 6, runSpacing: 6, children: [
                     if (bizT != null) Pill(bizT.name(t.lang)),
-                    if (gender == 'men' || gender == 'women')
+                    if (showGender)
                       Pill(gender == 'men'
                           ? _x(t.lang, 'مردانه', 'Men', 'رجالي')
                           : _x(t.lang, 'زنانه', 'Women', 'نسائي')),
@@ -646,8 +632,8 @@ class _ShopBodyState extends State<_ShopBody> {
                               size: 18, color: lk(context).primary),
                           const SizedBox(width: 6),
                           Text(
-                            _x(t.lang, 'قوانین این آرایشگاه',
-                                'This shop’s rules', 'قوانين هذا الصالون'),
+                            _x(t.lang, 'قوانین این $sw',
+                                'This $sw’s rules', 'قوانين هذا $sw'),
                             style: TextStyle(
                                 color: lk(context).primary,
                                 fontWeight: FontWeight.w700),
@@ -664,9 +650,10 @@ class _ShopBodyState extends State<_ShopBody> {
       ),
     );
   }
-
   Widget _content(T6 t) {
     final bt = BT(t.lang);
+    final type = bizKeyOf(_shop);
+    final sw = bwShop(type, t.lang);
     final cur = bStr(_shop['currency']);
     var total = 0;
     var totalDur = 0;
@@ -735,7 +722,7 @@ class _ShopBodyState extends State<_ShopBody> {
               style: TextStyle(color: muted(context), fontSize: 12)),
         ],
         if (_picked.isNotEmpty) ...[
-          _label(t.t('m_barber')),
+          _label(bwStaff(type, t.lang)),
           for (final sid in _picked)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -849,6 +836,15 @@ class _ShopBodyState extends State<_ShopBody> {
           label: t.t('cu_your_name'),
           icon: Icons.person_rounded,
         ),
+        const SizedBox(height: 4),
+        Text(
+          _x(
+              t.lang,
+              'نام واقعی خود را بنویسید تا کسب‌وکار شما را بشناسد.',
+              'Enter your real name so the business knows who you are.',
+              'اكتب اسمك الحقيقي ليعرفك النشاط التجاري.'),
+          style: TextStyle(color: muted(context), fontSize: 12),
+        ),
         const SizedBox(height: 12),
         GlassField(
           controller: _phone,
@@ -869,9 +865,9 @@ class _ShopBodyState extends State<_ShopBody> {
               child: Text(
                 _x(
                     t.lang,
-                    'با ثبت نوبت، قوانین این آرایشگاه را می‌پذیرید. (مشاهده‌ی قوانین)',
-                    'By booking you accept this shop’s rules. (View rules)',
-                    'بالحجز توافق على قوانين هذا الصالون. (عرض القوانين)'),
+                    'با ثبت نوبت، قوانین این $sw را می‌پذیرید. (مشاهده‌ی قوانین)',
+                    'By booking you accept this $sw’s rules. (View rules)',
+                    'بالحجز توافق على قوانين هذا $sw. (عرض القوانين)'),
                 style: TextStyle(
                     color: lk(context).primary,
                     fontSize: 12.5,
@@ -913,7 +909,6 @@ class _ShopBodyState extends State<_ShopBody> {
       ],
     );
   }
-
   Widget _choiceRow(String sid, T6 t) {
     final svc = _svc(sid);
     final el = _eligible(sid);

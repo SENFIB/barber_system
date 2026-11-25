@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-
 import '../../app/brand.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import '../settings/settings_page.dart';
+
+String _x(String l, String fa, String en, String ar) =>
+    l == 'fa' ? fa : (l == 'ar' ? ar : en);
 
 class RolePage extends StatelessWidget {
   const RolePage({super.key});
@@ -14,6 +16,7 @@ class RolePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
     final s = S(st.lang);
+    final l = st.lang;
 
     Widget card({
       required IconData icon,
@@ -72,17 +75,19 @@ class RolePage extends StatelessWidget {
                 style: TextStyle(color: muted(context), fontSize: 16)),
           ),
           const SizedBox(height: 30),
-
-          // اول آرایشگاه
+          // اول کسب‌وکار
           card(
             icon: Icons.storefront_rounded,
             gradient: AppColors.gradient,
-            title: s.t('role_shop'),
-            desc: s.t('role_shop_desc'),
+            title: _x(l, 'کسب‌وکار', 'Business', 'نشاط تجاري'),
+            desc: _x(
+                l,
+                'ورود یا ثبت‌نام کسب‌وکار، مدیریت نوبت‌ها و پرسنل',
+                'Log in or sign up your business, manage bookings and staff',
+                'دخول أو تسجيل نشاطك وإدارة المواعيد والموظفين'),
             onTap: () => st.setRole('shop'),
           ),
           const SizedBox(height: 16),
-
           // زیرش مشتری
           card(
             icon: Icons.person_rounded,
@@ -92,7 +97,11 @@ class RolePage extends StatelessWidget {
               colors: [AppColors.pink, AppColors.amber],
             ),
             title: s.t('role_customer'),
-            desc: s.t('role_customer_desc'),
+            desc: _x(
+                l,
+                'جستجوی کسب‌وکار و رزرو نوبت',
+                'Find a business and book an appointment',
+                'ابحث عن نشاط واحجز موعدًا'),
             onTap: () => st.setRole('customer'),
           ),
         ],

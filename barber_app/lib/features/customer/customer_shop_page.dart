@@ -19,6 +19,7 @@ import 'customer_api.dart';
 import 'customer_store.dart';
 import 'report_sheet.dart';
 import 'shop_ads.dart';
+import 'store_page.dart';
 
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
@@ -68,6 +69,7 @@ class ShopPage extends StatefulWidget {
   const ShopPage({super.key, required this.api, required this.card});
   final CustomerApi api;
   final Map<String, dynamic> card;
+
   @override
   State<ShopPage> createState() => _ShopPageState();
 }
@@ -123,6 +125,7 @@ class _ShopBody extends StatefulWidget {
   final bool themeOn;
   final void Function(AppLook? look) onLook;
   final VoidCallback onToggle;
+
   @override
   State<_ShopBody> createState() => _ShopBodyState();
 }
@@ -695,6 +698,11 @@ class _ShopBodyState extends State<_ShopBody> {
             onPressed: widget.onToggle,
           ),
         ],
+        StoreButton(
+          store: _shop['store'],
+          plan: bStr(_shop['plan']),
+          lang: t.lang,
+        ),
         _label(t.t('cu_services')),
         if (_services.isEmpty)
           Glass(

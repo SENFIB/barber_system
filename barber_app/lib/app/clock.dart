@@ -23,7 +23,7 @@ DateTime _lastSunday(int year, int month) {
   return d;
 }
 
-/// ساعت دیواری (فقط اعداد سال/ماه/روز/ساعت/دقیقه مهم‌اند)
+/// ساعت دیواری (فقط اعداد سال/ماه/روز/ساعت/دقیقه/ثانیه مهم‌اند)
 DateTime wallNow(String lang, bool phone) {
   if (phone) return DateTime.now();
   final u = DateTime.now().toUtc();
@@ -65,6 +65,7 @@ class HeaderClock extends StatefulWidget {
   final String lang;
   final String calendar;
   final bool phone;
+
   @override
   State<HeaderClock> createState() => _HeaderClockState();
 }
@@ -75,7 +76,7 @@ class _HeaderClockState extends State<HeaderClock> {
   @override
   void initState() {
     super.initState();
-    _t = Timer.periodic(const Duration(seconds: 5), (_) {
+    _t = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
   }
@@ -91,21 +92,24 @@ class _HeaderClockState extends State<HeaderClock> {
     final lang = widget.lang;
     final now = wallNow(lang, widget.phone);
     final cal = CalFmt.kind(widget.calendar, lang);
-    final iso = '${now.year.toString().padLeft(4, '0')}-${_two(now.month)}-${_two(now.day)}';
+    final iso =
+        '${now.year.toString().padLeft(4, '0')}-${_two(now.month)}-${_two(now.day)}';
     final p = CalFmt.ymd(iso, cal, lang) ?? <int>[now.year, now.month, now.day];
     final day = localDigits(p[2], lang);
     final year = localDigits(p[0], lang);
     final month = calMonthName(cal, p[1], lang);
-    final time = localDigits('${_two(now.hour)}:${_two(now.minute)}', lang);
+    final time = localDigits(
+        '${_two(now.hour)}:${_two(now.minute)}:${_two(now.second)}', lang);
     final wd = weekdayName(lang, now.weekday);
     final red = isWeekend(lang, now.weekday);
     final base = Theme.of(context).colorScheme.onSurface.withOpacity(0.8);
     return FittedBox(
       fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerStart,
       child: Text.rich(
         TextSpan(
           style: TextStyle(
-              fontSize: 12.5, color: base, fontWeight: FontWeight.w600),
+              fontSize: 13, color: base, fontWeight: FontWeight.w600),
           children: [
             TextSpan(
               text: wd,

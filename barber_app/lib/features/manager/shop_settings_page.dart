@@ -1,8 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../app/biz_text.dart';
+import '../../app/business_types.dart';
+import '../../app/look.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s2.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
+import '../settings/appearance_page.dart';
+import 'ads_section.dart';
 import 'plans_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
@@ -11,7 +17,6 @@ import 'shop_raw.dart';
 class ShopSettingsPage extends StatefulWidget {
   const ShopSettingsPage(this.ctx, {super.key});
   final ShopCtx ctx;
-
   @override
   State<ShopSettingsPage> createState() => _ShopSettingsPageState();
 }
@@ -32,13 +37,15 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
   final _rules = TextEditingController();
   String _cal = 'jalali';
   String _plan = '';
+  String _biz = 'barber';
+  String _theme = '';
   bool _loading = true;
   bool _busy = false;
   String? _err;
 
   String get _lang => SettingsScope.read(context).lang;
 
-  /// عکس آرایشگاه فقط برای پلن ویژه و شخصی
+  /// عکس و ظاهر اختصاصی فقط برای پلن ویژه و شخصی
   bool get _photoOk => _plan == 'special' || _plan == 'personal';
 
   /// متن‌های کوچکِ همین صفحه (فارسی / انگلیسی / عربی)
@@ -101,6 +108,11 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         _cancel.text = jStr(sh['cancel_before_min']);
         _rules.text = jStr(sh['rules']);
         _plan = jStr(sh['plan']).trim().toLowerCase();
+        _theme = jStr(sh['theme']);
+        final b = jStr(sh['biz_type']).trim();
+        _biz = bizTypeByKey(b) != null
+            ? b
+            : (jStr(sh['gender']) == 'women' ? 'salon' : 'barber');
         final c = jStr(sh['calendar']);
         _cal = const ['jalali', 'gregorian', 'hijri'].contains(c) ? c : 'jalali';
         _loading = false;
@@ -154,6 +166,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         'overtime_min': ot,
         'cancel_before_min': cancel,
         'rules': _rules.text.trim(),
+        'biz_type': _biz,
       };
       // عکس فقط برای پلن ویژه/شخصی فرستاده می‌شود
       if (_photoOk) params['photo_url'] = _photo.text.trim();
@@ -167,6 +180,54 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
       toast(context, x.error(e));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// ذخیره یا حذف ظاهر اختصاصی صفحه (عکس پس‌زمینه‌ی دستگاه فرستاده نمی‌شود)
+  Future<void> _saveTheme(AppLook? look) async {
+    var value = '';
+    if (look != null) {
+      final clean = look.copyWith(
+          bgImage: '', bgMode: look.bgMode == 'image' ? 'blobs' : look.bgMode);
+      value = jsonEncode(clean.toJson());
+    }
+    await ShopRaw(SettingsScope.read(context))
+        .call('shop_update', {'theme': value});
+    if (mounted) setState(() => _theme = value);
+  }
+
+  Future<void> _editTheme() async {
+    final st = SettingsScope.read(context);
+    final bt = BT(st.lang);
+    final start = AppLook.fromJsonString(_theme.isEmpty ? null : _theme);
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AppearancePage(
+          initial: start,
+          title: bt.t('th_page_title'),
+          onSave: (look) => _saveTheme(look),
+        ),
+      ),
+    );
+    if (saved == true && mounted) toast(context, bt.t('th_saved'));
+  }
+
+  Future<void> _removeTheme() async {
+    final bt = BT(_lang);
+    final ok = await confirmDialog(
+      context,
+      title: bt.t('th_remove'),
+      message: bt.t('th_remove_q'),
+      okLabel: bt.t('ok'),
+      cancelLabel: bt.t('cancel'),
+      danger: true,
+    );
+    if (!ok) return;
+    try {
+      await _saveTheme(null);
+      if (mounted) toast(context, bt.t('th_removed'));
+    } catch (e) {
+      if (mounted) toast(context, T2(_lang).error(e));
     }
   }
 
@@ -197,6 +258,46 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
     );
   }
 
+  /// کادر قفل با دکمه‌ی پلن‌ها (برای ویژگی‌های مخصوص پلن ویژه)
+  Widget _locked(String text) {
+    final bt = BT(_lang);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: lk(context).primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: lk(context).primary.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lock_rounded, color: lk(context).primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GradientButton(
+            outlined: true,
+            compact: true,
+            icon: Icons.workspace_premium_rounded,
+            label: bt.t('plans_btn'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => PlansPage(widget.ctx)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// بخش عکس: برای ویژه/شخصی فیلد لینک؛ برای بقیه کادر قفل با دکمه‌ی پلن‌ها
   Widget _photoBlock(T2 x) {
     if (_photoOk) {
@@ -217,44 +318,84 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
         ],
       );
     }
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: lk(context).primary.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: lk(context).primary.withOpacity(0.25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.lock_rounded, color: lk(context).primary),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _px(
-                    'عکس آرایشگاه فقط برای پلن ویژه است',
-                    'Shop photo is only for the Special plan',
-                    'صورة الصالون متاحة فقط للباقة المميزة',
-                  ),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
+    return _locked(_px(
+      'عکس آرایشگاه فقط برای پلن ویژه است',
+      'Shop photo is only for the Special plan',
+      'صورة الصالون متاحة فقط للباقة المميزة',
+    ));
+  }
+
+  /// انتخاب نوع کسب‌وکار: اول گروه، بعد نوع
+  Widget _bizBlock(BT bt) {
+    final lang = _lang;
+    final cur = bizTypeByKey(_biz);
+    final grp = cur?.group ?? 'beauty';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final g in kBizGroups)
+              ChoiceChip(
+                label: Text(g.name(lang)),
+                selected: g.key == grp,
+                onSelected: (_) => setState(() {
+                  final ts = bizTypesOf(g.key);
+                  if (ts.isNotEmpty) _biz = ts.first.key;
+                }),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final t in bizTypesOf(grp))
+              ChoiceChip(
+                label: Text(t.name(lang)),
+                selected: t.key == _biz,
+                onSelected: (_) => setState(() => _biz = t.key),
+              ),
+          ],
+        ),
+        _hint(bt.t('bz_hint')),
+      ],
+    );
+  }
+
+  /// ظاهر اختصاصی صفحه (فقط پلن ویژه)
+  Widget _themeBlock(BT bt) {
+    if (!_photoOk) return _locked(bt.t('th_locked'));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(bt.t('th_hint'),
+            style:
+                TextStyle(color: muted(context), fontSize: 12.5, height: 1.6)),
+        const SizedBox(height: 8),
+        Text(_theme.isEmpty ? bt.t('th_unset') : bt.t('th_set'),
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        GradientButton(
+          compact: true,
+          icon: Icons.palette_rounded,
+          label: bt.t('th_edit'),
+          onPressed: _editTheme,
+        ),
+        if (_theme.isNotEmpty) ...[
+          const SizedBox(height: 10),
           GradientButton(
-            outlined: true,
             compact: true,
-            icon: Icons.workspace_premium_rounded,
-            label: _px('مشاهده‌ی پلن‌ها', 'View plans', 'عرض الخطط'),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => PlansPage(widget.ctx)),
-            ),
+            outlined: true,
+            icon: Icons.delete_outline_rounded,
+            label: bt.t('th_remove'),
+            onPressed: _removeTheme,
           ),
         ],
-      ),
+      ],
     );
   }
 
@@ -262,6 +403,7 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
     final x = T2(st.lang);
+    final bt = BT(st.lang);
     final unit = x.t('unit_min');
     Widget body;
     if (_loading) {
@@ -330,6 +472,10 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
               ],
             ),
           ),
+          SectionLabel(bt.t('bz_title')),
+          Glass(child: _bizBlock(bt)),
+          SectionLabel(bt.t('th_title')),
+          Glass(child: _themeBlock(bt)),
           SectionLabel(
               _px('قوانین این آرایشگاه', 'This shop’s rules', 'قوانين هذا الصالون')),
           Glass(
@@ -457,6 +603,8 @@ class _ShopSettingsPageState extends State<ShopSettingsPage> {
             loading: _busy,
             onPressed: _save,
           ),
+          const SizedBox(height: 8),
+          const AdsSection(),
         ],
       );
     }

@@ -20,7 +20,6 @@ const Map<String, Map<String, String>> _tx = {
     'reason': 'دلیل (اختیاری)',
     'ok': 'تأیید',
     'pick': 'یک روز انتخاب کن',
-    'fallback': 'تقویم انتخابی در دسترس نیست؛ میلادی نشان داده می‌شود',
   },
   'en': {
     'title': 'Choose closure dates',
@@ -30,7 +29,6 @@ const Map<String, Map<String, String>> _tx = {
     'reason': 'Reason (optional)',
     'ok': 'Confirm',
     'pick': 'Pick a day',
-    'fallback': 'The selected calendar is not available; showing Gregorian',
   },
   'ar': {
     'title': 'اختيار فترة الإغلاق',
@@ -40,7 +38,6 @@ const Map<String, Map<String, String>> _tx = {
     'reason': 'السبب (اختياري)',
     'ok': 'تأكيد',
     'pick': 'اختر يومًا',
-    'fallback': 'التقويم المختار غير متاح؛ يُعرض الميلادي',
   },
 };
 
@@ -51,9 +48,105 @@ const Map<String, List<String>> _wdNames = {
   'ar': ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'],
 };
 
+// ---------------------------------------------------------------------------
+// تبدیل تقویم‌ها (محلی، بدون سرور)
+// ---------------------------------------------------------------------------
+int _tm(int a, int b) => a - (a ~/ b) * b;
+
+int _g2jdn(int y, int m, int d) {
+  final a = (14 - m) ~/ 12;
+  final yy = y + 4800 - a;
+  final mm = m + 12 * a - 3;
+  return d +
+      (153 * mm + 2) ~/ 5 +
+      365 * yy +
+      yy ~/ 4 -
+      yy ~/ 100 +
+      yy ~/ 400 -
+      32045;
+}
+
+List<int> _jdn2g(int jdn) {
+  final a = jdn + 32044;
+  final b = (4 * a + 3) ~/ 146097;
+  final c = a - (146097 * b) ~/ 4;
+  final d = (4 * c + 3) ~/ 1461;
+  final e = c - (1461 * d) ~/ 4;
+  final m = (5 * e + 2) ~/ 153;
+  return [
+    100 * b + d - 4800 + m ~/ 10,
+    m + 3 - 12 * (m ~/ 10),
+    e - (153 * m + 2) ~/ 5 + 1,
+  ];
+}
+
+const List<int> _jBreaks = [
+  -61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097,
+  2192, 2262, 2324, 2394, 2456, 3178
+];
+
+/// [leap, gy, march]
+List<int> _jalCal(int jy) {
+  final gy = jy + 621;
+  var leapJ = -14;
+  var jp = _jBreaks[0];
+  var jump = 0;
+  for (var i = 1; i < _jBreaks.length; i++) {
+    final jm = _jBreaks[i];
+    jump = jm - jp;
+    if (jy < jm) break;
+    leapJ += (jump ~/ 33) * 8 + _tm(jump, 33) ~/ 4;
+    jp = jm;
+  }
+  var n = jy - jp;
+  leapJ += (n ~/ 33) * 8 + (_tm(n, 33) + 3) ~/ 4;
+  if (_tm(jump, 33) == 4 && jump - n == 4) leapJ += 1;
+  final leapG = gy ~/ 4 - ((gy ~/ 100 + 1) * 3) ~/ 4 - 150;
+  final march = 20 + leapJ - leapG;
+  if (jump - n < 6) n = n - jump + ((jump + 4) ~/ 33) * 33;
+  var leap = _tm(_tm(n + 1, 33) - 1, 4);
+  if (leap == -1) leap = 4;
+  return [leap, gy, march];
+}
+
+int _j2jdn(int jy, int jm, int jd) {
+  final r = _jalCal(jy);
+  return _g2jdn(r[1], 3, r[2]) + (jm - 1) * 31 - (jm ~/ 7) * (jm - 7) + jd - 1;
+}
+
+List<int> _jdn2j(int jdn) {
+  final gy = _jdn2g(jdn)[0];
+  var jy = gy - 621;
+  final r = _jalCal(jy);
+  final jdn1f = _g2jdn(gy, 3, r[2]);
+  var k = jdn - jdn1f;
+  if (k >= 0) {
+    if (k <= 185) return [jy, 1 + k ~/ 31, k % 31 + 1];
+    k -= 186;
+  } else {
+    jy -= 1;
+    k += 179;
+    if (r[0] == 1) k += 1;
+  }
+  return [jy, 7 + k ~/ 30, k % 30 + 1];
+}
+
+int _h2jdn(int y, int m, int d) =>
+    d + (29.5 * (m - 1)).ceil() + (y - 1) * 354 + (3 + 11 * y) ~/ 30 + 1948439;
+
+List<int> _jdn2h(int jdn) {
+  final y = (30 * (jdn - 1948440) + 10646) ~/ 10631;
+  var m = ((jdn - (29 + _h2jdn(y, 1, 1))) / 29.5).ceil() + 1;
+  if (m > 12) m = 12;
+  final d = jdn - _h2jdn(y, m, 1) + 1;
+  return [y, m, d];
+}
+
 class ClosurePickerPage extends StatefulWidget {
-  const ClosurePickerPage({super.key, required this.settings, required this.calendar});
+  const ClosurePickerPage(
+      {super.key, required this.settings, required this.calendar});
   final AppSettings settings;
+  // نگه داشته شده برای سازگاری؛ تقویم از تنظیمات برنامه خوانده می‌شود
   final String calendar;
 
   @override
@@ -63,7 +156,6 @@ class ClosurePickerPage extends StatefulWidget {
 class _ClosurePickerPageState extends State<ClosurePickerPage> {
   late String _cal;
   int _off = 0;
-  bool _loading = true;
   int _y = 0;
   int _m = 1;
   List<String> _days = <String>[];
@@ -72,7 +164,6 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
   String? _b;
   String _aLabel = '';
   String _bLabel = '';
-  bool _fallback = false;
   final _reason = TextEditingController();
 
   AppSettings get _st => widget.settings;
@@ -82,8 +173,8 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
   @override
   void initState() {
     super.initState();
-    _cal = widget.calendar;
-    _load();
+    _cal = _resolveCal();
+    _build();
   }
 
   @override
@@ -92,61 +183,53 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
     super.dispose();
   }
 
+  String _resolveCal() {
+    final k = _st.calendarKey;
+    if (k == 'jalali' || k == 'gregorian' || k == 'hijri') return k;
+    return _lang == 'fa' ? 'jalali' : (_lang == 'ar' ? 'hijri' : 'gregorian');
+  }
+
   String _iso(int y, int m, int d) =>
       '${y.toString().padLeft(4, '0')}-${m.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
 
-  void _loadLocal() {
+  String _isoJdn(int jdn) {
+    final g = _jdn2g(jdn);
+    return _iso(g[0], g[1], g[2]);
+  }
+
+  List<int> _fromJdn(int jdn) {
+    if (_cal == 'jalali') return _jdn2j(jdn);
+    if (_cal == 'hijri') return _jdn2h(jdn);
+    return _jdn2g(jdn);
+  }
+
+  int _toJdn(int y, int m, int d) {
+    if (_cal == 'jalali') return _j2jdn(y, m, d);
+    if (_cal == 'hijri') return _h2jdn(y, m, d);
+    return _g2jdn(y, m, d);
+  }
+
+  void _build() {
     final now = DateTime.now();
-    final base = DateTime(now.year, now.month + _off, 1);
-    final n = DateTime(base.year, base.month + 1, 0).day;
-    _y = base.year;
-    _m = base.month;
-    _days = [for (var i = 1; i <= n; i++) _iso(base.year, base.month, i)];
+    final t = _fromJdn(_g2jdn(now.year, now.month, now.day));
+    final idx = t[0] * 12 + (t[1] - 1) + _off;
+    final y = idx ~/ 12;
+    final m = idx % 12 + 1;
+    final start = _toJdn(y, m, 1);
+    final ny = m == 12 ? y + 1 : y;
+    final nm = m == 12 ? 1 : m + 1;
+    final n = _toJdn(ny, nm, 1) - start;
+    _y = y;
+    _m = m;
+    _days = [for (var i = 0; i < n; i++) _isoJdn(start + i)];
     _today = _iso(now.year, now.month, now.day);
   }
 
-  /// true = موفق
-  Future<bool> _load() async {
-    setState(() => _loading = true);
-    var ok = true;
-    try {
-      if (_cal == 'gregorian') {
-        _loadLocal();
-      } else {
-        final d = await extraPublic(_st.apiUrl, 'cal_month', {'calendar': _cal, 'offset': _off});
-        final days = d['days'];
-        if (days is! List || days.isEmpty) throw ExtraError('CAL_UNAVAILABLE', '');
-        _days = [for (final x in days) '$x'];
-        _y = (d['year'] as num).toInt();
-        _m = (d['month'] as num).toInt();
-        _today = '${d['today']}';
-      }
-    } on ExtraError catch (e) {
-      if (e.code == 'CAL_UNAVAILABLE' || e.code == 'UNKNOWN_ACTION') {
-        _cal = 'gregorian';
-        _fallback = true;
-        _a = null;
-        _b = null;
-        _loadLocal();
-      } else {
-        ok = false;
-        if (mounted) toast(context, extraErrorText(e, _lang));
-      }
-    } catch (_) {
-      ok = false;
-    }
-    if (mounted) setState(() => _loading = false);
-    return ok;
-  }
-
-  Future<void> _go(int delta) async {
-    final old = _off;
-    _off += delta;
-    final ok = await _load();
-    if (!ok) {
-      _off = old;
-      if (mounted) setState(() {});
-    }
+  void _go(int delta) {
+    setState(() {
+      _off += delta;
+      _build();
+    });
   }
 
   String _label(int day) =>
@@ -177,7 +260,8 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
       toast(context, _t('pick'));
       return;
     }
-    Navigator.of(context).pop(ClosureResult(_a!, _b ?? _a!, _reason.text.trim()));
+    Navigator.of(context)
+        .pop(ClosureResult(_a!, _b ?? _a!, _reason.text.trim()));
   }
 
   Widget _cell(BuildContext context, int day, String iso) {
@@ -207,10 +291,12 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
         onTap: past ? null : () => _tap(iso, day),
         child: Container(
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+          decoration:
+              BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
           child: Text(
             localDigits(day, _lang),
-            style: TextStyle(color: fg, fontWeight: sel ? FontWeight.bold : null),
+            style:
+                TextStyle(color: fg, fontWeight: sel ? FontWeight.bold : null),
           ),
         ),
       ),
@@ -227,7 +313,8 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
         for (final w in order)
           Expanded(
             child: Center(
-              child: Text(names[w], style: TextStyle(color: muted(context), fontSize: 12)),
+              child: Text(names[w],
+                  style: TextStyle(color: muted(context), fontSize: 12)),
             ),
           ),
       ],
@@ -269,10 +356,6 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           Text(_t('hint'), style: TextStyle(color: muted(context))),
-          if (_fallback) ...[
-            const SizedBox(height: 6),
-            Text(_t('fallback'), style: const TextStyle(color: Colors.orange)),
-          ],
           const SizedBox(height: 12),
           Glass(
             padding: const EdgeInsets.all(12),
@@ -282,7 +365,7 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.chevron_left),
-                      onPressed: (_off <= 0 || _loading) ? null : () => _go(-1),
+                      onPressed: _off <= 0 ? null : () => _go(-1),
                     ),
                     Expanded(
                       child: Center(
@@ -292,18 +375,12 @@ class _ClosurePickerPageState extends State<ClosurePickerPage> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.chevron_right),
-                      onPressed: (_off >= 24 || _loading) ? null : () => _go(1),
+                      onPressed: _off >= 24 ? null : () => _go(1),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.all(30),
-                    child: CircularProgressIndicator(),
-                  )
-                else
-                  _grid(context),
+                _grid(context),
               ],
             ),
           ),

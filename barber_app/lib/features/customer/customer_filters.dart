@@ -27,6 +27,7 @@ class SearchFilters {
     this.group = '',
     this.type = '',
   });
+
   SearchFilters copy() => SearchFilters(
       q: q,
       city: city,
@@ -249,6 +250,7 @@ const Map<String, Map<String, String>> _tx = {
   },
 };
 
+/// نوار فیلتر: دسته (group) از قبل انتخاب شده و اینجا عوض نمی‌شود
 class SearchFilterBar extends StatelessWidget {
   const SearchFilterBar({
     super.key,
@@ -369,23 +371,7 @@ class SearchFilterBar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DropdownButtonFormField<String>(
-          value: group,
-          isExpanded: true,
-          decoration: _dec(bt.t('f_group')),
-          items: [
-            DropdownMenuItem<String>(
-                value: '',
-                child: _iconText(Icons.apps_rounded, bt.t('f_all'))),
-            for (final g in kBizGroups)
-              DropdownMenuItem<String>(
-                  value: g.key,
-                  child: _iconText(bizGroupIcon(g.key), g.name(lang))),
-          ],
-          onChanged: (v) => _set(group: v ?? ''),
-        ),
         if (group.isNotEmpty) ...[
-          const SizedBox(height: 10),
           DropdownButtonFormField<String>(
             value: typeValue,
             isExpanded: true,
@@ -400,8 +386,8 @@ class SearchFilterBar extends StatelessWidget {
             ],
             onChanged: (v) => _set(type: v ?? ''),
           ),
+          const SizedBox(height: 10),
         ],
-        const SizedBox(height: 10),
         DropdownButtonFormField<String>(
           value: catValue,
           isExpanded: true,

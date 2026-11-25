@@ -13,6 +13,7 @@ import '../legal/privacy_gate.dart';
 import '../manager/booking_common.dart';
 import 'customer_api.dart';
 import 'customer_store.dart';
+import 'report_sheet.dart';
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
 class ShopPhoto extends StatelessWidget {
@@ -69,6 +70,7 @@ class _ShopPageState extends State<ShopPage> {
   List<Map<String, dynamic>> _winback = <Map<String, dynamic>>[];
   int _maxServices = 3;
   int _maxAdvance = 30;
+  Set<int> _offDays = <int>{};
   final List<String> _picked = <String>[];
   final Map<String, String> _choice = <String, String>{};
   late DateTime _day;
@@ -105,6 +107,30 @@ class _ShopPageState extends State<ShopPage> {
     final c = bStr(_shop['calendar']);
     if (c.isNotEmpty) kCalKind = CalConv.kindOf(c, st.lang);
   }
+  /// روزهای تعطیل هفتگی کل آرایشگاه (۰ = یکشنبه)
+  Set<int> _parseOff(Map<String, dynamic> shop) {
+    final out = <int>{};
+    void add(dynamic v) {
+      final n = int.tryParse('$v'.trim());
+      if (n != null && n >= 0 && n <= 6) out.add(n);
+    }
+    final l = shop['weekly_off_list'];
+    if (l is List) {
+      for (final e in l) {
+        add(e);
+      }
+    }
+    if (out.isEmpty) {
+      final raw = bStr(shop['weekly_off']);
+      if (raw.isNotEmpty) {
+        for (final p in raw.split(RegExp(r'[|,]'))) {
+          add(p);
+        }
+      }
+    }
+    return out;
+  }
+  bool _isOff(DateTime d) => _offDays.contains(d.weekday % 7);
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -124,8 +150,19 @@ class _ShopPageState extends State<ShopPage> {
         _winback = bRows(r['winback']);
         final ms = bInt(r['max_services'], 3);
         _maxServices = ms < 1 ? 1 : ms;
+        // بازهٔ رزرو را خود آرایشگاه تعیین می‌کند (۰ = فقط امروز)
         final ma = bInt(r['max_advance_days'], 30);
-        _maxAdvance = ma < 1 ? 30 : (ma > 60 ? 60 : ma);
+        _maxAdvance = ma < 0 ? 0 : (ma > 60 ? 60 : ma);
+        _offDays = _parseOff(_shop);
+        // اگر امروز تعطیل است، اولین روز باز را انتخاب کن
+        final n = DateTime.now();
+        for (var i = 0; i <= _maxAdvance; i++) {
+          final d = DateTime(n.year, n.month, n.day + i);
+          if (!_isOff(d)) {
+            _day = d;
+            break;
+          }
+        }
         if (_name.text.isEmpty) _name.text = saved.name;
         if (_phone.text.isEmpty) _phone.text = saved.phone;
         _loading = false;
@@ -377,6 +414,7 @@ class _ShopPageState extends State<ShopPage> {
         .join(sep);
     final desc = bStr(_shop['description']);
     final hasRules = bStr(_shop['rules']).trim().isNotEmpty;
+    final gender = bStr(_shop['gender']);
     return Glass(
       padding: EdgeInsets.zero,
       child: Column(
@@ -414,6 +452,14 @@ class _ShopPageState extends State<ShopPage> {
                       Pill(t.t('cu_new')),
                   ],
                 ),
+                if (gender == 'men' || gender == 'women') ...[
+                  const SizedBox(height: 8),
+                  Wrap(children: [
+                    Pill(gender == 'men'
+                        ? _x(t.lang, 'مردانه', 'Men', 'رجالي')
+                        : _x(t.lang, 'زنانه', 'Women', 'نسائي')),
+                  ]),
+                ],
                 if (address.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Row(
@@ -504,7 +550,8 @@ class _ShopPageState extends State<ShopPage> {
     final now = DateTime.now();
     final days = <DateTime>[
       for (var i = 0; i <= _maxAdvance; i++)
-        DateTime(now.year, now.month, now.day + i),
+        if (!_isOff(DateTime(now.year, now.month, now.day + i)))
+          DateTime(now.year, now.month, now.day + i),
     ];
     final hasRules = bStr(_shop['rules']).trim().isNotEmpty;
     return ListView(
@@ -563,22 +610,28 @@ class _ShopPageState extends State<ShopPage> {
           ),
         ],
         _label(t.t('m_date')),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final d in days)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 8),
-                  child: ChoiceChip(
-                    label: Text(_dayLabel(d, t)),
-                    selected: bIso(d) == bIso(_day),
-                    onSelected: (_) => _setDay(d),
+        if (days.isEmpty)
+          Glass(
+            child: Text(t.t('m_no_slots'),
+                style: TextStyle(color: muted(context))),
+          )
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final d in days)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: ChoiceChip(
+                      label: Text(_dayLabel(d, t)),
+                      selected: bIso(d) == bIso(_day),
+                      onSelected: (_) => _setDay(d),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
         const SizedBox(height: 4),
         Text(localDigits(bIso(_day), t.lang),
             textDirection: TextDirection.ltr,
@@ -690,6 +743,17 @@ class _ShopPageState extends State<ShopPage> {
           onPressed: () {
             if (!_busy) _book();
           },
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: ReportButton(
+            st: widget.api.st,
+            shopId: _shopId,
+            shopName: bStr(_shop['name']),
+            plan: bStr(_shop['plan']),
+            city: bStr(_shop['city']),
+            server: bStr(widget.card['_server']),
+          ),
         ),
       ],
     );

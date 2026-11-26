@@ -7,6 +7,7 @@ import '../../app/servers.dart';
 import '../../app/settings.dart';
 import '../../app/widgets.dart';
 import 'activation_code.dart';
+import 'server_code.dart';
 
 class MoveError implements Exception {
   final String code;
@@ -79,6 +80,7 @@ class PlanMover {
     final oldUrl = st.apiUrl;
     final token = st.shopToken ?? '';
     final dev = st.deviceId;
+
     if (oldUrl == targetUrl) {
       await _post(oldUrl, {
         'action': 'renew',
@@ -88,6 +90,7 @@ class PlanMover {
       });
       return MoveResult(0, 0);
     }
+
     final bundle = await _post(oldUrl, {
       'action': 'transfer_export',
       'token': token,
@@ -130,17 +133,20 @@ const Map<String, Map<String, String>> _tx = {
     'special': 'ویژه',
     'personal': 'شخصی',
     'license': 'لایسنس پلن جدید',
-    'code': 'کد فعال‌سازی',
-    'hint': 'کد فعال‌سازی را همان‌طور که دریافت کرده‌اید (یک رشته‌ی کامل) اینجا بچسبانید.',
+    'code': 'کد لایسنس',
+    'exec': 'لینک اتصال (exec)',
+    'hint':
+        'کد لایسنس و لینک exec را که از توسعه‌دهنده گرفته‌اید در دو کادر جدا وارد کنید.',
     'go': 'انتقال و تغییر پلن',
     'confirm': 'کسب‌وکار به پلن جدید منتقل می‌شود. ادامه می‌دهید؟',
     'yes': 'ادامه',
     'no': 'انصراف',
     'done': 'پلن تغییر کرد ✅',
     'trim': 'پرسنل کم‌شده: {a} | شیفت کوتاه‌شده: {b}',
-    'bad_code': 'کد واردشده درست نیست',
+    'bad_code': 'کد یا لینک واردشده درست نیست',
     'need_license': 'کد را وارد کنید',
-    'need_code': 'کد فعال‌سازی کامل نیست',
+    'need_code': 'لینک exec را وارد کنید',
+    'need_exec': 'لینک exec را وارد کنید',
     'LICENSE_INVALID': 'لایسنس معتبر نیست یا قبلاً استفاده شده است',
     'PLAN_MISMATCH': 'این لایسنس برای پلن دیگری است',
     'USERNAME_TAKEN': 'این نام کاربری روی پلن جدید گرفته شده است',
@@ -165,17 +171,20 @@ const Map<String, Map<String, String>> _tx = {
     'special': 'Special',
     'personal': 'Personal',
     'license': 'License of the new plan',
-    'code': 'Activation code',
-    'hint': 'Paste the activation code exactly as you received it (one full string).',
+    'code': 'License code',
+    'exec': 'Link (exec)',
+    'hint':
+        'Enter the license code and the exec link you received from the developer in the two separate boxes.',
     'go': 'Move and change plan',
     'confirm': 'Your business will be moved to the new plan. Continue?',
     'yes': 'Continue',
     'no': 'Cancel',
     'done': 'Plan changed ✅',
     'trim': 'Staff reduced: {a} | Shifts shortened: {b}',
-    'bad_code': 'The code is not valid',
+    'bad_code': 'The code or link is not valid',
     'need_license': 'Enter the code',
-    'need_code': 'The activation code is incomplete',
+    'need_code': 'Enter the exec link',
+    'need_exec': 'Enter the exec link',
     'LICENSE_INVALID': 'The license is invalid or already used',
     'PLAN_MISMATCH': 'This license belongs to another plan',
     'USERNAME_TAKEN': 'This username is already taken on the new plan',
@@ -200,17 +209,20 @@ const Map<String, Map<String, String>> _tx = {
     'special': 'المميزة',
     'personal': 'الشخصية',
     'license': 'ترخيص الخطة الجديدة',
-    'code': 'رمز التفعيل',
-    'hint': 'الصق رمز التفعيل كما استلمته تمامًا (سطر واحد كامل).',
+    'code': 'رمز الترخيص',
+    'exec': 'رابط الاتصال (exec)',
+    'hint':
+        'أدخل رمز الترخيص ورابط exec اللذين استلمتهما من المطوّر في الحقلين المنفصلين.',
     'go': 'نقل وتغيير الخطة',
     'confirm': 'سيتم نقل النشاط التجاري إلى الخطة الجديدة. هل تتابع؟',
     'yes': 'متابعة',
     'no': 'إلغاء',
     'done': 'تم تغيير الخطة ✅',
     'trim': 'موظفون تم تقليلهم: {a} | ورديات تم تقصيرها: {b}',
-    'bad_code': 'الرمز المُدخل غير صحيح',
+    'bad_code': 'الرمز أو الرابط المُدخل غير صحيح',
     'need_license': 'أدخل الرمز',
-    'need_code': 'رمز التفعيل غير مكتمل',
+    'need_code': 'أدخل رابط exec',
+    'need_exec': 'أدخل رابط exec',
     'LICENSE_INVALID': 'الترخيص غير صالح أو مستخدم سابقًا',
     'PLAN_MISMATCH': 'هذا الترخيص لخطة أخرى',
     'USERNAME_TAKEN': 'اسم المستخدم هذا مأخوذ في الخطة الجديدة',
@@ -225,31 +237,51 @@ const Map<String, Map<String, String>> _tx = {
   },
 };
 
+/// متن‌های صفحه‌ی انتقال (برای صفحه‌های دیگر هم قابل استفاده است)
+String moveMsg(String lang, String key) {
+  final m = _tx[lang] ?? _tx['fa']!;
+  return m[key] ?? _tx['fa']![key] ?? m['other'] ?? key;
+}
+
+/// بعد از انتقال موفق: بخش کسب‌وکار از نو ساخته می‌شود تا سرور جدید برداشته شود
+Future<void> restartAfterMove(AppSettings st, NavigatorState nav) async {
+  nav.popUntil((route) => route.isFirst);
+  await st.setRole(null);
+  await Future<void>.delayed(const Duration(milliseconds: 250));
+  await st.setRole('shop');
+}
+
 class PlanMovePage extends StatefulWidget {
   final AppSettings settings;
   const PlanMovePage({super.key, required this.settings});
+
   @override
   State<PlanMovePage> createState() => _PlanMovePageState();
 }
 
 class _PlanMovePageState extends State<PlanMovePage> {
   final _lic = TextEditingController();
+  final _exec = TextEditingController();
   String _plan = 'pro';
   bool _busy = false;
+
   AppSettings get _st => widget.settings;
-  String _t(String k) {
-    final m = _tx[_st.lang] ?? _tx['fa']!;
-    return m[k] ?? _tx['fa']![k] ?? k;
-  }
+
+  String _t(String k) => moveMsg(_st.lang, k);
+
   @override
   void dispose() {
     _lic.dispose();
+    _exec.dispose();
     super.dispose();
   }
+
   void _snack(String s) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s)));
   }
+
   bool get _needsCode => _plan == 'special' || _plan == 'personal';
+
   Future<void> _go() async {
     if (_busy) return;
     final raw = _lic.text.trim();
@@ -270,46 +302,47 @@ class _PlanMovePageState extends State<PlanMovePage> {
         return;
       }
       lic = p.license;
-      final u = p.url;
-      if (u != null) {
-        target = u;
-      } else if (_st.hasCustomApiUrl) {
-        target = _st.apiUrl;
-      } else {
-        _snack(_t('need_code'));
+      final u = p.url ?? normalizeServerCode(_exec.text);
+      if (u == null) {
+        _snack(_exec.text.trim().isEmpty ? _t('need_exec') : _t('bad_code'));
         return;
       }
+      target = u;
     }
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         content: Text(_t('confirm')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(_t('no'))),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: Text(_t('yes'))),
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: Text(_t('no'))),
+          TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(_t('yes'))),
         ],
       ),
     );
     if (ok != true || !mounted) return;
+
     setState(() => _busy = true);
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final r = await PlanMover.move(st: _st, targetUrl: target, license: lic, plan: _plan);
+      final r = await PlanMover.move(
+          st: _st, targetUrl: target, license: lic, plan: _plan);
       var msg = _t('done');
       if (r.trimmedStaff > 0 || r.trimmedShifts > 0) {
-        msg += '\n${_t('trim').replaceAll('{a}', '${r.trimmedStaff}').replaceAll('{b}', '${r.trimmedShifts}')}';
+        msg +=
+            '\n${_t('trim').replaceAll('{a}', '${r.trimmedStaff}').replaceAll('{b}', '${r.trimmedShifts}')}';
       }
       messenger.showSnackBar(SnackBar(content: Text(msg)));
-      nav.popUntil((route) => route.isFirst);
-      await _st.setRole(null);
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      await _st.setRole('shop');
+      await restartAfterMove(_st, nav);
     } on MoveError catch (e) {
-      final m = _tx[_st.lang] ?? _tx['fa']!;
       if (mounted) {
         setState(() => _busy = false);
-        _snack(m[e.code] ?? _t('other'));
+        _snack(_t(e.code));
       }
     } catch (_) {
       if (mounted) {
@@ -318,6 +351,7 @@ class _PlanMovePageState extends State<PlanMovePage> {
       }
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final plans = ['basic', 'pro', 'special', 'personal'];
@@ -353,6 +387,13 @@ class _PlanMovePageState extends State<PlanMovePage> {
               ltr: true,
             ),
             if (_needsCode) ...[
+              const SizedBox(height: 12),
+              GlassField(
+                controller: _exec,
+                label: _t('exec'),
+                icon: Icons.link_rounded,
+                ltr: true,
+              ),
               const SizedBox(height: 6),
               Text(_t('hint'), style: Theme.of(context).textTheme.bodySmall),
             ],

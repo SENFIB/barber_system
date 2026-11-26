@@ -10,14 +10,19 @@ import '../../app/widgets.dart';
 import 'service_presets_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
+
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
+
 class ServicesPage extends StatefulWidget {
   const ServicesPage({super.key, required this.ctx});
+
   final ShopCtx ctx;
+
   @override
   State<ServicesPage> createState() => _ServicesPageState();
 }
+
 class _ServicesPageState extends State<ServicesPage> {
   bool _loading = true;
   bool _busy = false;
@@ -25,19 +30,23 @@ class _ServicesPageState extends State<ServicesPage> {
   List<Map<String, dynamic>> _list = [];
   late BizPanel _panel;
   String _cur = '';
+
   M get _m => M(SettingsScope.read(context).lang);
+
   @override
   void initState() {
     super.initState();
     _panel = BizPanel.of(widget.ctx.session.shop.bizType);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
+
   bool _lost(ApiException e) => const {
         'UNAUTHORIZED',
         'DEVICE_MISMATCH',
         'SUBSCRIPTION_EXPIRED',
         'SHOP_DEACTIVATED',
       }.contains(e.code);
+
   Future<void> _loadMe(ShopRaw raw) async {
     try {
       final me = await raw.call('me');
@@ -50,6 +59,7 @@ class _ServicesPageState extends State<ServicesPage> {
       }
     } catch (_) {}
   }
+
   Future<void> _load() async {
     final raw = ShopRaw(SettingsScope.read(context));
     setState(() {
@@ -78,6 +88,7 @@ class _ServicesPageState extends State<ServicesPage> {
       });
     }
   }
+
   Future<void> _act(Future<void> Function() fn, String okMsg) async {
     final m = _m;
     setState(() => _busy = true);
@@ -99,6 +110,7 @@ class _ServicesPageState extends State<ServicesPage> {
       await _load();
     }
   }
+
   Future<void> _presets() async {
     final st = SettingsScope.read(context);
     final ok = await Navigator.of(context).push<bool>(
@@ -106,6 +118,7 @@ class _ServicesPageState extends State<ServicesPage> {
     );
     if (ok == true && mounted) await _load();
   }
+
   Future<void> _edit([Map<String, dynamic>? ex]) async {
     final m = _m;
     final lang = SettingsScope.read(context).lang;
@@ -136,6 +149,7 @@ class _ServicesPageState extends State<ServicesPage> {
       m.t('svc_saved'),
     );
   }
+
   Future<void> _remove(String id) async {
     final m = _m;
     final ok = await confirmDialog(
@@ -149,10 +163,12 @@ class _ServicesPageState extends State<ServicesPage> {
     if (!ok) return;
     await _act(() => widget.ctx.api.serviceRemove(id), m.t('svc_removed'));
   }
+
   List<String> _ids(dynamic v) {
     if (v is List) return v.map((e) => '$e').toList();
     return const [];
   }
+
   Widget _card(Map<String, dynamic> sv, M m, String lang) {
     final id = '${sv['service_id'] ?? ''}';
     final name = '${sv['name'] ?? ''}';
@@ -212,6 +228,7 @@ class _ServicesPageState extends State<ServicesPage> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final lang = SettingsScope.of(context).lang;
@@ -273,7 +290,7 @@ class _ServicesPageState extends State<ServicesPage> {
       );
     }
     return GlassScaffold(
-      title: m.t('svc_title'),
+      title: _x(lang, 'خدمات', 'Services', 'الخدمات'),
       floatingActionButton: !_loading && _err == null
           ? FloatingActionButton.extended(
               onPressed: _busy ? null : () => _edit(),
@@ -287,13 +304,16 @@ class _ServicesPageState extends State<ServicesPage> {
     );
   }
 }
+
 class _SvcResult {
   const _SvcResult(this.name, this.duration, this.price, this.combinable);
+
   final String name;
   final int duration;
   final int price;
   final List<String> combinable;
 }
+
 class _ServiceDialog extends StatefulWidget {
   const _ServiceDialog({
     required this.m,
@@ -303,15 +323,18 @@ class _ServiceDialog extends StatefulWidget {
     required this.others,
     this.existing,
   });
+
   final M m;
   final String lang;
   final String cur;
   final IconData icon;
   final List<Map<String, dynamic>> others;
   final Map<String, dynamic>? existing;
+
   @override
   State<_ServiceDialog> createState() => _ServiceDialogState();
 }
+
 class _ServiceDialogState extends State<_ServiceDialog> {
   late final TextEditingController _name =
       TextEditingController(text: '${widget.existing?['name'] ?? ''}');
@@ -326,6 +349,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
         : '${parsePrice(widget.existing!['price'])}',
   );
   final Set<String> _comb = {};
+
   @override
   void initState() {
     super.initState();
@@ -337,6 +361,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
       }
     }
   }
+
   @override
   void dispose() {
     _name.dispose();
@@ -344,6 +369,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
     _price.dispose();
     super.dispose();
   }
+
   void _ok() {
     final m = widget.m;
     if (_name.text.trim().length < 2) {
@@ -360,6 +386,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
       _SvcResult(_name.text.trim(), d, _price.number ?? 0, _comb.toList()),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final m = widget.m;

@@ -12,9 +12,18 @@ import 'shop_raw.dart';
 import 'shop_settings_page.dart';
 import 'staff_edit_page.dart';
 
+class _NewStaff {
+  const _NewStaff(this.name, this.role, this.serves);
+  final String name;
+  final String role;
+  final bool serves;
+}
+
 class StaffPage extends StatefulWidget {
   const StaffPage(this.ctx, {super.key});
+
   final ShopCtx ctx;
+
   @override
   State<StaffPage> createState() => _StaffPageState();
 }
@@ -57,8 +66,10 @@ class _StaffPageState extends State<StaffPage> {
     }
     try {
       final raw = _raw;
-      final me = await raw.call('me');
-      final d = await raw.call('staff_list');
+      final meF = raw.call('me');
+      final listF = raw.call('staff_list');
+      final me = await meF;
+      final d = await listF;
       if (!mounted) return;
       final sh = me['shop'];
       setState(() {
@@ -113,48 +124,119 @@ class _StaffPageState extends State<StaffPage> {
   Future<void> _add() async {
     final x = T6(_lang);
     final lang = _lang;
-    final c = TextEditingController();
-    final name = await showDialog<String>(
+    final nameC = TextEditingController();
+    final otherC = TextEditingController();
+    final res = await showDialog<_NewStaff>(
       context: context,
-      builder: (dc) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: Text(_panel.addStaff(lang)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_panel.addHint(lang),
-                style: TextStyle(color: muted(dc), fontSize: 13, height: 1.6)),
-            const SizedBox(height: 14),
-            TextField(
-              controller: c,
-              autofocus: true,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (v) => Navigator.pop(dc, v.trim()),
-              decoration: InputDecoration(labelText: _panel.staffName(lang)),
+      builder: (dc) {
+        var pick = 'main';
+        return StatefulBuilder(builder: (dc2, setD) {
+          void submit() {
+            final n = nameC.text.trim();
+            if (n.isEmpty) return;
+            var role = '';
+            var serves = true;
+            if (pick.startsWith('s:')) {
+              for (final r in kSupportRoles) {
+                if ('s:${r.key}' == pick) {
+                  role = r.name(lang);
+                  serves = false;
+                }
+              }
+            } else if (pick == 'other') {
+              role = otherC.text.trim();
+            }
+            Navigator.pop(dc2, _NewStaff(n, role, serves));
+          }
+
+          return AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+            title: Text(_panel.addStaff(lang)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_panel.addHint(lang),
+                      style: TextStyle(
+                          color: muted(dc2), fontSize: 13, height: 1.6)),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: nameC,
+                    autofocus: true,
+                    textInputAction: pick == 'other'
+                        ? TextInputAction.next
+                        : TextInputAction.done,
+                    onSubmitted: (_) {
+                      if (pick != 'other') submit();
+                    },
+                    decoration:
+                        InputDecoration(labelText: _panel.staffName(lang)),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(_panel.roleLabel(lang),
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: Text(_panel.noun(lang)),
+                        selected: pick == 'main',
+                        onSelected: (_) => setD(() => pick = 'main'),
+                      ),
+                      for (final r in kSupportRoles)
+                        ChoiceChip(
+                          label: Text(r.name(lang)),
+                          selected: pick == 's:${r.key}',
+                          onSelected: (_) =>
+                              setD(() => pick = 's:${r.key}'),
+                        ),
+                      ChoiceChip(
+                        label: Text(_panel.roleOther(lang)),
+                        selected: pick == 'other',
+                        onSelected: (_) => setD(() => pick = 'other'),
+                      ),
+                    ],
+                  ),
+                  if (pick == 'other') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: otherC,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => submit(),
+                      decoration: InputDecoration(
+                          labelText: _panel.roleOtherHint(lang)),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dc), child: Text(x.t('cancel'))),
-          TextButton(
-              onPressed: () => Navigator.pop(dc, c.text.trim()),
-              child: Text(x.t('add'))),
-        ],
-      ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(dc2),
+                  child: Text(x.t('cancel'))),
+              TextButton(onPressed: submit, child: Text(x.t('add'))),
+            ],
+          );
+        });
+      },
     );
-    if (name == null || name.isEmpty) return;
+    if (res == null || res.name.isEmpty) return;
     var newId = '';
     final ok = await _act(() async {
       final r = await _raw.call('staff_add', {
-        'name': name,
+        'name': res.name,
+        if (res.role.isNotEmpty) 'specialty': res.role,
         'work_start': '09:00',
         'work_end': '18:00',
       });
       newId = jStr(r['staff_id']);
     }, x.t('staff_added'));
-    if (ok && newId.isNotEmpty && mounted) {
+    // منشی و نظافتچی نوبت نمی‌گیرند؛ صفحه‌ی ساعت کار برایشان باز نمی‌شود
+    if (ok && res.serves && newId.isNotEmpty && mounted) {
       final rows = _staff.where((r) => jStr(r['staff_id']) == newId).toList();
       if (rows.isNotEmpty) await _edit(rows.first);
     }
@@ -240,7 +322,10 @@ class _StaffPageState extends State<StaffPage> {
   }
 
   Widget _unsetBanner(T6 x) {
-    final unset = _staff.where(scheduleUnset).toList();
+    final unset = _staff
+        .where((r) =>
+            scheduleUnset(r) && supportRoleOf(jStr(r['specialty'])) == null)
+        .toList();
     if (unset.isEmpty) return const SizedBox.shrink();
     final msg = _owner
         ? x.t('sh_unset_owner', {'n': unset.length})
@@ -341,6 +426,7 @@ class _StaffPageState extends State<StaffPage> {
     final mine = id == _myId;
     final name = jStr(r['name']);
     final spec = jStr(r['specialty']);
+    final support = supportRoleOf(spec);
     final hasLogin = jBool(r['has_login']);
     final ot = jInt(r['overtime_min']);
     final cnt = jInt(r['rating_count']) ?? 0;
@@ -370,7 +456,7 @@ class _StaffPageState extends State<StaffPage> {
           children: [
             Row(
               children: [
-                GradientIcon(_panel.staffIcon, size: 46),
+                GradientIcon(support?.icon ?? _panel.staffIcon, size: 46),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -412,20 +498,21 @@ class _StaffPageState extends State<StaffPage> {
               spacing: 16,
               runSpacing: 6,
               children: [
-                if (unset)
+                if (unset && support == null)
                   _info(Icons.warning_amber_rounded, x.t('sh_not_set'),
                       color: Colors.orange)
-                else
+                else if (!unset)
                   _info(Icons.schedule_rounded,
                       shiftsText(shiftsOfStaff(r), lang)),
                 if (ot != null && ot > 0)
                   _info(Icons.more_time_rounded,
                       x.t('sp_overtime', {'n': ot})),
-                _info(
-                    _panel.icon,
-                    svcN == 0
-                        ? x.t('sp_all_services')
-                        : x.t('sp_services_n', {'n': svcN})),
+                if (support == null)
+                  _info(
+                      _panel.icon,
+                      svcN == 0
+                          ? x.t('sp_all_services')
+                          : x.t('sp_services_n', {'n': svcN})),
                 if (off.isNotEmpty)
                   _info(Icons.event_busy_rounded,
                       x.t('sp_days_off', {'d': offText})),

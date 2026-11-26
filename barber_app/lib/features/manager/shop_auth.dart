@@ -9,7 +9,6 @@ import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
-import '../settings/settings_page.dart';
 import 'activation_code.dart';
 import 'server_code.dart';
 import 'shifts_editor.dart';
@@ -111,13 +110,6 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => st.setRole(null),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.settings_rounded),
-          onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const SettingsPage())),
-        ),
-      ],
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
         children: [

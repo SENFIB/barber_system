@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../app/biz_icons.dart';
+import '../../app/business_types.dart';
+import '../../app/currency.dart';
 import '../../app/extra_http.dart';
 import '../../app/service_catalog.dart';
 import '../../app/settings.dart';
+import '../../app/type_services.dart';
 import '../../app/widgets.dart';
-
 const Map<String, Map<String, String>> _tx = {
   'fa': {
     'title': 'خدمات پیشنهادی',
@@ -52,7 +54,6 @@ const Map<String, Map<String, String>> _tx = {
     'all_off': 'إلغاء تحديد الكل',
   },
 };
-
 const Map<String, Map<String, String>> _groupNames = {
   'beauty': {'fa': 'زیبایی و آرایش', 'en': 'Beauty & grooming', 'ar': 'التجميل والعناية'},
   'wellness': {'fa': 'سلامت و آرامش', 'en': 'Wellness & relaxation', 'ar': 'الصحة والاسترخاء'},
@@ -61,8 +62,7 @@ const Map<String, Map<String, String>> _groupNames = {
   'edu': {'fa': 'آموزش و ورزش', 'en': 'Training & sports', 'ar': 'التعليم والرياضة'},
   'pets': {'fa': 'حیوانات خانگی', 'en': 'Pets', 'ar': 'الحيوانات الأليفة'},
 };
-
-/// فقط خدمات پیشنهادیِ دسته‌ی همین کسب‌وکار نشان داده می‌شود
+/// فقط خدمات پیشنهادیِ همین «نوع» کسب‌وکار نشان داده می‌شود
 /// (گروه زیبایی بر اساس مردانه/زنانه)
 class SuggestedServicesPage extends StatefulWidget {
   const SuggestedServicesPage({
@@ -74,60 +74,67 @@ class SuggestedServicesPage extends StatefulWidget {
   final AppSettings settings;
   final String gender;
   final String initialGroup;
-
   @override
   State<SuggestedServicesPage> createState() => _SuggestedServicesPageState();
 }
-
 class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
   bool _loading = true;
   bool _saving = false;
   String? _error;
   Set<String> _have = <String>{};
-  final List<CatalogItem> _items = [];
+  List<CatalogItem> _items = [];
   final Map<String, bool> _sel = {};
-  final Map<String, TextEditingController> _min = {};
-  final Map<String, TextEditingController> _price = {};
-
+  final Map<String, DigitController> _min = {};
+  final Map<String, MoneyController> _price = {};
+  String _group = 'beauty';
+  String _type = '';
+  String _gender = 'both';
+  String _cur = '';
   AppSettings get _st => widget.settings;
   String get _lang => _st.lang;
   String _t(String k) => (_tx[_lang] ?? _tx['fa']!)[k] ?? _tx['fa']![k] ?? k;
   String _gName(String g) =>
       (_groupNames[g] ?? const <String, String>{})[_lang] ?? g;
-
   @override
   void initState() {
     super.initState();
-    final g = _groupNames.containsKey(widget.initialGroup)
+    _group = _groupNames.containsKey(widget.initialGroup)
         ? widget.initialGroup
         : 'beauty';
-    final gender = g == 'beauty' ? widget.gender : 'both';
-    for (final c in catalogForGroup(g, gender)) {
-      if (_sel.containsKey(c.key)) continue;
-      _items.add(c);
-      _sel[c.key] = false;
-      _min[c.key] = TextEditingController(text: '${c.minutes}');
-      _price[c.key] = TextEditingController();
-    }
+    _gender = widget.gender;
+    _build();
     _load();
   }
-
-  @override
-  void dispose() {
+  void _disposeCtrls() {
     for (final c in _min.values) {
       c.dispose();
     }
     for (final c in _price.values) {
       c.dispose();
     }
+    _min.clear();
+    _price.clear();
+  }
+  void _build() {
+    _disposeCtrls();
+    _sel.clear();
+    final gender = _group == 'beauty' ? _gender : 'both';
+    _items = catalogForType(_group, _type, gender);
+    for (final c in _items) {
+      _sel[c.key] = false;
+      _min[c.key] = DigitController(lang: _lang, text: '${c.minutes}');
+      _price[c.key] = MoneyController(lang: _lang);
+    }
+  }
+  @override
+  void dispose() {
+    _disposeCtrls();
     super.dispose();
   }
-
   bool get _allOn {
     final avail = _items.where((c) => !_have.contains(c.key)).toList();
     return avail.isNotEmpty && avail.every((c) => _sel[c.key] == true);
   }
-
   void _toggleAll() {
     final v = !_allOn;
     setState(() {
@@ -136,13 +143,20 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
       }
     });
   }
-
+  Future<dynamic> _me() async {
+    try {
+      return await extraManager(_st, 'me');
+    } catch (_) {
+      return null;
+    }
+  }
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
+      final meF = _me();
       final r = await extraManager(_st, 'service_list');
       final list = r['services'];
       final have = <String>{};
@@ -155,28 +169,39 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
         }
       }
       _have = have;
+      final me = await meF;
+      final sh = me is Map ? me['shop'] : null;
+      if (sh is Map) {
+        final bz = bizTypeByKey('${sh['biz_type'] ?? ''}');
+        if (bz != null) {
+          _group = bz.group;
+          _type = bz.key;
+        }
+        _cur = '${sh['currency'] ?? ''}';
+        final v = '${sh['gender'] ?? ''}';
+        if (v == 'men' || v == 'women') _gender = v;
+        _build();
+      }
     } on ExtraError catch (e) {
       _error = extraErrorText(e, _lang);
     }
     if (mounted) setState(() => _loading = false);
   }
-
   Future<void> _save() async {
     if (_saving) return;
     final out = <Map<String, dynamic>>[];
     for (final c in _items) {
       if (_sel[c.key] != true || _have.contains(c.key)) continue;
-      final m = _min[c.key]!.text.trim();
-      final p = _price[c.key]!.text.trim();
-      if (m.isEmpty) {
+      final m = _min[c.key]!.number;
+      if (m == null) {
         toast(context, _t('need_price'));
         return;
       }
       out.add({
         'cat': c.key,
         'name': c.name(_lang),
-        'duration_min': latinOf(m),
-        'price': p.isEmpty ? '0' : latinOf(p),
+        'duration_min': m,
+        'price': _price[c.key]!.number ?? 0,
       });
     }
     if (out.isEmpty) {
@@ -196,11 +221,11 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
       }
     }
   }
-
   Widget _num(TextEditingController c, String label) {
     return TextField(
       controller: c,
       keyboardType: TextInputType.number,
+      textDirection: TextDirection.ltr,
       decoration: InputDecoration(
         labelText: label,
         isDense: true,
@@ -208,10 +233,10 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
       ),
     );
   }
-
   Widget _row(CatalogItem c) {
     final have = _have.contains(c.key);
     final on = _sel[c.key] == true && !have;
+    final curName = currencyName(_cur, _lang);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Glass(
@@ -234,7 +259,9 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
                 children: [
                   Expanded(child: _num(_min[c.key]!, _t('minutes'))),
                   const SizedBox(width: 10),
-                  Expanded(child: _num(_price[c.key]!, _t('price'))),
+                  Expanded(
+                      child: _num(
+                          _price[c.key]!, '${_t('price')} ($curName)')),
                 ],
               ),
             ],
@@ -243,7 +270,6 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     Widget body;
@@ -259,18 +285,15 @@ class _SuggestedServicesPageState extends State<SuggestedServicesPage> {
         ],
       );
     } else {
-      final g = _groupNames.containsKey(widget.initialGroup)
-          ? widget.initialGroup
-          : 'beauty';
       body = ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           Row(
             children: [
-              Icon(bizGroupIcon(g)),
+              Icon(bizGroupIcon(_group)),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(_gName(g),
+                child: Text(_gName(_group),
                     style: const TextStyle(
                         fontWeight: FontWeight.w800, fontSize: 15)),
               ),

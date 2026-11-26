@@ -1,15 +1,19 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../app/biz_icons.dart';
 import '../../app/biz_panel.dart';
 import '../../app/business_types.dart';
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
+import '../../app/strings_pay.dart';
 import '../../app/strings_s6.dart';
 import '../../app/util.dart';
 import '../../app/widgets.dart';
 import 'activation_code.dart';
+import 'pay_page.dart';
 import 'server_code.dart';
 import 'shifts_editor.dart';
 import 'shop_api.dart';
@@ -59,7 +63,6 @@ String _w(String lang, T6 s, String key) {
 
 class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
-
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -218,7 +221,6 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
 class SignupChoicePage extends StatelessWidget {
   const SignupChoicePage(
       {super.key, required this.api, required this.onSession});
-
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -226,7 +228,6 @@ class SignupChoicePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = SettingsScope.of(context).lang;
     final s = T6(lang);
-
     Widget card(IconData icon, String title, String desc, VoidCallback onTap) {
       return Glass(
         onTap: onTap,
@@ -288,10 +289,8 @@ String _planName(String lang, String key) {
       return _x(lang, 'پایه', 'Basic', 'أساسية');
     case 'pro':
       return _x(lang, 'پرو', 'Pro', 'برو');
-    case 'special':
-      return _x(lang, 'ویژه', 'Special', 'مميزة');
     default:
-      return _x(lang, 'پلن شخصی', 'Personal plan', 'الخطة الشخصية');
+      return _x(lang, 'ویژه', 'Special', 'مميزة');
   }
 }
 
@@ -301,20 +300,25 @@ IconData _planIcon(String key) {
       return Icons.store_rounded;
     case 'pro':
       return Icons.workspace_premium_rounded;
-    case 'special':
-      return Icons.diamond_rounded;
     default:
-      return Icons.dns_rounded;
+      return Icons.diamond_rounded;
   }
 }
 
 String _planPrice(String lang, PlanDef p) {
   final toman = _x(lang, 'تومان', 'Toman', 'تومان');
-  if (p.key == 'personal' || p.oneTime > 0) {
+  final perMonth = _x(lang, '/ ماه', '/ month', '/ شهر');
+  if (p.autoPay) {
+    final usdt = '${fmtNum(p.usdtMonthly.round(), lang)} USDT $perMonth';
+    if (lang == 'fa' && p.monthly > 0) {
+      return '$usdt  •  ${fmtNum(p.monthly, lang)} $toman';
+    }
+    return usdt;
+  }
+  if (p.oneTime > 0) {
     return _x(lang, 'خرید یکباره', 'One-time purchase', 'شراء لمرة واحدة');
   }
   if (p.monthly <= 0) return _x(lang, 'رایگان', 'Free', 'مجاني');
-  final perMonth = _x(lang, '/ ماه', '/ month', '/ شهر');
   return '${fmtNum(p.monthly, lang)} $toman $perMonth';
 }
 
@@ -381,7 +385,7 @@ List<String> _planFeatures(String lang, PlanDef p) {
             'Past bookings cleaned every 2 weeks',
             'تنظيف الحجوزات القديمة كل أسبوعين'),
       ];
-    case 'special':
+    default:
       return [
         staff,
         shifts,
@@ -402,18 +406,11 @@ List<String> _planFeatures(String lang, PlanDef p) {
             'Dedicated activation with a setup code',
             'تفعيل خاص برمز الإعداد'),
       ];
-    default:
-      return [
-        _x(lang, 'راه‌اندازی توسط خود کسب‌وکار',
-            'Set up by the business itself',
-            'الإعداد يتولاه النشاط التجاري بنفسه'),
-      ];
   }
 }
 
 class OwnerPlanPage extends StatelessWidget {
   const OwnerPlanPage({super.key, required this.api, required this.onSession});
-
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -460,7 +457,6 @@ class OwnerCategoryPage extends StatelessWidget {
       required this.api,
       required this.onSession,
       required this.plan});
-
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
@@ -535,7 +531,6 @@ class OwnerCategoryPage extends StatelessWidget {
 class _PlanCard extends StatelessWidget {
   const _PlanCard(
       {required this.plan, required this.lang, required this.onTap});
-
   final PlanDef plan;
   final String lang;
   final VoidCallback onTap;
@@ -599,7 +594,6 @@ class OwnerSignupPage extends StatefulWidget {
       required this.onSession,
       required this.plan,
       required this.bizType});
-
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
@@ -625,9 +619,10 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   String _gender = 'both';
   late List<Shift> _shifts;
   List<int> _daysOff = <int>[];
+  int _months = 1;
+  bool _paidLicense = false;
 
-  bool get _planNeedsCode =>
-      widget.plan.key == 'special' || widget.plan.key == 'personal';
+  bool get _planNeedsCode => widget.plan.key == 'special';
 
   @override
   void initState() {
@@ -649,7 +644,16 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     super.dispose();
   }
 
-  String? _validate(T6 s) {
+  String? _validate(T6 s, String lang) {
+    if (_license.text.trim().isEmpty &&
+        widget.plan.autoPay &&
+        _shop.text.trim().isNotEmpty) {
+      return _x(
+          lang,
+          'ابتدا پرداخت کنید یا کد لایسنس را وارد کنید',
+          'Pay first, or enter a license code',
+          'ادفع أولاً أو أدخل رمز الترخيص');
+    }
     if (_license.text.trim().isEmpty ||
         _shop.text.trim().isEmpty ||
         _phone.text.trim().isEmpty ||
@@ -673,12 +677,11 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
     final st = SettingsScope.read(context);
     final lang = st.lang;
     final s = T6(lang);
-    final err = _validate(s);
+    final err = _validate(s, lang);
     if (err != null) {
       toast(context, err);
       return;
     }
-
     var licenseText = _license.text.trim();
     String? serverUrl;
     if (_planNeedsCode) {
@@ -698,7 +701,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       licenseText = p.license;
       serverUrl = p.url;
     }
-
     final bizType = widget.bizType;
     final gender = BizPanel.of(bizType).beauty ? _gender : '';
     final planKey = widget.plan.key;
@@ -739,6 +741,140 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // ───────────── پرداخت (basic / pro) ─────────────
+  Future<void> _pay(String method) async {
+    final st = SettingsScope.read(context);
+    final lang = st.lang;
+    if (_shop.text.trim().isEmpty || _phone.text.trim().isEmpty) {
+      toast(
+          context,
+          _x(
+              lang,
+              'اول نام کسب‌وکار و شماره تلفن را بنویسید',
+              'Enter the business name and phone first',
+              'اكتب اسم النشاط ورقم الهاتف أولاً'));
+      return;
+    }
+    final res = await Navigator.of(context).push<String>(MaterialPageRoute(
+      builder: (_) => PayPage(
+        settings: st,
+        plan: widget.plan,
+        months: _months,
+        method: method,
+        shopName: _shop.text.trim(),
+        phone: _phone.text.trim(),
+      ),
+    ));
+    if (!mounted) return;
+    if (res != null && res.trim().isNotEmpty) {
+      setState(() {
+        _license.text = res.trim();
+        _paidLicense = true;
+      });
+    }
+  }
+
+  Widget _payBox(String lang) {
+    final p = widget.plan;
+    final pt = PayT(lang);
+    final showToman = lang == 'fa' && p.monthly > 0;
+    final usdt = planTotalUsdt(p, _months).round();
+    final toman = planTotal(p, _months).round();
+    final monthWord = _x(lang, 'ماه', 'mo', 'شهر');
+    return Glass(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_x(lang, 'خرید اشتراک', 'Buy a subscription', 'شراء الاشتراك'),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(
+              _x(
+                  lang,
+                  'با پرداخت، کد لایسنس خودکار در همین فرم پر می‌شود.',
+                  'After payment, the license code is filled in automatically.',
+                  'بعد الدفع يُملأ رمز الترخيص تلقائيًا في هذا النموذج.'),
+              style:
+                  TextStyle(color: muted(context), fontSize: 12.5, height: 1.5)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final m in kMonthOptions)
+                ChoiceChip(
+                  label: Text('${fmtNum(m, lang)} $monthWord'),
+                  selected: _months == m,
+                  onSelected: (_) => setState(() => _months = m),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+              '${_x(lang, 'مبلغ کل', 'Total', 'الإجمالي')}: '
+              '${fmtNum(usdt, lang)} USDT'
+              '${showToman ? '  •  ${fmtNum(toman, lang)} ${_x(lang, 'تومان', 'Toman', 'تومان')}' : ''}',
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 14),
+          GradientButton(
+            label: pt.t('buy_usdt'),
+            icon: Icons.currency_bitcoin_rounded,
+            onPressed: () => _pay('usdt'),
+          ),
+          if (lang == 'fa' && p.cardPay) ...[
+            const SizedBox(height: 10),
+            GradientButton(
+              outlined: true,
+              label: pt.t('buy_card'),
+              icon: Icons.credit_card_rounded,
+              onPressed: () => _pay('card'),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+              _paidLicense
+                  ? _x(lang, '✓ لایسنس شما دریافت شد و در کادر زیر پر شده است.',
+                      '✓ License received and filled in below.',
+                      '✓ تم استلام الترخيص وتعبئته أدناه.')
+                  : _x(
+                      lang,
+                      'اگر کد لایسنس دارید، آن را در کادر زیر وارد کنید.',
+                      'If you already have a license code, enter it below.',
+                      'إذا كان لديك رمز ترخيص، أدخله في الحقل أدناه.'),
+              style:
+                  TextStyle(color: muted(context), fontSize: 12.5, height: 1.5)),
+        ],
+      ),
+    );
+  }
+
+  // ───────────── ایمیل برای خرید پلن ویژه ─────────────
+  Future<void> _mailDev() async {
+    final lang = SettingsScope.read(context).lang;
+    final subject = PayT.mailSubject(widget.plan.key);
+    final body = PayT.mailBody(
+      planKey: widget.plan.key,
+      shopName: _shop.text.trim(),
+      phone: _phone.text.trim(),
+      username: _user.text.trim(),
+    );
+    final uri = Uri.parse('mailto:$kSupportEmail'
+        '?subject=${Uri.encodeComponent(subject)}'
+        '&body=${Uri.encodeComponent(body)}');
+    var ok = false;
+    try {
+      ok = await launchUrl(uri);
+    } catch (_) {
+      ok = false;
+    }
+    if (!ok) {
+      await Clipboard.setData(ClipboardData(text: kSupportEmail));
+      if (mounted) toast(context, PayT(lang).t('mail_copied'));
     }
   }
 
@@ -879,6 +1015,43 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
             child: Column(
               children: [
                 GlassField(
+                  controller: _shop,
+                  label: _w(lang, s, 'shop_name'),
+                  icon: Icons.storefront_rounded,
+                ),
+                _gap(),
+                GlassField(
+                  controller: _phone,
+                  label: s.t('phone'),
+                  icon: Icons.phone_rounded,
+                  keyboard: TextInputType.phone,
+                  ltr: true,
+                ),
+                _gap(),
+                GlassField(
+                  controller: _city,
+                  label: s.t('city'),
+                  icon: Icons.location_city_rounded,
+                ),
+                _gap(),
+                GlassField(
+                  controller: _address,
+                  label: s.t('address'),
+                  icon: Icons.place_outlined,
+                ),
+              ],
+            ),
+          ),
+          if (widget.plan.autoPay) ...[
+            const SizedBox(height: 16),
+            _payBox(lang),
+          ],
+          const SizedBox(height: 16),
+          Glass(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                GlassField(
                   controller: _license,
                   label: combined
                       ? _x(lang, 'کد فعال‌سازی', 'Activation code',
@@ -923,32 +1096,15 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
                         style: TextStyle(color: muted(context), fontSize: 12)),
                   ),
                 ],
-                _gap(),
-                GlassField(
-                  controller: _shop,
-                  label: _w(lang, s, 'shop_name'),
-                  icon: Icons.storefront_rounded,
-                ),
-                _gap(),
-                GlassField(
-                  controller: _phone,
-                  label: s.t('phone'),
-                  icon: Icons.phone_rounded,
-                  keyboard: TextInputType.phone,
-                  ltr: true,
-                ),
-                _gap(),
-                GlassField(
-                  controller: _city,
-                  label: s.t('city'),
-                  icon: Icons.location_city_rounded,
-                ),
-                _gap(),
-                GlassField(
-                  controller: _address,
-                  label: s.t('address'),
-                  icon: Icons.place_outlined,
-                ),
+                if (_planNeedsCode) ...[
+                  const SizedBox(height: 12),
+                  GradientButton(
+                    outlined: true,
+                    icon: Icons.mail_outline_rounded,
+                    label: PayT(lang).t('mail_btn'),
+                    onPressed: _mailDev,
+                  ),
+                ],
               ],
             ),
           ),
@@ -1074,7 +1230,6 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
 
 class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
-
   final ShopApi api;
   final SessionCallback onSession;
 

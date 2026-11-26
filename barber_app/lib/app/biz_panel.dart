@@ -6,7 +6,7 @@ import 'business_types.dart';
 String _p(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
 
-/// نقش‌های پشتیبانی که نوبت نمی‌گیرند (منشی، نظافتچی)
+/// نقش‌های پشتیبان که نوبت نمی‌گیرند (منشی، نظافتچی)
 class SupportRole {
   const SupportRole(this.key, this.fa, this.en, this.ar, this.icon);
   final String key;
@@ -37,7 +37,6 @@ SupportRole? supportRoleOf(String text) {
 /// واژه‌ها و آیکون‌های پنل بر اساس نوع کسب‌وکار
 class BizPanel {
   const BizPanel._(this.type, this.group);
-
   final String type;
   final String group;
 
@@ -49,7 +48,6 @@ class BizPanel {
   }
 
   bool get beauty => group == 'beauty';
-
   IconData get icon => bizTypeIcon(type);
 
   IconData get staffIcon {
@@ -79,7 +77,6 @@ class BizPanel {
   List<String> get _n => bwRole(type);
 
   String noun(String l) => _p(l, _n[0], _n[1], _n[2]);
-
   String plural(String l) => _p(l, _n[3], _n[4], _n[5]);
 
   String staffTitle(String l) => _p(l, 'مدیریت ${_n[3]}',
@@ -92,53 +89,51 @@ class BizPanel {
       'إضافة ${_n[2]} وسكرتير وغيرهم، وساعات عملهم وخدماتهم');
 
   String staffMine(String l) => _p(l, 'ساعت کار من', 'My schedule', 'جدولي');
-
   String addStaff(String l) =>
       _p(l, 'افزودن نفر', 'Add a person', 'إضافة شخص');
-
   String staffName(String l) => _p(l, 'نام', 'Name', 'الاسم');
-
   String roleLabel(String l) => _p(l, 'نقش', 'Role', 'الدور');
-
   String roleOther(String l) => _p(l, 'سایر', 'Other', 'أخرى');
-
   String roleOtherHint(String l) => _p(
       l, 'نقش را بنویس، مثلاً حسابدار', 'Type the role, e.g. accountant',
       'اكتب الدور، مثلاً محاسب');
-
   String addHint(String l) => _p(
       l,
       'نام را بنویس و نقش را انتخاب کن؛ بعد از ساخت می‌توانی ساعت کار و خدمات را تنظیم کنی.',
       'Type the name and pick a role; afterwards you can set working hours and services.',
       'اكتب الاسم واختر الدور؛ بعدها يمكنك ضبط ساعات العمل والخدمات.');
 
-  String selfLabel(String l) => _p(
-      l, 'خودم هم خدمت می‌دهم', 'I also provide services myself',
-      'أقدّم الخدمات بنفسي أيضًا');
+  /// «خودم هم مشغول کارم» (زیبایی) / «خودم هم فعالیت می‌کنم» (بقیه)
+  String selfLabel(String l) => beauty
+      ? _p(l, 'خودم هم مشغول کارم', 'I also work here myself',
+          'أنا أيضًا مشغول بالعمل')
+      : _p(l, 'خودم هم فعالیت می‌کنم', 'I am also active myself',
+          'أنا أيضًا أعمل بنفسي');
 
-  String becomeSelf(String l) => _p(
-      l, 'خودم هم خدمت می‌دهم', 'I provide services too',
-      'أقدّم الخدمات أيضًا');
+  String becomeSelf(String l) => selfLabel(l);
 
   String becomeSelfDesc(String l) => _p(
       l,
-      'اگر خودت هم به مشتری‌ها خدمت می‌دهی، اسمت هم در فهرست قرار می‌گیرد تا مشتری‌ها از تو هم نوبت بگیرند.',
-      'If you also serve customers yourself, you will be listed too so customers can book with you.',
-      'إذا كنت تقدّم الخدمات بنفسك فسيظهر اسمك في القائمة ليتمكن الزبائن من الحجز عندك.');
+      'اگر خودت هم کار می‌کنی، اسمت هم در فهرست قرار می‌گیرد تا مشتری‌ها از تو هم نوبت بگیرند.',
+      'If you also work yourself, you will be listed too so customers can book with you.',
+      'إذا كنت تعمل بنفسك فسيظهر اسمك في القائمة ليتمكن الزبائن من الحجز عندك.');
 
-  String stopSelf(String l) => _p(
-      l, 'دیگر خودم خدمت نمی‌دهم', 'I no longer provide services myself',
-      'لم أعد أقدّم الخدمات بنفسي');
+  String stopSelf(String l) => beauty
+      ? _p(l, 'دیگر خودم مشغول کار نیستم', 'I no longer work here myself',
+          'لم أعد أعمل بنفسي')
+      : _p(l, 'دیگر خودم فعالیت نمی‌کنم', 'I am no longer active myself',
+          'لم أعد أعمل بنفسي');
 
   String stopSelfConfirm(String l) => _p(
       l,
-      'نام تو از فهرست ارائه‌دهندگان خدمت برداشته می‌شود. ادامه می‌دهی؟',
-      'Your name will be removed from the list of service providers. Continue?',
-      'سيُحذف اسمك من قائمة مقدّمي الخدمات. هل تريد المتابعة؟');
+      'نام تو از فهرستی که مشتری‌ها از آن نوبت می‌گیرند برداشته می‌شود. ادامه می‌دهی؟',
+      'Your name will be removed from the list customers book from. Continue?',
+      'سيُحذف اسمك من القائمة التي يحجز منها الزبائن. هل تريد المتابعة؟');
+
+  String ownerLabel(String l) => _p(l, 'مدیر', 'Owner', 'المدير');
 
   String noStaff(String l) => _p(l, 'هنوز کسی اضافه نشده',
       'No one has been added yet', 'لم تتم إضافة أحد بعد');
-
   String capacity(String l, String n, String max) => _p(
       l,
       'ظرفیت: $n از $max نفر',

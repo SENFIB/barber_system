@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/app_header.dart';
 import '../../app/biz_panel.dart';
 import '../../app/cal_fmt.dart';
 import '../../app/fmt.dart';
@@ -9,6 +10,7 @@ import '../../app/strings_s3.dart';
 import '../../app/strings_s5.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
+import 'ads_page.dart';
 import 'booking_rules_page.dart';
 import 'bookings_page.dart';
 import 'plans_page.dart';
@@ -19,8 +21,10 @@ import 'shop_raw.dart';
 import 'staff_page.dart';
 import 'timeoff_page.dart';
 import 'winback_page.dart';
+
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
+
 String _subLabel(String lang, String plan, String fallback) {
   switch (plan) {
     case 'basic':
@@ -34,28 +38,53 @@ String _subLabel(String lang, String plan, String fallback) {
       return fallback;
   }
 }
+
 class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key, required this.ctx});
+
   final ShopCtx ctx;
+
   @override
   State<ManagerHome> createState() => _ManagerHomeState();
 }
+
 class _ManagerHomeState extends State<ManagerHome> {
   String _synced = '';
   String _bizType = '';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadType());
   }
+
+  @override
+  void dispose() {
+    // هدر دوباره لوگوی خود برنامه را نشان بدهد
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => kHeaderBrand.value = null);
+    super.dispose();
+  }
+
   Future<void> _loadType() async {
     try {
       final me = await ShopRaw(SettingsScope.read(context)).call('me');
+      if (!mounted) return;
       final sh = me['shop'];
-      final k = sh is Map ? '${sh['biz_type'] ?? ''}' : '';
-      if (mounted && k != _bizType) setState(() => _bizType = k);
+      if (sh is Map) {
+        final k = '${sh['biz_type'] ?? ''}';
+        final plan = '${sh['plan'] ?? ''}'.toLowerCase();
+        final photo = '${sh['photo_url'] ?? sh['photo'] ?? ''}'.trim();
+        final name = '${sh['name'] ?? ''}';
+        final special = plan == 'special' || plan == 'personal';
+        kHeaderBrand.value = (special && photo.startsWith('http'))
+            ? HeaderBrand(photo, name)
+            : null;
+        if (k != _bizType) setState(() => _bizType = k);
+      }
     } catch (_) {}
   }
+
   @override
   Widget build(BuildContext context) {
     final ctx = widget.ctx;
@@ -70,6 +99,7 @@ class _ManagerHomeState extends State<ManagerHome> {
     final planKey = 'plan_${shop.plan}';
     final panel =
         BizPanel.of(_bizType.isNotEmpty ? _bizType : shop.bizType);
+
     if (sess.isOwner) {
       final k = '${sub.free}|${sub.expiresAt}|$lang';
       if (k != _synced) {
@@ -85,6 +115,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         });
       }
     }
+
     Widget tile({
       required IconData icon,
       required String title,
@@ -126,6 +157,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         ),
       );
     }
+
     final roleText = sess.isOwner
         ? _x(lang, 'مدیر', 'Owner', 'المدير')
         : _x(lang, 'نفر پرسنل', 'Staff member', 'موظف');
@@ -140,6 +172,7 @@ class _ManagerHomeState extends State<ManagerHome> {
     if (typeText.isNotEmpty) {
       pills.add(Pill(typeText, color: AppColors.green));
     }
+
     final headerInfo = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -151,6 +184,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         Wrap(spacing: 8, runSpacing: 6, children: pills),
       ],
     );
+
     final headerCard = Glass(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -161,6 +195,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         ],
       ),
     );
+
     Widget warnCard() {
       final n = fmtNum(sub.daysLeft ?? sub.warnDays, lang);
       return Padding(
@@ -187,6 +222,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         ),
       );
     }
+
     final subRows = <Widget>[
       Row(
         children: [
@@ -252,6 +288,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         children: subRows,
       ),
     );
+
     final items = <Widget>[
       headerCard,
       const SizedBox(height: 14),
@@ -261,6 +298,7 @@ class _ManagerHomeState extends State<ManagerHome> {
       items.add(subCard);
     }
     items.add(const SizedBox(height: 18));
+
     items.add(tile(
       icon: Icons.event_available_rounded,
       title: s.t('bookings'),
@@ -276,6 +314,7 @@ class _ManagerHomeState extends State<ManagerHome> {
       onTap: () => Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => BookingsPage(ctx))),
     ));
+
     if (sess.isOwner) {
       items.add(tile(
         icon: Icons.groups_rounded,
@@ -302,10 +341,11 @@ class _ManagerHomeState extends State<ManagerHome> {
             .push(MaterialPageRoute(builder: (_) => StaffPage(ctx))),
       ));
     }
+
     if (sess.isOwner) {
       items.add(tile(
         icon: Icons.design_services_rounded,
-        title: s.t('services'),
+        title: _x(lang, 'خدمات', 'Services', 'الخدمات'),
         desc: _x(
           lang,
           'خدمت‌ها، مدت و قیمت‌ها را اضافه و ویرایش کن',
@@ -367,6 +407,21 @@ class _ManagerHomeState extends State<ManagerHome> {
             .push(MaterialPageRoute(builder: (_) => WinbackPage(ctx))),
       ));
       items.add(tile(
+        icon: Icons.campaign_rounded,
+        title: _x(lang, 'تبلیغات', 'Advertising', 'الإعلانات'),
+        desc: _x(
+          lang,
+          'معرفی کسب‌وکار شما در صفحه‌ی کسب‌وکارهای دیگر',
+          'Promote your business on other businesses’ pages',
+          'روّج لنشاطك في صفحات الأنشطة الأخرى',
+        ),
+        gradient: const LinearGradient(
+          colors: [AppColors.amber, AppColors.violet],
+        ),
+        onTap: () => Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const AdsPage())),
+      ));
+      items.add(tile(
         icon: Icons.workspace_premium_rounded,
         title: t5.t('pl_tile'),
         desc: t5.t('pl_tile_desc'),
@@ -377,8 +432,8 @@ class _ManagerHomeState extends State<ManagerHome> {
             .push(MaterialPageRoute(builder: (_) => PlansPage(ctx))),
       ));
     }
+
     return GlassScaffold(
-      title: s.t('app_name'),
       actions: [
         IconButton(
           icon: const Icon(Icons.logout_rounded),

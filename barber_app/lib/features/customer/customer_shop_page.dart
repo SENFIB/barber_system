@@ -7,6 +7,7 @@ import '../../app/biz_words.dart';
 import '../../app/business_types.dart';
 import '../../app/cal_conv.dart';
 import '../../app/config.dart';
+import '../../app/currency.dart';
 import '../../app/fmt.dart';
 import '../../app/look.dart';
 import '../../app/reminders.dart';
@@ -21,8 +22,10 @@ import 'customer_store.dart';
 import 'report_sheet.dart';
 import 'shop_ads.dart';
 import 'store_page.dart';
+
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
+
 bool _truthy(dynamic v) => v == true || '$v' == 'true' || '$v' == '1';
 
 /// اسمی که شبیه شناسه/کد/شماره است (نام واقعی نیست)
@@ -32,6 +35,7 @@ bool _looksId(String s) {
   if (RegExp(r'^[0-9\s+\-]+$').hasMatch(v)) return true;
   return !v.contains(' ') && RegExp(r'^[A-Za-z0-9_\-]{14,}$').hasMatch(v);
 }
+
 class ShopPhoto extends StatelessWidget {
   const ShopPhoto({
     super.key,
@@ -44,6 +48,7 @@ class ShopPhoto extends StatelessWidget {
   final double width;
   final double height;
   final double radius;
+
   @override
   Widget build(BuildContext context) {
     Widget ph() => Container(
@@ -68,17 +73,21 @@ class ShopPhoto extends StatelessWidget {
     );
   }
 }
+
 /// پوسته‌ی صفحه: ظاهر اختصاصی کسب‌وکار (فقط پلن ویژه) را با یک دکمه روشن/خاموش می‌کند
 class ShopPage extends StatefulWidget {
   const ShopPage({super.key, required this.api, required this.card});
   final CustomerApi api;
   final Map<String, dynamic> card;
+
   @override
   State<ShopPage> createState() => _ShopPageState();
 }
+
 class _ShopPageState extends State<ShopPage> {
   AppLook? _look;
   bool _on = false;
+
   @override
   Widget build(BuildContext context) {
     final base = Theme.of(context);
@@ -110,6 +119,7 @@ class _ShopPageState extends State<ShopPage> {
     );
   }
 }
+
 class _ShopBody extends StatefulWidget {
   const _ShopBody({
     required this.api,
@@ -125,9 +135,11 @@ class _ShopBody extends StatefulWidget {
   final bool themeOn;
   final void Function(AppLook? look) onLook;
   final VoidCallback onToggle;
+
   @override
   State<_ShopBody> createState() => _ShopBodyState();
 }
+
 class _ShopBodyState extends State<_ShopBody> {
   bool _loading = true;
   bool _busy = false;
@@ -148,8 +160,10 @@ class _ShopBodyState extends State<_ShopBody> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   AppSettings? _stRef;
+
   String get _shopId => bStr(widget.card['shop_id']);
   T6 _tr() => T6(SettingsScope.read(context).lang);
+
   @override
   void initState() {
     super.initState();
@@ -160,6 +174,7 @@ class _ShopBodyState extends State<_ShopBody> {
       if (mounted) _load();
     });
   }
+
   @override
   void dispose() {
     _name.dispose();
@@ -169,6 +184,7 @@ class _ShopBodyState extends State<_ShopBody> {
     if (s != null) kCalKind = CalConv.kindOf(s.calendarKey, s.lang);
     super.dispose();
   }
+
   /// اگر کاربر تقویم دلخواه نزده باشد، تاریخ‌ها با تقویم همین کسب‌وکار نمایش داده می‌شوند
   void _applyShopCal(AppSettings st) {
     _stRef = st;
@@ -176,6 +192,7 @@ class _ShopBodyState extends State<_ShopBody> {
     final c = bStr(_shop['calendar']);
     if (c.isNotEmpty) kCalKind = CalConv.kindOf(c, st.lang);
   }
+
   /// ظاهر اختصاصی (فقط ویژه/شخصی؛ عکس پس‌زمینه‌ی دستگاهِ صاحب‌کار اینجا معنی ندارد)
   AppLook? _parseTheme(Map<String, dynamic> shop) {
     final plan = bStr(shop['plan']);
@@ -186,6 +203,7 @@ class _ShopBodyState extends State<_ShopBody> {
     return l.copyWith(
         bgImage: '', bgMode: l.bgMode == 'image' ? 'blobs' : l.bgMode);
   }
+
   /// روزهای تعطیل هفتگی کل کسب‌وکار (۰ = یکشنبه)
   Set<int> _parseOff(Map<String, dynamic> shop) {
     final out = <int>{};
@@ -193,6 +211,7 @@ class _ShopBodyState extends State<_ShopBody> {
       final n = int.tryParse('$v'.trim());
       if (n != null && n >= 0 && n <= 6) out.add(n);
     }
+
     final l = shop['weekly_off_list'];
     if (l is List) {
       for (final e in l) {
@@ -209,7 +228,9 @@ class _ShopBodyState extends State<_ShopBody> {
     }
     return out;
   }
+
   bool _isOff(DateTime d) => _offDays.contains(d.weekday % 7);
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -257,26 +278,31 @@ class _ShopBodyState extends State<_ShopBody> {
       });
     }
   }
+
   List<Map<String, dynamic>> _eligible(String sid) {
     return _staff.where((s) {
       final ids = bIds(s['service_ids']);
       return ids.isEmpty || ids.contains(sid);
     }).toList();
   }
+
   Map<String, dynamic> _svc(String id) => _services.firstWhere(
         (s) => bStr(s['service_id']) == id,
         orElse: () => <String, dynamic>{},
       );
+
   String _staffName(String id) {
     for (final s in _staff) {
       if (bStr(s['staff_id']) == id) return bStr(s['name']);
     }
     return id;
   }
+
   void _resetSlots() {
     _slots = null;
     _slotIdx = -1;
   }
+
   void _toggle(String id) {
     if (_picked.contains(id)) {
       setState(() {
@@ -296,6 +322,7 @@ class _ShopBodyState extends State<_ShopBody> {
       _resetSlots();
     });
   }
+
   void _setDay(DateTime d) {
     setState(() {
       _day = d;
@@ -303,6 +330,7 @@ class _ShopBodyState extends State<_ShopBody> {
     });
     if (_picked.isNotEmpty) _loadSlots();
   }
+
   Future<void> _loadSlots() async {
     final t = _tr();
     if (_picked.isEmpty) {
@@ -334,6 +362,7 @@ class _ShopBodyState extends State<_ShopBody> {
       if (mounted) setState(() => _slotsBusy = false);
     }
   }
+
   /// یادآوری‌های محلی (۲ ساعت و ۱۰ دقیقه قبل) + «پیام اختصاصی».
   /// پیام اختصاصی: یک بازهٔ مشترک برای همهٔ متن‌ها؛ اگر چند متن باشد یکی تصادفی انتخاب می‌شود.
   Future<void> _remind(Map<String, dynamic> slot, Map<String, String> choice,
@@ -373,6 +402,7 @@ class _ShopBodyState extends State<_ShopBody> {
       }
     } catch (_) {}
   }
+
   Future<void> _book() async {
     final t = _tr();
     if (_picked.isEmpty) {
@@ -435,16 +465,24 @@ class _ShopBodyState extends State<_ShopBody> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  /// متن قانون لغو؛ هر زمانی (دقیقه تا ماه) درست نوشته می‌شود
   String _policy(T6 t) {
     final m = bInt(_shop['cancel_before_min'], 120);
-    final txt = (m >= 60 && m % 60 == 0)
-        ? t.t('cu_h', {'n': fmtNum(m ~/ 60, t.lang)})
-        : t.t('cu_m', {'n': fmtNum(m, t.lang)});
-    return t.t('cu_policy', {'t': txt});
+    if (m <= 0) {
+      return _x(
+          t.lang,
+          'لغو نوبت تا لحظه‌ی شروع ممکن است.',
+          'You can cancel until the appointment starts.',
+          'يمكنك الإلغاء حتى لحظة بدء الموعد.');
+    }
+    return t.t('cu_policy', {'t': fmtSpan(m, t.lang)});
   }
+
   void _openRules(String lang) {
     openShopRules(context, lang, bStr(_shop['name']), bStr(_shop['rules']));
   }
+
   /// باز کردن صفحه‌ی کسب‌وکاری که تبلیغش دیده شده
   void _openAd(Map<String, dynamic> ad) {
     final server = bStr(ad['_server']);
@@ -460,6 +498,7 @@ class _ShopBodyState extends State<_ShopBody> {
       MaterialPageRoute(builder: (_) => ShopPage(api: api, card: card)),
     );
   }
+
   /// برچسب روز: «نام روز + روز/ماه» در تقویم انتخاب‌شده
   String _dayLabel(DateTime d, T6 t) {
     final n = CalConv.numeric(bIso(d), kCalKind, t.lang);
@@ -467,11 +506,13 @@ class _ShopBodyState extends State<_ShopBody> {
     final dm = p.length == 3 ? '${p[1]}/${p[2]}' : n;
     return '${t.t('d_${d.weekday % 7}')} $dm';
   }
+
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(top: 18, bottom: 8),
         child: Text(text,
             style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
       );
+
   @override
   Widget build(BuildContext context) {
     final st0 = SettingsScope.of(context);
@@ -511,6 +552,7 @@ class _ShopBodyState extends State<_ShopBody> {
       body: body,
     );
   }
+
   Widget _header(T6 t) {
     final avg = cDouble(_shop['rating_avg']);
     final count = bInt(_shop['rating_count']);
@@ -650,6 +692,7 @@ class _ShopBodyState extends State<_ShopBody> {
       ),
     );
   }
+
   Widget _content(T6 t) {
     final bt = BT(t.lang);
     final type = bizKeyOf(_shop);
@@ -659,7 +702,7 @@ class _ShopBodyState extends State<_ShopBody> {
     var totalDur = 0;
     for (final id in _picked) {
       final s = _svc(id);
-      total += bInt(s['price']);
+      total += parsePrice(s['price']);
       totalDur += bInt(s['duration_min']);
     }
     final slots = _slots;
@@ -709,8 +752,8 @@ class _ShopBodyState extends State<_ShopBody> {
                   label: Text([
                     bStr(s['name']),
                     '${fmtNum(bInt(s['duration_min']), t.lang)} ${t.t('b_min')}',
-                    if (bInt(s['price']) > 0)
-                      '${fmtNum(bInt(s['price']), t.lang)} $cur'.trim(),
+                    if (parsePrice(s['price']) > 0)
+                      fmtMoney(parsePrice(s['price']), cur, t.lang),
                   ].join(' · ')),
                   selected: _picked.contains(bStr(s['service_id'])),
                   onSelected: (_) => _toggle(bStr(s['service_id'])),
@@ -733,7 +776,7 @@ class _ShopBodyState extends State<_ShopBody> {
             children: [
               Text('${t.t('cu_total')}: ',
                   style: TextStyle(color: muted(context))),
-              Text('${fmtNum(total, t.lang)} $cur'.trim(),
+              Text(fmtMoney(total, cur, t.lang),
                   style: const TextStyle(fontWeight: FontWeight.w800)),
               const SizedBox(width: 12),
               Text('· ${fmtNum(totalDur, t.lang)} ${t.t('b_min')}',
@@ -826,6 +869,8 @@ class _ShopBodyState extends State<_ShopBody> {
                       ],
                     ),
                   ),
+                Text(fmtMoney(total, cur, t.lang),
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
               ],
             ),
           ),
@@ -909,6 +954,7 @@ class _ShopBodyState extends State<_ShopBody> {
       ],
     );
   }
+
   Widget _choiceRow(String sid, T6 t) {
     final svc = _svc(sid);
     final el = _eligible(sid);

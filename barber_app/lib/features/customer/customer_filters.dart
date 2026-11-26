@@ -9,6 +9,7 @@ import '../../app/registry.dart' show kRegistryUrl;
 import '../../app/service_catalog.dart';
 import '../../app/servers.dart';
 import '../../app/settings.dart';
+import '../../app/type_services.dart';
 
 class SearchFilters {
   String q;
@@ -27,7 +28,6 @@ class SearchFilters {
     this.group = '',
     this.type = '',
   });
-
   SearchFilters copy() => SearchFilters(
       q: q,
       city: city,
@@ -259,6 +259,7 @@ class SearchFilterBar extends StatelessWidget {
     required this.cities,
     required this.onChanged,
   });
+
   final String lang;
   final SearchFilters filters;
   final List<String> cities;
@@ -292,7 +293,7 @@ class SearchFilterBar extends StatelessWidget {
     if (f.group.isNotEmpty && f.group != 'beauty') {
       f.gender = '';
     }
-    final items = catalogForGroup(f.group, f.gender);
+    final items = catalogForType(f.group, f.type, f.gender);
     if (f.cat.isNotEmpty && !items.any((c) => c.key == f.cat)) f.cat = '';
     if (f.cat.isEmpty && (f.sort == 'price_asc' || f.sort == 'price_desc')) {
       f.sort = 'rating';
@@ -345,7 +346,8 @@ class SearchFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bt = BT(lang);
-    final items = catalogForGroup(filters.group, filters.gender);
+    final items =
+        catalogForType(filters.group, filters.type, filters.gender);
     final catValue = items.any((c) => c.key == filters.cat) ? filters.cat : '';
     final cityValue =
         (filters.city.isEmpty || cities.contains(filters.city))
@@ -357,6 +359,7 @@ class SearchFilterBar extends StatelessWidget {
     final types = group.isEmpty ? <BizType>[] : bizTypesOf(group);
     final typeValue =
         types.any((t) => t.key == filters.type) ? filters.type : '';
+
     final cityBox = DropdownButtonFormField<String>(
       value: cityValue,
       isExpanded: true,
@@ -368,6 +371,7 @@ class SearchFilterBar extends StatelessWidget {
       ],
       onChanged: (v) => _set(city: v ?? ''),
     );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -389,6 +393,7 @@ class SearchFilterBar extends StatelessWidget {
           const SizedBox(height: 10),
         ],
         DropdownButtonFormField<String>(
+          key: ValueKey('svc_${filters.group}_${filters.type}'),
           value: catValue,
           isExpanded: true,
           decoration: _dec(_t('svc')),

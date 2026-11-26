@@ -1,18 +1,20 @@
+import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
+import '../../app/strings_pay.dart';
 import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
+import 'pay_api.dart';
+import 'pay_page.dart';
 import 'renew_page.dart';
 import 'shop_api.dart';
 
 class PlansPage extends StatefulWidget {
   const PlansPage(this.ctx, {super.key});
   final ShopCtx ctx;
-
   @override
   State<PlansPage> createState() => _PlansPageState();
 }
@@ -34,6 +36,10 @@ class _PlansPageState extends State<PlansPage> {
   }
 
   String _priceLine(PlanDef p, T6 t, String lang) {
+    if (p.autoPay) {
+      return t.t('pl_per_month',
+          {'p': fmtNum(p.usdtMonthly, lang), 'c': 'USDT'});
+    }
     final c = t.t('pl_toman');
     if (p.oneTime > 0) {
       return t.t('pl_one_time', {'p': fmtNum(p.oneTime, lang), 'c': c});
@@ -44,61 +50,85 @@ class _PlansPageState extends State<PlansPage> {
 
   int _total(PlanDef p) {
     if (p.oneTime > 0) return p.oneTime;
+    if (p.autoPay) return planTotalUsdt(p, _months);
     return planTotal(p, _months);
   }
 
-  String _summary(PlanDef p, T6 t, String lang) {
-    final c = t.t('pl_toman');
-    final months = p.oneTime > 0
-        ? t.t('pl_months_one_time')
-        : t.t('pl_months', {'n': _months});
-    return t.t('pl_order', {
-      'plan': t.t('pl_name_${p.key}'),
-      'months': months,
-      'total': fmtNum(_total(p), lang),
-      'c': c,
-      'shop': widget.ctx.session.shop.name,
-    });
+  /// خرید خودکار با تتر (پایه و پرو)
+  Future<void> _buyUsdt(PlanDef p) async {
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PayPage(ctx: widget.ctx, plan: p, months: _months),
+      ),
+    );
+    if (ok == true) {
+      await widget.ctx.reload();
+      if (mounted) Navigator.of(context).pop();
+    }
   }
 
-  Future<void> _buy(PlanDef p, T6 t, String lang) async {
-    final text = _summary(p, t, lang);
-    await showDialog<void>(
+  /// ثبت درخواست (ویژه و شخصی)
+  Future<void> _request(PlanDef p, String lang) async {
+    final pt = PayT(lang);
+    final t6 = T6(lang);
+    final contact = TextEditingController();
+    final note = TextEditingController();
+    final go = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text(t.t('pl_buy_title')),
+        title: Text(pt.t('req_title', {'plan': t6.t('pl_name_${p.key}')})),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SelectableText(text,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 14),
-              Text(kPayContact.trim().isEmpty
-                  ? t.t('pl_unset')
-                  : t.t('pl_contact', {'c': kPayContact})),
+              Text(pt.t('req_desc')),
+              const SizedBox(height: 12),
+              TextField(
+                controller: contact,
+                decoration: InputDecoration(labelText: pt.t('req_contact')),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: note,
+                maxLines: 2,
+                decoration: InputDecoration(labelText: pt.t('req_note')),
+              ),
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(c).pop(),
-            child: Text(t.t('pl_close')),
+            onPressed: () => Navigator.pop(c, false),
+            child: Text(pt.t('cancel')),
           ),
           FilledButton(
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: text));
-              final m = ScaffoldMessenger.maybeOf(context);
-              m?.hideCurrentSnackBar();
-              m?.showSnackBar(SnackBar(content: Text(t.t('pl_copied'))));
-              Navigator.of(c).pop();
+              if (contact.text.trim().length < 3) return;
+              Navigator.pop(c, true);
             },
-            child: Text(t.t('pl_copy')),
+            child: Text(pt.t('req_send')),
           ),
         ],
       ),
     );
+    if (go != true || !mounted) return;
+    final shop = widget.ctx.session.shop;
+    try {
+      await PayApi(widget.ctx.api.settings).request(
+        plan: p.key,
+        months: p.oneTime > 0 ? 0 : _months,
+        shopName: shop.name,
+        phone: shop.phone,
+        contact: contact.text.trim(),
+        note: note.text.trim(),
+      );
+      if (mounted) toast(context, pt.t('req_ok'));
+    } on ApiException catch (e) {
+      if (mounted) toast(context, pt.error(e));
+    } catch (_) {
+      if (mounted) toast(context, pt.t('err_NETWORK'));
+    }
   }
 
   /// «کد لایسنس دارم»: برای پلن ویژه/شخصی دو کادر (لایسنس + exec) نشان می‌دهد
@@ -199,11 +229,15 @@ class _PlansPageState extends State<PlansPage> {
   }
 
   Widget _panel(PlanDef p, T6 t, String lang) {
-    final c = t.t('pl_toman');
-    final paid = p.oneTime > 0 || p.monthly > 0;
-    final monthly = p.oneTime == 0 && p.monthly > 0;
+    final pt = PayT(lang);
+    final isUsdt = p.autoPay;
+    final tomanPaid = p.oneTime > 0 || p.monthly > 0;
+    final paid = isUsdt || tomanPaid;
+    final monthly = p.oneTime == 0 && (isUsdt || p.monthly > 0);
+    final unit = isUsdt ? 'USDT' : t.t('pl_toman');
     final total = _total(p);
-    final full = monthly ? p.monthly * _months : total;
+    final base = isUsdt ? p.usdtMonthly : p.monthly;
+    final full = monthly ? base * _months : total;
     final saved = full - total;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +265,7 @@ class _PlansPageState extends State<PlansPage> {
             children: [
               Text('${t.t('pl_total')}: ',
                   style: TextStyle(color: muted(context))),
-              Text('${fmtNum(total, lang)} $c',
+              Text('${fmtNum(total, lang)} $unit',
                   style: const TextStyle(
                       fontSize: 17, fontWeight: FontWeight.w800)),
             ],
@@ -240,18 +274,27 @@ class _PlansPageState extends State<PlansPage> {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                t.t('pl_save', {'p': fmtNum(saved, lang), 'c': c}),
+                t.t('pl_save', {'p': fmtNum(saved, lang), 'c': unit}),
                 style: const TextStyle(color: AppColors.green),
               ),
             ),
           const SizedBox(height: 14),
-          GradientButton(
-            icon: Icons.shopping_cart_rounded,
-            label: t.t('pl_buy'),
-            onPressed: () {
-              _buy(p, t, lang);
-            },
-          ),
+          if (isUsdt)
+            GradientButton(
+              icon: Icons.shopping_cart_rounded,
+              label: pt.t('buy_usdt'),
+              onPressed: () {
+                _buyUsdt(p);
+              },
+            )
+          else
+            GradientButton(
+              icon: Icons.support_agent_rounded,
+              label: pt.t('req_btn'),
+              onPressed: () {
+                _request(p, lang);
+              },
+            ),
           const SizedBox(height: 10),
         ],
         GradientButton(

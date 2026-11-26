@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/cal_fmt.dart';
+import '../../app/currency.dart';
+import '../../app/date_pick.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
@@ -18,6 +21,42 @@ const Map<String, String> _appCustomer = {
   'ar': 'زبون من التطبيق',
 };
 
+const Map<String, Map<String, String>> _bx = {
+  'fa': {
+    'tab0': 'جاری',
+    'tab1': 'انجام‌شده',
+    'tab2': 'نیامده',
+    'tab3': 'لغوشده',
+    'locked': 'فعال می‌شود از ساعت {t}',
+    'expired': 'مهلت این اقدام تمام شده است',
+    'total': 'جمع',
+  },
+  'en': {
+    'tab0': 'Current',
+    'tab1': 'Done',
+    'tab2': 'No-show',
+    'tab3': 'Cancelled',
+    'locked': 'Unlocks at {t}',
+    'expired': 'The time to act has passed',
+    'total': 'Total',
+  },
+  'ar': {
+    'tab0': 'الحالية',
+    'tab1': 'المنجزة',
+    'tab2': 'لم يحضر',
+    'tab3': 'الملغاة',
+    'locked': 'يُفعَّل من الساعة {t}',
+    'expired': 'انتهت مهلة الإجراء',
+    'total': 'المجموع',
+  },
+};
+
+String _lx(String lang, String k) =>
+    (_bx[lang] ?? _bx['fa']!)[k] ?? _bx['fa']![k] ?? k;
+
+/// تا چند دقیقه بعد از پایان نوبت، دکمه‌ها فعال می‌مانند
+const int _kGraceMin = 15;
+
 /// اگر «نام» در واقع یک شناسه‌ی فنی باشد (مثل c_83hd92kd01) نشان داده نمی‌شود
 String _niceName(String n, String lang) {
   final s = n.trim();
@@ -28,9 +67,19 @@ String _niceName(String n, String lang) {
   return s;
 }
 
+/// تاریخ + دقیقه → دقیقه‌ی مطلق (برای مقایسه)
+int _absOf(String date, int min) {
+  final d = date.length >= 10 ? date.substring(0, 10) : date;
+  final p = DateTime.tryParse(d);
+  if (p == null) return -1;
+  return DateTime.utc(p.year, p.month, p.day).millisecondsSinceEpoch ~/ 60000 +
+      min;
+}
+
 class BookingsPage extends StatefulWidget {
   const BookingsPage(this.ctx, {super.key});
   final ShopCtx ctx;
+
   @override
   State<BookingsPage> createState() => _BookingsPageState();
 }
@@ -44,15 +93,32 @@ class _BookingsPageState extends State<BookingsPage> {
   List<Map<String, dynamic>> _rows = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _staff = <Map<String, dynamic>>[];
   String _staffFilter = '';
+  int _tab = 0;
+  String? _shopCur;
+  int _baseAbs = -1;
+  DateTime _fetchedAt = DateTime.now();
+  Timer? _tick;
+
   bool get _owner => widget.ctx.session.isOwner;
   T6 _tr() => T6(SettingsScope.read(context).lang);
+
   @override
   void initState() {
     super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _load();
     });
   }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
   bool _lost(Object e) {
     if (isSessionLost(e)) {
       if (mounted) Navigator.of(context).pop();
@@ -61,6 +127,16 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     return false;
   }
+
+  /// «الان» به دقیقه‌ی مطلق؛ از ساعت سرور و گذشت زمان از آخرین دریافت
+  int _curAbs() {
+    if (_baseAbs >= 0) {
+      return _baseAbs + DateTime.now().difference(_fetchedAt).inMinutes;
+    }
+    final n = DateTime.now();
+    return _absOf(bIso(DateTime(n.year, n.month, n.day)), n.hour * 60 + n.minute);
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -98,9 +174,25 @@ class _BookingsPageState extends State<BookingsPage> {
           staff = bFirstList(sr, ['staff', 'items', 'list']);
         } catch (_) {}
       }
+      if (_shopCur == null) {
+        try {
+          final me = await raw.call('me');
+          final sh = me['shop'];
+          if (sh is Map) _shopCur = '${sh['currency'] ?? ''}';
+        } catch (_) {}
+      }
       if (!mounted) return;
+      var base = -1;
+      if (bStr(now['date']).isNotEmpty) {
+        final nm = bStr(now['time']).isNotEmpty
+            ? bMin(bStr(now['time']))
+            : bInt(now['min']);
+        base = _absOf(bStr(now['date']), nm);
+      }
       setState(() {
         _now = now;
+        _baseAbs = base;
+        _fetchedAt = DateTime.now();
         _date = day;
         _staff = staff;
         _rows = all.where((b) => bStr(b['date']).startsWith(day)).toList();
@@ -115,6 +207,7 @@ class _BookingsPageState extends State<BookingsPage> {
       });
     }
   }
+
   Future<void> _act(String action, Map<String, dynamic> params) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -131,6 +224,7 @@ class _BookingsPageState extends State<BookingsPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
   Future<void> _confirmAct({
     required String message,
     required String yes,
@@ -150,24 +244,30 @@ class _BookingsPageState extends State<BookingsPage> {
     if (ok != true || !mounted) return;
     await _act(action, params);
   }
+
   void _shift(int n) {
     final d = bParse(_date ?? '');
     if (d == null) return;
     setState(() => _date = bIso(DateTime(d.year, d.month, d.day + n)));
     _load();
   }
+
   Future<void> _pick() async {
+    final st = SettingsScope.read(context);
     final cur = bParse(_date ?? '') ?? DateTime.now();
-    final d = await showDatePicker(
-      context: context,
-      initialDate: cur,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+    final d = await pickLocalDate(
+      context,
+      cur,
+      DateTime(2020),
+      DateTime(2100),
+      st.calendarKey,
+      st.lang,
     );
     if (d == null || !mounted) return;
     setState(() => _date = bIso(d));
     _load();
   }
+
   Future<void> _newManual() async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -176,6 +276,8 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     if (ok == true && mounted) _load();
   }
+
+  /// گروه‌ها: تازه‌ترین نوبت بالا
   List<List<Map<String, dynamic>>> _groups() {
     final map = <String, List<Map<String, dynamic>>>{};
     for (final b in _rows) {
@@ -189,21 +291,32 @@ class _BookingsPageState extends State<BookingsPage> {
       g.sort((a, b) => bMin(bStr(a['start_time']))
           .compareTo(bMin(bStr(b['start_time']))));
     }
-    list.sort((a, b) => bMin(bStr(a.first['start_time']))
-        .compareTo(bMin(bStr(b.first['start_time']))));
+    list.sort((a, b) => bMin(bStr(b.first['start_time']))
+        .compareTo(bMin(bStr(a.first['start_time']))));
     return list;
   }
-  bool _started(Map<String, dynamic> b) {
-    final today = bStr(_now['date']);
-    final d = bStr(b['date']);
-    if (today.isEmpty) return false;
-    if (d.compareTo(today) < 0) return true;
-    if (d != today) return false;
-    final nm = bStr(_now['time']).isNotEmpty
-        ? bMin(bStr(_now['time']))
-        : bInt(_now['min']);
-    return bMin(bStr(b['start_time'])) <= nm;
+
+  /// 0 جاری، 1 انجام‌شده، 2 نیامده، 3 لغوشده
+  int _cat(List<Map<String, dynamic>> g) {
+    final ss = g.map((b) => bStr(b['status'])).toList();
+    if (ss.any((s) => s == 'booked' || s == 'checked_in')) return 0;
+    if (ss.any((s) => s == 'finished')) return 1;
+    if (ss.any((s) => s == 'no_show')) return 2;
+    return 3;
   }
+
+  /// 0 = هنوز قفل ، 1 = فعال ، 2 = مهلت تمام شد
+  int _win(String date, String start, String end) {
+    final s = _absOf(date, bMin(start));
+    var e = _absOf(date, bMin(end));
+    if (s < 0) return 1;
+    if (e < s) e += 1440;
+    final now = _curAbs();
+    if (now < s) return 0;
+    if (now <= e + _kGraceMin) return 1;
+    return 2;
+  }
+
   Color _stColor(String s) {
     switch (s) {
       case 'booked':
@@ -219,13 +332,21 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     return muted(context);
   }
+
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
     final t = T6(st.lang);
-    final groups = _groups();
+    final all = _groups();
+    final counts = <int>[0, 0, 0, 0];
+    for (final g in all) {
+      counts[_cat(g)]++;
+    }
+    final groups = all.where((g) => _cat(g) == _tab).toList();
     final children = <Widget>[
       _dayBar(t),
+      const SizedBox(height: 10),
+      _tabBar(t, counts),
       const SizedBox(height: 10),
     ];
     if (_owner && _staff.length > 1) {
@@ -277,15 +398,6 @@ class _BookingsPageState extends State<BookingsPage> {
           ),
         ));
       } else {
-        children.add(Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Wrap(
-            spacing: 8,
-            children: [
-              Pill(t.t('b_count', {'n': fmtNum(groups.length, t.lang)})),
-            ],
-          ),
-        ));
         for (final g in groups) {
           children.add(Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -325,6 +437,26 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
+
+  Widget _tabBar(T6 t, List<int> counts) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < 4; i++)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: ChoiceChip(
+                label: Text('${_lx(t.lang, 'tab$i')} · ${fmtNum(counts[i], t.lang)}'),
+                selected: _tab == i,
+                onSelected: (_) => setState(() => _tab = i),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _dayBar(T6 t) {
     final st = SettingsScope.read(context);
     final day = _date;
@@ -380,6 +512,7 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
+
   Widget _filterBar(T6 t) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -412,25 +545,40 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
+
   Widget _groupCard(List<Map<String, dynamic>> g, T6 t) {
     final first = g.first;
     final name = _niceName(bStr(first['customer_name']), t.lang);
     final phone = bStr(first['customer_phone']);
     final manual = g.any((b) => bStr(b['source']) == 'manual');
+    final cur = bStr(first['currency']).isNotEmpty
+        ? bStr(first['currency'])
+        : (_shopCur ?? '');
     var endMin = 0;
     var endStr = '';
+    var startMin = 24 * 60;
+    var startStr = bStr(first['start_time']);
+    var total = 0;
     for (final b in g) {
       final m = bMin(bStr(b['end_time']));
       if (m >= endMin) {
         endMin = m;
         endStr = bStr(b['end_time']);
       }
+      final sm = bMin(bStr(b['start_time']));
+      if (sm < startMin) {
+        startMin = sm;
+        startStr = bStr(b['start_time']);
+      }
+      final s = bStr(b['status']);
+      if (s != 'cancelled' && s != 'no_show') total += parsePrice(b['price']);
     }
     final allDead = g.every((b) {
       final s = bStr(b['status']);
       return s == 'cancelled' || s == 'no_show';
     });
     final anyBooked = g.any((b) => bStr(b['status']) == 'booked');
+    final gw = _win(bStr(first['date']), startStr, endStr);
     final gid = bStr(first['group_id']);
     final card = Glass(
       child: Column(
@@ -438,7 +586,7 @@ class _BookingsPageState extends State<BookingsPage> {
         children: [
           Row(
             children: [
-              Text(localDigits('${bStr(first['start_time'])} – $endStr', t.lang),
+              Text(localDigits('$startStr – $endStr', t.lang),
                   textDirection: TextDirection.ltr,
                   style: const TextStyle(
                       fontSize: 18, fontWeight: FontWeight.w800)),
@@ -482,26 +630,41 @@ class _BookingsPageState extends State<BookingsPage> {
             ],
           ),
           const Divider(height: 22),
-          for (final b in g) _line(b, t),
-          if (anyBooked) ...[
+          for (final b in g) _line(b, t, cur),
+          if (g.length > 1 && total > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Text('${_lx(t.lang, 'total')}: ',
+                      style: TextStyle(color: muted(context))),
+                  Text(fmtMoney(total, cur, t.lang),
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+          if (anyBooked && gw != 2) ...[
             const SizedBox(height: 4),
             GradientButton(
               compact: true,
               danger: true,
               icon: Icons.cancel_rounded,
               label: t.t('b_cancel'),
-              onPressed: () {
-                if (_busy) return;
-                _confirmAct(
-                  message: t.t('b_cancel_q'),
-                  yes: t.t('b_cancel_yes'),
-                  danger: true,
-                  action: 'booking_cancel',
-                  params: gid.isNotEmpty
-                      ? <String, dynamic>{'group_id': gid}
-                      : <String, dynamic>{'booking_id': bStr(first['booking_id'])},
-                );
-              },
+              onPressed: (_busy || gw != 1)
+                  ? null
+                  : () {
+                      _confirmAct(
+                        message: t.t('b_cancel_q'),
+                        yes: t.t('b_cancel_yes'),
+                        danger: true,
+                        action: 'booking_cancel',
+                        params: gid.isNotEmpty
+                            ? <String, dynamic>{'group_id': gid}
+                            : <String, dynamic>{
+                                'booking_id': bStr(first['booking_id'])
+                              },
+                      );
+                    },
             ),
           ],
         ],
@@ -509,18 +672,22 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     return allDead ? Opacity(opacity: 0.6, child: card) : card;
   }
-  Widget _line(Map<String, dynamic> b, T6 t) {
+
+  Widget _line(Map<String, dynamic> b, T6 t, String cur) {
     final status = bStr(b['status']);
-    final canDone = status == 'booked' || status == 'checked_in';
-    final canNo = status == 'booked' && _started(b);
+    final active = status == 'booked' || status == 'checked_in';
+    final w = active
+        ? _win(bStr(b['date']), bStr(b['start_time']), bStr(b['end_time']))
+        : 1;
+    final canDone = active;
+    final canNo = status == 'booked';
     final rating = bInt(b['rating']);
-    final price = bInt(b['price']);
+    final price = parsePrice(b['price']);
     final dur = bInt(b['duration_min']);
     final bid = bStr(b['booking_id']);
     final sub = <String>[
       if (bStr(b['staff_name']).isNotEmpty) bStr(b['staff_name']),
       if (dur > 0) '${fmtNum(dur, t.lang)} ${t.t('b_min')}',
-      if (price > 0) fmtNum(price, t.lang),
     ].join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -543,6 +710,13 @@ class _BookingsPageState extends State<BookingsPage> {
                             style: TextStyle(
                                 color: muted(context), fontSize: 12.5)),
                       ),
+                    if (price > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(fmtMoney(price, cur, t.lang),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 13.5)),
+                      ),
                   ],
                 ),
               ),
@@ -557,7 +731,12 @@ class _BookingsPageState extends State<BookingsPage> {
               Pill(t.t('b_status_$status'), color: _stColor(status)),
             ],
           ),
-          if (canDone || canNo) ...[
+          if (active && w == 2) ...[
+            const SizedBox(height: 6),
+            Text(_lx(t.lang, 'expired'),
+                style: TextStyle(color: muted(context), fontSize: 12)),
+          ],
+          if (active && w != 2) ...[
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -568,16 +747,17 @@ class _BookingsPageState extends State<BookingsPage> {
                     compact: true,
                     icon: Icons.check_circle_rounded,
                     label: t.t('b_done'),
-                    onPressed: () {
-                      if (_busy) return;
-                      _confirmAct(
-                        message: t.t('b_done_q'),
-                        yes: t.t('b_done_yes'),
-                        danger: false,
-                        action: 'booking_finish',
-                        params: <String, dynamic>{'booking_id': bid},
-                      );
-                    },
+                    onPressed: (_busy || w != 1)
+                        ? null
+                        : () {
+                            _confirmAct(
+                              message: t.t('b_done_q'),
+                              yes: t.t('b_done_yes'),
+                              danger: false,
+                              action: 'booking_finish',
+                              params: <String, dynamic>{'booking_id': bid},
+                            );
+                          },
                   ),
                 if (canNo)
                   GradientButton(
@@ -585,19 +765,28 @@ class _BookingsPageState extends State<BookingsPage> {
                     outlined: true,
                     icon: Icons.person_off_rounded,
                     label: t.t('b_noshow'),
-                    onPressed: () {
-                      if (_busy) return;
-                      _confirmAct(
-                        message: t.t('b_noshow_q'),
-                        yes: t.t('b_noshow_yes'),
-                        danger: true,
-                        action: 'booking_noshow',
-                        params: <String, dynamic>{'booking_id': bid},
-                      );
-                    },
+                    onPressed: (_busy || w != 1)
+                        ? null
+                        : () {
+                            _confirmAct(
+                              message: t.t('b_noshow_q'),
+                              yes: t.t('b_noshow_yes'),
+                              danger: true,
+                              action: 'booking_noshow',
+                              params: <String, dynamic>{'booking_id': bid},
+                            );
+                          },
                   ),
               ],
             ),
+            if (w == 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                    _lx(t.lang, 'locked').replaceAll('{t}',
+                        localDigits(bStr(b['start_time']), t.lang)),
+                    style: TextStyle(color: muted(context), fontSize: 12)),
+              ),
           ],
         ],
       ),

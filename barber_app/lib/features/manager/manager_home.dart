@@ -1,4 +1,3 @@
-import 'package:barber_app/app/app_header.dart';
 import 'package:flutter/material.dart';
 import '../../app/app_header.dart';
 import '../../app/biz_panel.dart';
@@ -42,7 +41,6 @@ String _subLabel(String lang, String plan, String fallback) {
 
 class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key, required this.ctx});
-
   final ShopCtx ctx;
 
   @override
@@ -163,6 +161,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         ? _x(lang, 'مدیر', 'Owner', 'المدير')
         : _x(lang, 'نفر پرسنل', 'Staff member', 'موظف');
     final planText = s.has(planKey) ? s.t(planKey) : shop.plan;
+
     final pills = <Widget>[
       Pill(roleText),
     ];
@@ -241,6 +240,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         ],
       ),
     ];
+
     if (!sub.free) {
       subRows.add(const SizedBox(height: 12));
       subRows.add(
@@ -275,7 +275,9 @@ class _ManagerHomeState extends State<ManagerHome> {
             label: s.t('renew'),
             onPressed: () async {
               final ok = await Navigator.of(context).push<bool>(
-                MaterialPageRoute(builder: (_) => RenewPage(api: ctx.api)),
+                MaterialPageRoute(
+                    builder: (_) => RenewPage(
+                        api: ctx.api, currentPlan: shop.plan)),
               );
               if (ok == true) await ctx.reload();
             },
@@ -283,6 +285,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         );
       }
     }
+
     final subCard = Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,21 +395,7 @@ class _ManagerHomeState extends State<ManagerHome> {
         onTap: () => Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => TimeOffPage(ctx))),
       ));
-      items.add(tile(
-        icon: Icons.favorite_rounded,
-        title: panel.msgTitle(lang),
-        desc: _x(
-          lang,
-          'متن پیام‌ها و فاصلهٔ زمانی ارسال برای مشتری‌ها',
-          'Message texts and how many days later they are sent to customers',
-          'نصوص الرسائل وعدد الأيام لإرسالها للزبائن',
-        ),
-        gradient: const LinearGradient(
-          colors: [AppColors.pink, AppColors.blue],
-        ),
-        onTap: () => Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => WinbackPage(ctx))),
-      ));
+      // «تبلیغات» بالای «پیام اختصاصی»
       items.add(tile(
         icon: Icons.campaign_rounded,
         title: _x(lang, 'تبلیغات', 'Advertising', 'الإعلانات'),
@@ -421,6 +410,21 @@ class _ManagerHomeState extends State<ManagerHome> {
         ),
         onTap: () => Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => const AdsPage())),
+      ));
+      items.add(tile(
+        icon: Icons.favorite_rounded,
+        title: panel.msgTitle(lang),
+        desc: _x(
+          lang,
+          'متن پیام‌ها و فاصلهٔ زمانی ارسال برای مشتری‌ها',
+          'Message texts and how many days later they are sent to customers',
+          'نصوص الرسائل وعدد الأيام لإرسالها للزبائن',
+        ),
+        gradient: const LinearGradient(
+          colors: [AppColors.pink, AppColors.blue],
+        ),
+        onTap: () => Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => WinbackPage(ctx))),
       ));
       items.add(tile(
         icon: Icons.workspace_premium_rounded,

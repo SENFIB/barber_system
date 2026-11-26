@@ -1,6 +1,7 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import '../../app/biz_panel.dart';
+import '../../app/currency.dart';
 import '../../app/fmt.dart';
 import '../../app/settings.dart';
 import '../../app/strings_m.dart';
@@ -17,6 +18,7 @@ String _x(String l, String fa, String en, String ar) =>
 class ServicesPage extends StatefulWidget {
   const ServicesPage({super.key, required this.ctx});
   final ShopCtx ctx;
+
   @override
   State<ServicesPage> createState() => _ServicesPageState();
 }
@@ -27,6 +29,7 @@ class _ServicesPageState extends State<ServicesPage> {
   String? _err;
   List<Map<String, dynamic>> _list = [];
   late BizPanel _panel;
+  String _cur = '';
 
   M get _m => M(SettingsScope.read(context).lang);
 
@@ -54,8 +57,11 @@ class _ServicesPageState extends State<ServicesPage> {
       try {
         final me = await raw.call('me');
         final sh = me['shop'];
-        if (sh is Map && '${sh['biz_type'] ?? ''}'.isNotEmpty) {
-          _panel = BizPanel.of('${sh['biz_type']}');
+        if (sh is Map) {
+          if ('${sh['biz_type'] ?? ''}'.isNotEmpty) {
+            _panel = BizPanel.of('${sh['biz_type']}');
+          }
+          _cur = '${sh['currency'] ?? ''}';
         }
       } catch (_) {}
       final l = await widget.ctx.api.serviceList();
@@ -110,11 +116,14 @@ class _ServicesPageState extends State<ServicesPage> {
 
   Future<void> _edit([Map<String, dynamic>? ex]) async {
     final m = _m;
+    final lang = SettingsScope.read(context).lang;
     final exId = ex == null ? '' : '${ex['service_id']}';
     final r = await showDialog<_SvcResult>(
       context: context,
       builder: (_) => _ServiceDialog(
         m: m,
+        lang: lang,
+        cur: _cur,
         icon: _panel.icon,
         existing: ex,
         others:
@@ -155,11 +164,11 @@ class _ServicesPageState extends State<ServicesPage> {
     return const [];
   }
 
-  Widget _card(Map<String, dynamic> sv, M m) {
+  Widget _card(Map<String, dynamic> sv, M m, String lang) {
     final id = '${sv['service_id'] ?? ''}';
     final name = '${sv['name'] ?? ''}';
     final dur = int.tryParse('${sv['duration_min']}') ?? 0;
-    final price = num.tryParse('${sv['price']}') ?? 0;
+    final price = parsePrice(sv['price']);
     final names = {for (final e in _list) '${e['service_id']}': '${e['name']}'};
     final comb = _ids(sv['combinable_with'])
         .map((c) => names[c] ?? '')
@@ -185,9 +194,10 @@ class _ServicesPageState extends State<ServicesPage> {
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      Pill('$dur ${m.t('min_unit')}', color: AppColors.blue),
+                      Pill('${fmtNum(dur, lang)} ${m.t('min_unit')}',
+                          color: AppColors.blue),
                       Pill(
-                        '${fmtNum(price)} ${m.t('cur_default')}'.trim(),
+                        fmtMoney(price, _cur, lang),
                         color: AppColors.green,
                       ),
                     ],
@@ -269,7 +279,7 @@ class _ServicesPageState extends State<ServicesPage> {
                       style: TextStyle(color: muted(context), height: 1.6)),
                 ),
               ),
-            for (final sv in _list) _card(sv, m),
+            for (final sv in _list) _card(sv, m, lang),
           ],
         ),
       );
@@ -301,14 +311,19 @@ class _SvcResult {
 class _ServiceDialog extends StatefulWidget {
   const _ServiceDialog({
     required this.m,
+    required this.lang,
+    required this.cur,
     required this.icon,
     required this.others,
     this.existing,
   });
   final M m;
+  final String lang;
+  final String cur;
   final IconData icon;
   final List<Map<String, dynamic>> others;
   final Map<String, dynamic>? existing;
+
   @override
   State<_ServiceDialog> createState() => _ServiceDialogState();
 }
@@ -318,8 +333,13 @@ class _ServiceDialogState extends State<_ServiceDialog> {
       TextEditingController(text: '${widget.existing?['name'] ?? ''}');
   late final TextEditingController _dur = TextEditingController(
       text: '${widget.existing?['duration_min'] ?? 30}');
-  late final TextEditingController _price = TextEditingController(
-      text: widget.existing == null ? '' : '${widget.existing!['price'] ?? 0}');
+  late final MoneyController _price = MoneyController(
+    lang: widget.lang,
+    text: (widget.existing == null ||
+            parsePrice(widget.existing!['price']) <= 0)
+        ? null
+        : '${parsePrice(widget.existing!['price'])}',
+  );
   final Set<String> _comb = {};
 
   @override
@@ -360,7 +380,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
     }
     Navigator.pop(
       context,
-      _SvcResult(_name.text.trim(), d, _num(_price.text) ?? 0, _comb.toList()),
+      _SvcResult(_name.text.trim(), d, _price.number ?? 0, _comb.toList()),
     );
   }
 
@@ -399,7 +419,8 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                   Expanded(
                     child: GlassField(
                       controller: _price,
-                      label: m.t('svc_price'),
+                      label:
+                          '${m.t('svc_price')} (${currencyName(widget.cur, widget.lang)})',
                       icon: Icons.payments_outlined,
                       keyboard: TextInputType.number,
                       ltr: true,
@@ -414,7 +435,7 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                 children: [
                   for (final v in const [10, 15, 20, 30, 45, 60])
                     ActionChip(
-                      label: Text('$v'),
+                      label: Text(fmtNum(v, widget.lang)),
                       onPressed: () => setState(() => _dur.text = '$v'),
                     ),
                 ],

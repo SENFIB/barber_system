@@ -151,8 +151,8 @@ String _art(String n) => 'AEIOUaeiou'.contains(n[0]) ? 'an' : 'a';
 /// «خودم هم دامپزشکم» و مانند آن
 String bwSelf(String? type, String l) {
   if (bwGeneric(type)) {
-    return _w(l, 'خودم هم خدمت می‌دهم', 'I also provide services myself',
-        'أقدّم الخدمات بنفسي أيضًا');
+    return _w(l, 'خودم هم فعالیت می‌کنم', 'I am also active myself',
+        'أنا أيضًا أعمل بنفسي');
   }
   final r = bwRole(type);
   final fa = r[0].endsWith('ی') ? '${r[0]}‌ام' : '${r[0]}م';

@@ -19,9 +19,40 @@ class _NewStaff {
   final bool serves;
 }
 
+/// اگر «نام» در واقع شناسه‌ی فنی باشد (مثل s_83hd92kd01)
+bool _idLike(String s) {
+  final v = s.trim();
+  return RegExp(r'^[A-Za-z0-9_\-]{8,}$').hasMatch(v) &&
+      RegExp(r'[0-9_\-]').hasMatch(v);
+}
+
+/// نام قابل‌نمایش؛ خالی یا شناسه → رشته‌ی خالی
+String _okName(dynamic v) {
+  final s = jStr(v).trim();
+  return (s.isEmpty || _idLike(s)) ? '' : s;
+}
+
+String _pickOwnerName(Map<String, dynamic> me) {
+  final sh = me['shop'];
+  final u = me['user'];
+  final cands = <dynamic>[
+    me['owner_name'],
+    me['user_name'],
+    me['display_name'],
+    if (u is Map) u['name'],
+    if (u is Map) u['owner_name'],
+    if (sh is Map) sh['owner_name'],
+    me['name'],
+  ];
+  for (final v in cands) {
+    final n = _okName(v);
+    if (n.isNotEmpty) return n;
+  }
+  return '';
+}
+
 class StaffPage extends StatefulWidget {
   const StaffPage(this.ctx, {super.key});
-
   final ShopCtx ctx;
 
   @override
@@ -34,6 +65,8 @@ class _StaffPageState extends State<StaffPage> {
   String? _err;
   bool _owner = false;
   String _myId = '';
+  String _ownerName = '';
+  bool _fixTried = false;
   int _max = 0;
   List<Map<String, dynamic>> _staff = [];
   late BizPanel _panel;
@@ -57,6 +90,32 @@ class _StaffPageState extends State<StaffPage> {
     return false;
   }
 
+  /// نام نمایشی: اگر شناسه یا خالی بود، نام مدیر یا «مدیر»
+  String _shownName(Map<String, dynamic> r, bool mine) {
+    final n = _okName(r['name']);
+    if (n.isNotEmpty) return n;
+    if (mine) {
+      return _ownerName.isNotEmpty ? _ownerName : _panel.ownerLabel(_lang);
+    }
+    return '—';
+  }
+
+  /// اگر رکورد خودِ مدیر با شناسه ساخته شده بود، یک بار نامش را در سرور اصلاح می‌کند
+  Future<void> _fixOwnerName() async {
+    if (_fixTried || !_owner || _myId.isEmpty || _ownerName.isEmpty) return;
+    for (final r in _staff) {
+      if (jStr(r['staff_id']) == _myId && _okName(r['name']).isEmpty) {
+        _fixTried = true;
+        try {
+          await _raw.call(
+              'staff_update', {'staff_id': _myId, 'name': _ownerName});
+          if (mounted) _load(silent: true);
+        } catch (_) {}
+        return;
+      }
+    }
+  }
+
   Future<void> _load({bool silent = false}) async {
     if (!silent) {
       setState(() {
@@ -75,6 +134,8 @@ class _StaffPageState extends State<StaffPage> {
       setState(() {
         _owner = jStr(me['role']) == 'owner';
         _myId = jStr(me['staff_id']);
+        final on = _pickOwnerName(me);
+        if (on.isNotEmpty) _ownerName = on;
         _staff = jRows(d['staff']);
         _max = jInt(d['max_staff']) ?? 0;
         if (sh is Map && '${sh['biz_type'] ?? ''}'.isNotEmpty) {
@@ -83,6 +144,7 @@ class _StaffPageState extends State<StaffPage> {
         _loading = false;
         _err = null;
       });
+      _fixOwnerName();
     } catch (e) {
       if (!mounted) return;
       if (_lost(e)) return;
@@ -247,7 +309,7 @@ class _StaffPageState extends State<StaffPage> {
     final yes = await confirmDialog(
       context,
       title: x.t('remove'),
-      message: '${jStr(r['name'])}\n${x.t('remove_confirm')}',
+      message: '${_shownName(r, false)}\n${x.t('remove_confirm')}',
       okLabel: x.t('remove'),
       cancelLabel: x.t('cancel'),
       danger: true,
@@ -270,6 +332,8 @@ class _StaffPageState extends State<StaffPage> {
         danger: true,
       );
       if (!yes) return;
+    } else {
+      _fixTried = false;
     }
     final ok = await _act(() async {
       await _raw.call('owner_barber', {
@@ -279,6 +343,8 @@ class _StaffPageState extends State<StaffPage> {
         'enabled': v,
         'enable': v,
         'on': v,
+        if (v && _ownerName.isNotEmpty) 'name': _ownerName,
+        if (v && _ownerName.isNotEmpty) 'owner_name': _ownerName,
       });
     }, x.t(v ? 'staff_added' : 'staff_removed'));
     if (ok) widget.ctx.reload();
@@ -424,7 +490,7 @@ class _StaffPageState extends State<StaffPage> {
   Widget _card(Map<String, dynamic> r, T6 x, String lang) {
     final id = jStr(r['staff_id']);
     final mine = id == _myId;
-    final name = jStr(r['name']);
+    final name = _shownName(r, mine);
     final spec = jStr(r['specialty']);
     final support = supportRoleOf(spec);
     final hasLogin = jBool(r['has_login']);
@@ -480,7 +546,7 @@ class _StaffPageState extends State<StaffPage> {
                           ],
                         ],
                       ),
-                      if (spec.isNotEmpty)
+                      if (spec.isNotEmpty && !_idLike(spec))
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(spec,

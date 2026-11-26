@@ -28,6 +28,9 @@ const Map<String, Map<String, String>> _bx = {
     'locked': 'فعال می‌شود از ساعت {t}',
     'expired': 'مهلت این اقدام تمام شده است',
     'total': 'جمع',
+    'view1': 'ردیفی',
+    'view2': '۲ ستون',
+    'view3': '۳ ستون',
   },
   'en': {
     'tab0': 'Current',
@@ -37,6 +40,9 @@ const Map<String, Map<String, String>> _bx = {
     'locked': 'Unlocks at {t}',
     'expired': 'The time to act has passed',
     'total': 'Total',
+    'view1': 'List',
+    'view2': '2 columns',
+    'view3': '3 columns',
   },
   'ar': {
     'tab0': 'الحالية',
@@ -46,6 +52,9 @@ const Map<String, Map<String, String>> _bx = {
     'locked': 'يُفعَّل من الساعة {t}',
     'expired': 'انتهت مهلة الإجراء',
     'total': 'المجموع',
+    'view1': 'قائمة',
+    'view2': 'عمودان',
+    'view3': '3 أعمدة',
   },
 };
 String _lx(String lang, String k) =>
@@ -85,6 +94,7 @@ class _BookingsPageState extends State<BookingsPage> {
   List<Map<String, dynamic>> _staff = <Map<String, dynamic>>[];
   String _staffFilter = '';
   int _tab = 0;
+  int _cols = 0; // 0 = خودکار (ویندوز: ۲ ستون)
   String? _shopCur;
   int _baseAbs = -1;
   DateTime _fetchedAt = DateTime.now();
@@ -122,6 +132,23 @@ class _BookingsPageState extends State<BookingsPage> {
     final n = DateTime.now();
     return _absOf(bIso(DateTime(n.year, n.month, n.day)), n.hour * 60 + n.minute);
   }
+  Future<List<Map<String, dynamic>>> _loadStaff(ShopRaw raw) async {
+    if (!_owner || _staff.isNotEmpty) return _staff;
+    try {
+      final sr = await raw.call('staff_list');
+      return bFirstList(sr, ['staff', 'items', 'list']);
+    } catch (_) {
+      return _staff;
+    }
+  }
+  Future<void> _loadCur(ShopRaw raw) async {
+    if (_shopCur != null) return;
+    try {
+      final me = await raw.call('me');
+      final sh = me['shop'];
+      if (sh is Map) _shopCur = '${sh['currency'] ?? ''}';
+    } catch (_) {}
+  }
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -141,7 +168,12 @@ class _BookingsPageState extends State<BookingsPage> {
       }
       final params = <String, dynamic>{'date_from': from, 'date_to': to};
       if (_owner && _staffFilter.isNotEmpty) params['staff_id'] = _staffFilter;
+      // سه درخواست هم‌زمان (سریع‌تر)
+      final staffF = _loadStaff(raw);
+      final curF = _loadCur(raw);
       final r = await raw.call('bookings_list', params);
+      final staff = await staffF;
+      await curF;
       if (!mounted) return;
       final nowRaw = r['now'];
       final now = nowRaw is Map
@@ -152,21 +184,6 @@ class _BookingsPageState extends State<BookingsPage> {
               ? bStr(now['date'])
               : bIso(DateTime.now()));
       final all = bFirstList(r, ['bookings']);
-      var staff = _staff;
-      if (_owner && staff.isEmpty) {
-        try {
-          final sr = await raw.call('staff_list');
-          staff = bFirstList(sr, ['staff', 'items', 'list']);
-        } catch (_) {}
-      }
-      if (_shopCur == null) {
-        try {
-          final me = await raw.call('me');
-          final sh = me['shop'];
-          if (sh is Map) _shopCur = '${sh['currency'] ?? ''}';
-        } catch (_) {}
-      }
-      if (!mounted) return;
       var base = -1;
       if (bStr(now['date']).isNotEmpty) {
         final nm = bStr(now['time']).isNotEmpty
@@ -318,12 +335,18 @@ class _BookingsPageState extends State<BookingsPage> {
       counts[_cat(g)]++;
     }
     final groups = all.where((g) => _cat(g) == _tab).toList();
+    final wide = MediaQuery.of(context).size.width >= 900;
+    final cols = wide ? (_cols == 0 ? 2 : _cols) : 1;
     final children = <Widget>[
       _dayBar(t),
       const SizedBox(height: 10),
       _tabBar(t, counts),
       const SizedBox(height: 10),
     ];
+    if (wide) {
+      children.add(_viewBar(t, cols));
+      children.add(const SizedBox(height: 10));
+    }
     if (_owner && _staff.length > 1) {
       children.add(_filterBar(t));
       children.add(const SizedBox(height: 10));
@@ -372,19 +395,39 @@ class _BookingsPageState extends State<BookingsPage> {
             ),
           ),
         ));
-      } else {
+      } else if (cols == 1) {
         for (final g in groups) {
           children.add(Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: _groupCard(g, t),
           ));
         }
+      } else {
+        for (var i = 0; i < groups.length; i += cols) {
+          children.add(Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var j = 0; j < cols; j++) ...[
+                  if (j > 0) const SizedBox(width: 12),
+                  Expanded(
+                    child: i + j < groups.length
+                        ? _groupCard(groups[i + j], t)
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ],
+            ),
+          ));
+        }
       }
     }
     children.add(const SizedBox(height: 90));
+    final double maxW = cols == 1 ? 720.0 : (cols == 2 ? 1100.0 : 1500.0);
     return GlassScaffold(
       title: t.t('b_title'),
-      maxWidth: 720,
+      maxWidth: maxW,
       actions: [
         if (_owner)
           IconButton(
@@ -409,6 +452,30 @@ class _BookingsPageState extends State<BookingsPage> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: children,
         ),
+      ),
+    );
+  }
+  Widget _viewBar(T6 t, int cols) {
+    const icons = <IconData>[
+      Icons.view_agenda_rounded,
+      Icons.grid_view_rounded,
+      Icons.apps_rounded,
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 1; i <= 3; i++)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: ChoiceChip(
+                avatar: Icon(icons[i - 1], size: 18),
+                label: Text(_lx(t.lang, 'view$i')),
+                selected: cols == i,
+                onSelected: (_) => setState(() => _cols = i),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -614,6 +681,7 @@ class _BookingsPageState extends State<BookingsPage> {
                 ],
               ),
             ),
+          // «لغو» از لحظه‌ی ثبت نوبت فعال است (تا ۱۵ دقیقه بعد از پایان)
           if (anyBooked && gw != 2) ...[
             const SizedBox(height: 4),
             GradientButton(
@@ -621,7 +689,7 @@ class _BookingsPageState extends State<BookingsPage> {
               danger: true,
               icon: Icons.cancel_rounded,
               label: t.t('b_cancel'),
-              onPressed: (_busy || gw != 1)
+              onPressed: _busy
                   ? null
                   : () {
                       _confirmAct(

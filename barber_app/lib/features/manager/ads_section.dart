@@ -10,7 +10,6 @@ import 'shop_raw.dart';
 
 bool _b(dynamic v) => v == true || '$v' == 'true' || '$v' == '1';
 String _s(dynamic v) => v == null ? '' : '$v';
-
 String _codeOf(Object e) {
   try {
     return ((e as dynamic).code ?? '').toString();
@@ -20,10 +19,9 @@ String _codeOf(Object e) {
 }
 
 /// صفحه‌ی تبلیغات: سه کادر جدا
-/// ۱) کد تبلیغ  ۲) انتخاب دسته‌ها (بعد از فعال‌شدن)  ۳) بدون تبلیغ در پنل مشتری‌ها
+/// ۱) کد تبلیغ  ۲) انتخاب جاهای نمایش (همیشه باز) + دکمه‌ی فعال‌سازی  ۳) بدون تبلیغ
 class AdsSection extends StatefulWidget {
   const AdsSection({super.key});
-
   @override
   State<AdsSection> createState() => _AdsSectionState();
 }
@@ -33,13 +31,10 @@ class _AdsSectionState extends State<AdsSection> {
   final _promoCode = TextEditingController();
   final _noAdsCode = TextEditingController();
   final Set<String> _cats = <String>{};
-
   bool _loading = true;
-  bool _busyPromo = false;
   bool _busyNo = false;
   bool _busySave = false;
   String? _err;
-
   bool _free = false; // ویژه/شخصی: رایگان
   bool _adOn = false;
   bool _noAdsOn = false;
@@ -65,7 +60,8 @@ class _AdsSectionState extends State<AdsSection> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  /// keep=true: متن و دسته‌هایی که کاربر تیک زده دست‌نخورده می‌مانند
+  Future<void> _load({bool keep = false}) async {
     setState(() {
       _loading = true;
       _err = null;
@@ -84,16 +80,18 @@ class _AdsSectionState extends State<AdsSection> {
         _noAdsUntil = _s(d['no_ads_until']);
         final own = _s(d['biz_type']);
         _own = bizTypeByKey(own) != null ? own : 'barber';
-        _text.text = _s(d['ad_text']);
-        _cats.clear();
-        final c = d['ad_cats'];
-        if (c is List) {
-          for (final e in c) {
-            if (bizTypeByKey('$e') != null) _cats.add('$e');
-          }
-        } else if (c is String) {
-          for (final e in c.split(RegExp(r'[|,]'))) {
-            if (bizTypeByKey(e.trim()) != null) _cats.add(e.trim());
+        if (!keep) {
+          _text.text = _s(d['ad_text']);
+          _cats.clear();
+          final c = d['ad_cats'];
+          if (c is List) {
+            for (final e in c) {
+              if (bizTypeByKey('$e') != null) _cats.add('$e');
+            }
+          } else if (c is String) {
+            for (final e in c.split(RegExp(r'[|,]'))) {
+              if (bizTypeByKey(e.trim()) != null) _cats.add(e.trim());
+            }
           }
         }
         _loading = false;
@@ -107,41 +105,42 @@ class _AdsSectionState extends State<AdsSection> {
     }
   }
 
-  Future<void> _redeem(TextEditingController ctl, bool promo) async {
+  void _redeemErr(Object e) {
     final bt = BT(_st.lang);
-    final code = normalizeDigits(ctl.text).trim().toUpperCase();
-    if (code.isEmpty) return;
-    setState(() {
-      if (promo) {
-        _busyPromo = true;
-      } else {
-        _busyNo = true;
-      }
-    });
+    final c = _codeOf(e);
+    final m = '$e';
+    if (c == 'AD_CODE_USED' || m.contains('AD_CODE_USED')) {
+      toast(context, bt.t('ad_code_used'));
+    } else if (c == 'AD_CODE_INVALID' || m.contains('AD_CODE_INVALID')) {
+      toast(context, bt.t('ad_code_bad'));
+    } else {
+      toast(context, T2(_st.lang).error(e));
+    }
+  }
+
+  Future<bool> _redeemCall(String code) async {
     try {
       await ShopRaw(_st).call('ad_redeem', {'code': code});
-      if (!mounted) return;
-      ctl.clear();
-      toast(context, bt.t('ad_code_ok'));
-      await _load();
+      return true;
     } catch (e) {
-      if (!mounted) return;
-      final c = _codeOf(e);
-      final m = '$e';
-      if (c == 'AD_CODE_USED' || m.contains('AD_CODE_USED')) {
-        toast(context, bt.t('ad_code_used'));
-      } else if (c == 'AD_CODE_INVALID' || m.contains('AD_CODE_INVALID')) {
-        toast(context, bt.t('ad_code_bad'));
-      } else {
-        toast(context, T2(_st.lang).error(e));
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busyPromo = false;
-          _busyNo = false;
-        });
-      }
+      if (mounted) _redeemErr(e);
+      return false;
+    }
+  }
+
+  /// کد «بدون تبلیغ»
+  Future<void> _redeemNoAds() async {
+    final bt = BT(_st.lang);
+    final code = normalizeDigits(_noAdsCode.text).trim().toUpperCase();
+    if (code.isEmpty) return;
+    setState(() => _busyNo = true);
+    final ok = await _redeemCall(code);
+    if (!mounted) return;
+    setState(() => _busyNo = false);
+    if (ok) {
+      _noAdsCode.clear();
+      toast(context, bt.t('ad_code_ok'));
+      await _load(keep: true);
     }
   }
 
@@ -154,10 +153,16 @@ class _AdsSectionState extends State<AdsSection> {
     });
   }
 
-  Future<void> _save() async {
+  /// دکمه‌ی فعال‌سازی: کد (در صورت نیاز) + جاهای تیک‌خورده با هم ثبت می‌شوند
+  Future<void> _activate() async {
     final bt = BT(_st.lang);
     final text = _text.text.trim();
-    if (_adActive && text.isEmpty) {
+    final code = normalizeDigits(_promoCode.text).trim().toUpperCase();
+    if (!_free && !_adActive && code.isEmpty) {
+      toast(context, bt.t('ad_code_bad'));
+      return;
+    }
+    if (text.isEmpty) {
       toast(context, bt.t('ad_need_text'));
       return;
     }
@@ -165,15 +170,23 @@ class _AdsSectionState extends State<AdsSection> {
       toast(context, bt.t('ad_text_long'));
       return;
     }
-    if (_adActive && _cats.isEmpty) {
+    if (_cats.isEmpty) {
       toast(context, bt.t('ad_need_cat'));
       return;
     }
     setState(() => _busySave = true);
     try {
+      if (!_free && code.isNotEmpty) {
+        final ok = await _redeemCall(code);
+        if (!ok) return;
+        _promoCode.clear();
+      }
+      _adOn = true;
+      _adActive = true;
       await _post();
       if (!mounted) return;
       toast(context, bt.t('ad_saved'));
+      await _load(keep: true);
     } catch (e) {
       if (!mounted) return;
       toast(context, T2(_st.lang).error(e));
@@ -182,7 +195,30 @@ class _AdsSectionState extends State<AdsSection> {
     }
   }
 
-  /// کلید «بدون تبلیغ» برای پلن‌های رایگان (ویژه/شخصی): همان لحظه ذخیره می‌شود
+  /// کلید تبلیغ برای پلن‌های رایگان: خاموش‌کردن همان لحظه ذخیره می‌شود
+  Future<void> _toggleAd(bool v) async {
+    final bt = BT(_st.lang);
+    final old = _adOn;
+    setState(() {
+      _adOn = v;
+      _adActive = v;
+    });
+    if (v) return; // روشن‌کردن با دکمه‌ی فعال‌سازی ثبت می‌شود
+    try {
+      await _post();
+      if (!mounted) return;
+      toast(context, bt.t('ad_saved'));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _adOn = old;
+        _adActive = old;
+      });
+      toast(context, T2(_st.lang).error(e));
+    }
+  }
+
+  /// کلید «بدون تبلیغ» برای پلن‌های رایگان: همان لحظه ذخیره می‌شود
   Future<void> _toggleNoAds(bool v) async {
     final bt = BT(_st.lang);
     final old = _noAdsOn;
@@ -304,8 +340,10 @@ class _AdsSectionState extends State<AdsSection> {
     }
 
     String until(String iso) => CalFmt.date(iso, st.calendarKey, lang);
+    final activateLabel =
+        lang == 'fa' ? 'فعال‌سازی' : (lang == 'ar' ? 'تفعيل' : 'Activate');
 
-    // ---------- کادر ۱: کد تبلیغ ----------
+    // ---------- کادر ۱: کد تبلیغ (لایسنس) ----------
     final Widget promoInner;
     if (_free) {
       promoInner = Column(
@@ -313,12 +351,7 @@ class _AdsSectionState extends State<AdsSection> {
         children: [
           _hint(bt.t('ad_hint')),
           const SizedBox(height: 8),
-          _switchRow(bt.t('ad_free_on'), _adOn, (v) {
-            setState(() {
-              _adOn = v;
-              _adActive = v;
-            });
-          }),
+          _switchRow(bt.t('ad_free_on'), _adOn, _toggleAd),
         ],
       );
     } else {
@@ -340,46 +373,34 @@ class _AdsSectionState extends State<AdsSection> {
             icon: Icons.vpn_key_rounded,
             ltr: true,
           ),
-          const SizedBox(height: 10),
-          GradientButton(
-            outlined: true,
-            compact: true,
-            loading: _busyPromo,
-            icon: Icons.check_rounded,
-            label: bt.t('ad_code_btn'),
-            onPressed: () => _redeem(_promoCode, true),
-          ),
         ],
       );
     }
 
-    // ---------- کادر ۲: کجا نمایش داده شود ----------
-    Widget? whereBox;
-    if (_adActive) {
-      whereBox = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _hint(bt.t('ad_where_hint')),
-          const SizedBox(height: 12),
-          GlassField(
-            controller: _text,
-            label: '${bt.t('ad_text')} (${bt.t('ad_text_hint')})',
-            icon: Icons.campaign_rounded,
-          ),
-          const SizedBox(height: 14),
-          Text(bt.t('ad_cats'),
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-          _catPicker(bt, lang),
-          const SizedBox(height: 16),
-          GradientButton(
-            loading: _busySave,
-            icon: Icons.check_rounded,
-            label: bt.t('ad_save'),
-            onPressed: _save,
-          ),
-        ],
-      );
-    }
+    // ---------- کادر ۲: کجا نمایش داده شود (همیشه باز) + فعال‌سازی ----------
+    final Widget whereInner = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _hint(bt.t('ad_where_hint')),
+        const SizedBox(height: 12),
+        GlassField(
+          controller: _text,
+          label: '${bt.t('ad_text')} (${bt.t('ad_text_hint')})',
+          icon: Icons.campaign_rounded,
+        ),
+        const SizedBox(height: 14),
+        Text(bt.t('ad_cats'),
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        _catPicker(bt, lang),
+        const SizedBox(height: 16),
+        GradientButton(
+          loading: _busySave,
+          icon: Icons.check_rounded,
+          label: activateLabel,
+          onPressed: _activate,
+        ),
+      ],
+    );
 
     // ---------- کادر ۳: بدون تبلیغ ----------
     final Widget noAdsInner;
@@ -418,7 +439,7 @@ class _AdsSectionState extends State<AdsSection> {
             loading: _busyNo,
             icon: Icons.check_rounded,
             label: bt.t('ad_code_btn'),
-            onPressed: () => _redeem(_noAdsCode, false),
+            onPressed: _redeemNoAds,
           ),
         ],
       );
@@ -428,7 +449,7 @@ class _AdsSectionState extends State<AdsSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _box(bt.t('ad_box_promo'), promoInner),
-        if (whereBox != null) _box(bt.t('ad_box_where'), whereBox),
+        _box(bt.t('ad_box_where'), whereInner),
         _box(bt.t('ad_box_noads'), noAdsInner),
       ],
     );

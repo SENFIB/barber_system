@@ -1,6 +1,8 @@
 import 'package:barber_core/barber_core.dart';
+import 'biz_words.dart';
 import 'fmt.dart';
 import 'strings_s5.dart';
+
 /// جایگزینی واژه‌ی «باربر» با معادل درست هر زبان (جمع‌ها اول)
 const Map<String, List<List<String>>> _termFix = {
   'fa': [
@@ -19,6 +21,7 @@ const Map<String, List<List<String>>> _termFix = {
     ['باربر', 'barber'],
   ],
 };
+
 /// «گوشی» → «دستگاه» (برنامه روی ویندوز هم اجرا می‌شود).
 /// «شماره تلفن» و مشابهش دست نمی‌خورد (اول محافظت می‌شود).
 const Map<String, List<List<String>>> _deviceFix = {
@@ -53,7 +56,64 @@ const Map<String, List<List<String>>> _deviceFix = {
     ['الجوال', 'الجهاز'],
   ],
 };
-/// آخرین مرحله‌ی هر متن: درست‌کردن واژه‌ها («باربر»، «گوشی») و رقم‌ها به زبان برنامه
+
+final RegExp _faBiz = RegExp('آرایشگرها|آرایشگران|آرایشگر|آرایشگاه');
+final RegExp _enBiz =
+    RegExp(r'[Bb]arbershop|[Bb]arbers|[Bb]arber\(s\)|[Bb]arber');
+final RegExp _arBiz = RegExp('الحلاقون|حلاقين|حلاق|الصالون');
+
+String _capFirst(String s) =>
+    s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+String _lowFirst(String s) =>
+    s.isEmpty ? s : s[0].toLowerCase() + s.substring(1);
+
+/// فیلتر مرکزی: وقتی مدیر وارد شده، واژه‌های «آرایشگر/آرایشگاه»
+/// (و معادل‌های انگلیسی/عربی) با واژه‌ی نوع کسب‌وکار او عوض می‌شوند.
+/// جایگزینی یک‌مرحله‌ای است تا واژه‌ی تازه دوباره عوض نشود.
+String _bizFix(String s, String lang) {
+  if (!kUiManagerMode || kUiBizType.isEmpty) return s;
+  final type = kUiBizType;
+  final r = bwRoleQuiet(type);
+  if (lang == 'fa') {
+    if (!s.contains('آرایشگ')) return s;
+    return s.replaceAllMapped(_faBiz, (m) {
+      final x = m[0]!;
+      if (x == 'آرایشگرها' || x == 'آرایشگران') return r[3];
+      if (x == 'آرایشگر') return r[0];
+      return bwShop(type, 'fa');
+    });
+  }
+  if (lang == 'ar') {
+    return s.replaceAllMapped(_arBiz, (m) {
+      final x = m[0]!;
+      if (x == 'الحلاقون') return r[5];
+      if (x == 'حلاقين') {
+        return r[5].startsWith('ال') ? r[5].substring(2) : r[5];
+      }
+      if (x == 'حلاق') return r[2];
+      return bwShop(type, 'ar');
+    });
+  }
+  return s.replaceAllMapped(_enBiz, (m) {
+    final x = m[0]!;
+    final low = x.toLowerCase();
+    final up = x[0] == x[0].toUpperCase();
+    String w;
+    if (low == 'barbershop') {
+      w = bwShop(type, 'en');
+    } else if (low == 'barbers') {
+      w = r[4];
+    } else if (low == 'barber(s)') {
+      w = '${r[1]}(s)';
+    } else {
+      w = r[1];
+    }
+    return up ? _capFirst(w) : _lowFirst(w);
+  });
+}
+
+/// آخرین مرحله‌ی هر متن: درست‌کردن واژه‌ها («باربر»، «گوشی»)،
+/// واژه‌های نوع کسب‌وکار و رقم‌ها به زبان برنامه
 String uiText(String s, String lang) {
   var r = s;
   final fixes = _termFix[lang] ?? _termFix['en']!;
@@ -64,14 +124,17 @@ String uiText(String s, String lang) {
   for (final f in dev) {
     r = r.replaceAll(f[0], f[1]);
   }
+  r = _bizFix(r, lang);
   return localDigits(r, lang);
 }
+
 /// متن‌های تازه + همه‌ی متن‌های قبلی (T5 و پایین‌تر).
 /// هر متنی که از این کلاس رد شود، واژه‌ها و رقم‌هایش به زبان برنامه می‌شود.
 class T6 {
   T6(this.lang) : _base = T5(lang);
   final String lang;
   final T5 _base;
+
   String t(String key, [Map<String, Object?>? args]) {
     final own = _m[lang]?[key] ?? _m['en']?[key];
     if (own == null) {
@@ -84,6 +147,7 @@ class T6 {
     }
     return uiText(r, lang);
   }
+
   String error(Object e) {
     if (e is ApiException) {
       final k = 'err_${e.code}';
@@ -95,6 +159,7 @@ class T6 {
     return uiText(_base.error(e), lang);
   }
 }
+
 final Map<String, Map<String, String>> _m = {
   'fa': {
     'pl_f_winback': 'ارسال پیام اختصاصی آرایشگاه در بازه‌های مشخص',

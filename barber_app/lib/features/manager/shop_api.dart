@@ -12,6 +12,7 @@ class ShopCtx {
     required this.reload,
     required this.logout,
   });
+
   final ShopApi api;
   final ManagerSession session;
   final Future<void> Function() reload;
@@ -20,6 +21,7 @@ class ShopCtx {
 
 class ShopApi {
   ShopApi(this.settings);
+
   final AppSettings settings;
 
   ApiClient get _client => ApiClient(settings.apiUrl);
@@ -126,6 +128,7 @@ class ShopApi {
   /// تشخیص داده می‌شود.
   /// shifts = «09:00-13:00|16:00-22:00» و daysOff = روزهای تعطیل (0 = یکشنبه)
   /// برای مالکی که خودش هم آرایشگر است.
+  /// bizType = نوع کسب‌وکار (همراه ثبت‌نام ذخیره می‌شود)، gender = men|women|both
   Future<ManagerSession> register({
     required String licenseKey,
     required String shopName,
@@ -141,6 +144,8 @@ class ShopApi {
     String shifts = '',
     List<int>? daysOff,
     String? serverUrl,
+    String bizType = '',
+    String gender = '',
   }) async {
     final p = <String, dynamic>{
       'license_key': licenseKey.trim().toUpperCase(),
@@ -156,6 +161,10 @@ class ShopApi {
     if (ownerName.trim().isNotEmpty) p['owner_name'] = ownerName.trim();
     if (specialty.trim().isNotEmpty) p['specialty'] = specialty.trim();
     if (plan.isNotEmpty) p['plan'] = plan;
+    if (bizType.trim().isNotEmpty) p['biz_type'] = bizType.trim();
+    if (gender == 'men' || gender == 'women' || gender == 'both') {
+      p['gender'] = gender;
+    }
     if (ownerIsBarber && shifts.isNotEmpty) {
       p['shifts'] = shifts;
       final first = shifts.split('|').first.split('-');
@@ -204,6 +213,7 @@ class ShopApi {
   }
 
   // ───────────── حساب و اشتراک ─────────────
+
   Future<ManagerSession> me() async =>
       _session(await _auth('me'), token: settings.shopToken);
 
@@ -222,6 +232,7 @@ class ShopApi {
       _map(await _auth('shop_update', fields));
 
   // ───────────── آرایشگرها ─────────────
+
   Future<Map<String, dynamic>> staffList() async =>
       _map(await _auth('staff_list'));
 
@@ -299,6 +310,7 @@ class ShopApi {
   }
 
   // ───────────── خدمات ─────────────
+
   Future<List<Map<String, dynamic>>> serviceList() async =>
       _rows(await _auth('service_list'), 'services');
 
@@ -325,6 +337,7 @@ class ShopApi {
   }
 
   // ───────────── مرخصی / تعطیلی ─────────────
+
   Future<List<Map<String, dynamic>>> timeoffList() async =>
       _rows(await _auth('timeoff_list'), 'blocks');
 
@@ -351,6 +364,7 @@ class ShopApi {
   }
 
   // ───────────── نوبت‌ها ─────────────
+
   /// خروجی: {bookings:[...], now:{date,min}}
   Future<Map<String, dynamic>> bookingsList({
     String? dateFrom,
@@ -398,6 +412,7 @@ class ShopApi {
   }
 
   // ───────────── پیام اختصاصی آرایشگاه (ویژه/شخصی) ─────────────
+
   Future<List<Map<String, dynamic>>> winbackList() async =>
       _rows(await _auth('winback_list'), 'rules');
 

@@ -1,39 +1,34 @@
 import 'package:flutter/material.dart';
 import '../../app/business_types.dart';
+import '../../app/currency.dart';
 import '../../app/service_catalog.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
-import '../../app/util.dart';
+import '../../app/type_services.dart';
 import '../../app/widgets.dart';
 import 'shop_raw.dart';
-
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
-
 class ServicePresetsPage extends StatefulWidget {
   const ServicePresetsPage({super.key, required this.settings});
   final AppSettings settings;
-
   @override
   State<ServicePresetsPage> createState() => _ServicePresetsPageState();
 }
-
 class _ServicePresetsPageState extends State<ServicePresetsPage> {
   bool _loading = true;
   bool _saving = false;
   List<CatalogItem> _items = [];
+  String _cur = '';
   final Set<String> _on = {};
-  final Map<String, TextEditingController> _dur = {};
-  final Map<String, TextEditingController> _price = {};
-
+  final Map<String, DigitController> _dur = {};
+  final Map<String, MoneyController> _price = {};
   String get _lang => widget.settings.lang;
-
   @override
   void initState() {
     super.initState();
     _load();
   }
-
   @override
   void dispose() {
     for (final c in _dur.values) {
@@ -44,24 +39,28 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
     }
     super.dispose();
   }
-
   Future<void> _load() async {
     var g = 'both';
     var group = 'beauty';
+    var type = '';
     try {
       final me = await ShopRaw(widget.settings).call('me');
       final shop = me['shop'];
       if (shop is Map) {
         final bz = bizTypeByKey('${shop['biz_type'] ?? ''}');
-        if (bz != null) group = bz.group;
+        if (bz != null) {
+          group = bz.group;
+          type = bz.key;
+        }
+        _cur = '${shop['currency'] ?? ''}';
         final v = '${shop['gender'] ?? ''}';
         if (group == 'beauty' && (v == 'men' || v == 'women')) g = v;
       }
     } catch (_) {}
-    final list = catalogForGroup(group, g);
+    final list = catalogForType(group, type, g);
     for (final it in list) {
-      _dur[it.key] = TextEditingController(text: '${it.minutes}');
-      _price[it.key] = TextEditingController();
+      _dur[it.key] = DigitController(lang: _lang, text: '${it.minutes}');
+      _price[it.key] = MoneyController(lang: _lang);
     }
     if (!mounted) return;
     setState(() {
@@ -69,14 +68,7 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       _loading = false;
     });
   }
-
-  int? _num(String t) {
-    final d = normalizeDigits(t).replaceAll(RegExp(r'[^0-9]'), '');
-    return d.isEmpty ? null : int.tryParse(d);
-  }
-
   bool get _allOn => _items.isNotEmpty && _on.length == _items.length;
-
   void _toggleAll() {
     setState(() {
       if (_allOn) {
@@ -86,14 +78,13 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       }
     });
   }
-
   Future<void> _save() async {
     if (_saving) return;
     final lang = _lang;
     final items = <Map<String, dynamic>>[];
     for (final it in _items) {
       if (!_on.contains(it.key)) continue;
-      final d = _num(_dur[it.key]!.text);
+      final d = _dur[it.key]!.number;
       if (d == null || d < 5 || d > 480) {
         toast(
             context,
@@ -106,7 +97,7 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
         'cat': it.key,
         'name': catalogName(it.key, lang),
         'duration_min': d,
-        'price': _num(_price[it.key]!.text) ?? 0,
+        'price': _price[it.key]!.number ?? 0,
       });
     }
     if (items.isEmpty) {
@@ -137,10 +128,10 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       toast(context, T6(lang).error(e));
     }
   }
-
   Widget _row(CatalogItem it) {
     final lang = _lang;
     final on = _on.contains(it.key);
+    final curName = currencyName(_cur, lang);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Glass(
@@ -178,7 +169,8 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
                   Expanded(
                     child: GlassField(
                       controller: _price[it.key]!,
-                      label: _x(lang, 'قیمت', 'Price', 'السعر'),
+                      label:
+                          '${_x(lang, 'قیمت', 'Price', 'السعر')} ($curName)',
                       icon: Icons.payments_outlined,
                       keyboard: TextInputType.number,
                       ltr: true,
@@ -191,7 +183,6 @@ class _ServicePresetsPageState extends State<ServicePresetsPage> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final lang = _lang;

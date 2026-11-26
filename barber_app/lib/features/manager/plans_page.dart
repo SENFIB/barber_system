@@ -1,5 +1,7 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
@@ -7,7 +9,6 @@ import '../../app/strings_pay.dart';
 import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
-import 'pay_api.dart';
 import 'pay_page.dart';
 import 'renew_page.dart';
 import 'shop_api.dart';
@@ -15,6 +16,7 @@ import 'shop_api.dart';
 class PlansPage extends StatefulWidget {
   const PlansPage(this.ctx, {super.key});
   final ShopCtx ctx;
+
   @override
   State<PlansPage> createState() => _PlansPageState();
 }
@@ -29,36 +31,42 @@ class _PlansPageState extends State<PlansPage> {
         return Icons.workspace_premium_rounded;
       case 'special':
         return Icons.diamond_rounded;
-      case 'personal':
-        return Icons.dns_rounded;
     }
     return Icons.content_cut_rounded;
   }
 
   String _priceLine(PlanDef p, T6 t, String lang) {
-    if (p.autoPay) {
-      return t.t('pl_per_month',
-          {'p': fmtNum(p.usdtMonthly, lang), 'c': 'USDT'});
-    }
     final c = t.t('pl_toman');
-    if (p.oneTime > 0) {
-      return t.t('pl_one_time', {'p': fmtNum(p.oneTime, lang), 'c': c});
+    if (p.autoPay) {
+      final usdt = t.t('pl_per_month',
+          {'p': fmtNum(p.usdtMonthly, lang), 'c': 'USDT'});
+      if (lang == 'fa' && p.cardPay) {
+        final toman =
+            t.t('pl_per_month', {'p': fmtNum(p.monthly, lang), 'c': c});
+        return '$toman  ·  $usdt';
+      }
+      return usdt;
     }
     if (p.monthly == 0) return t.t('pl_free_now');
     return t.t('pl_per_month', {'p': fmtNum(p.monthly, lang), 'c': c});
   }
 
+  /// جمع به واحد اصلی پلن (تتر برای پایه و پرو، تومان برای ویژه)
   int _total(PlanDef p) {
-    if (p.oneTime > 0) return p.oneTime;
     if (p.autoPay) return planTotalUsdt(p, _months);
     return planTotal(p, _months);
   }
 
-  /// خرید خودکار با تتر (پایه و پرو)
-  Future<void> _buyUsdt(PlanDef p) async {
+  /// خرید آنلاین. method: 'usdt' یا 'card'
+  Future<void> _buy(PlanDef p, String method) async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => PayPage(ctx: widget.ctx, plan: p, months: _months),
+        builder: (_) => PayPage(
+          ctx: widget.ctx,
+          plan: p,
+          months: _months,
+          method: method,
+        ),
       ),
     );
     if (ok == true) {
@@ -67,71 +75,42 @@ class _PlansPageState extends State<PlansPage> {
     }
   }
 
-  /// ثبت درخواست (ویژه و شخصی)
-  Future<void> _request(PlanDef p, String lang) async {
-    final pt = PayT(lang);
-    final t6 = T6(lang);
-    final contact = TextEditingController();
-    final note = TextEditingController();
-    final go = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text(pt.t('req_title', {'plan': t6.t('pl_name_${p.key}')})),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(pt.t('req_desc')),
-              const SizedBox(height: 12),
-              TextField(
-                controller: contact,
-                decoration: InputDecoration(labelText: pt.t('req_contact')),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: note,
-                maxLines: 2,
-                decoration: InputDecoration(labelText: pt.t('req_note')),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: Text(pt.t('cancel')),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (contact.text.trim().length < 3) return;
-              Navigator.pop(c, true);
-            },
-            child: Text(pt.t('req_send')),
-          ),
-        ],
-      ),
-    );
-    if (go != true || !mounted) return;
-    final shop = widget.ctx.session.shop;
+  /// نام کاربری مدیر (اگر در session باشد)
+  String _username() {
     try {
-      await PayApi(widget.ctx.api.settings).request(
-        plan: p.key,
-        months: p.oneTime > 0 ? 0 : _months,
-        shopName: shop.name,
-        phone: shop.phone,
-        contact: contact.text.trim(),
-        note: note.text.trim(),
-      );
-      if (mounted) toast(context, pt.t('req_ok'));
-    } on ApiException catch (e) {
-      if (mounted) toast(context, pt.error(e));
+      final v = (widget.ctx.session as dynamic).username;
+      if (v != null && '$v'.trim().isNotEmpty) return '$v'.trim();
+    } catch (_) {}
+    return '';
+  }
+
+  /// پلن ویژه: باز کردن برنامه‌ی ایمیل با متن آماده (همیشه فارسی)
+  Future<void> _mail(PlanDef p, String lang) async {
+    final pt = PayT(lang);
+    final shop = widget.ctx.session.shop;
+    final user = _username();
+    final subject = PayT.mailSubject(p.key);
+    final body = PayT.mailBody(
+      planKey: p.key,
+      shopName: shop.name,
+      phone: shop.phone,
+      username: user.isEmpty ? '—' : user,
+    );
+    final uri = Uri.parse(
+        'mailto:$kSupportEmail?subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}');
+    var ok = false;
+    try {
+      ok = await launchUrl(uri);
     } catch (_) {
-      if (mounted) toast(context, pt.t('err_NETWORK'));
+      ok = false;
+    }
+    if (!ok) {
+      await Clipboard.setData(const ClipboardData(text: kSupportEmail));
+      if (mounted) toast(context, pt.t('mail_copied', {'e': kSupportEmail}));
     }
   }
 
-  /// «کد لایسنس دارم»: برای پلن ویژه/شخصی دو کادر (لایسنس + exec) نشان می‌دهد
+  /// «کد لایسنس دارم»: برای پلن ویژه دو کادر (لایسنس + exec) نشان می‌دهد
   Future<void> _haveCode(String planKey) async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -231,14 +210,14 @@ class _PlansPageState extends State<PlansPage> {
   Widget _panel(PlanDef p, T6 t, String lang) {
     final pt = PayT(lang);
     final isUsdt = p.autoPay;
-    final tomanPaid = p.oneTime > 0 || p.monthly > 0;
-    final paid = isUsdt || tomanPaid;
-    final monthly = p.oneTime == 0 && (isUsdt || p.monthly > 0);
+    final paid = isUsdt || p.monthly > 0;
+    final monthly = isUsdt || p.monthly > 0;
     final unit = isUsdt ? 'USDT' : t.t('pl_toman');
     final total = _total(p);
     final base = isUsdt ? p.usdtMonthly : p.monthly;
     final full = monthly ? base * _months : total;
     final saved = full - total;
+    final showCard = lang == 'fa' && p.cardPay;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -270,6 +249,15 @@ class _PlansPageState extends State<PlansPage> {
                       fontSize: 17, fontWeight: FontWeight.w800)),
             ],
           ),
+          if (showCard)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${fmtNum(planTotal(p, _months), lang)} ${t.t('pl_toman')}',
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ),
           if (saved > 0)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -279,20 +267,30 @@ class _PlansPageState extends State<PlansPage> {
               ),
             ),
           const SizedBox(height: 14),
-          if (isUsdt)
+          if (isUsdt) ...[
             GradientButton(
-              icon: Icons.shopping_cart_rounded,
+              icon: Icons.currency_bitcoin_rounded,
               label: pt.t('buy_usdt'),
               onPressed: () {
-                _buyUsdt(p);
+                _buy(p, 'usdt');
               },
-            )
-          else
+            ),
+            if (showCard) ...[
+              const SizedBox(height: 10),
+              GradientButton(
+                icon: Icons.credit_card_rounded,
+                label: pt.t('buy_card'),
+                onPressed: () {
+                  _buy(p, 'card');
+                },
+              ),
+            ],
+          ] else
             GradientButton(
-              icon: Icons.support_agent_rounded,
-              label: pt.t('req_btn'),
+              icon: Icons.mail_rounded,
+              label: pt.t('mail_btn'),
               onPressed: () {
-                _request(p, lang);
+                _mail(p, lang);
               },
             ),
           const SizedBox(height: 10),

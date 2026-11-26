@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/cal_fmt.dart';
+import '../../app/currency.dart';
 import '../../app/fmt.dart';
 import '../../app/reminders.dart';
 import '../../app/settings.dart';
@@ -11,10 +12,41 @@ import '../../app/widgets.dart';
 import '../manager/booking_common.dart';
 import 'customer_api.dart';
 
+const Map<String, Map<String, String>> _cx = {
+  'fa': {
+    'start': 'شروع نوبت',
+    'start_q': 'به کسب‌وکار اعلام می‌شود که نوبت شما شروع شده است. ادامه می‌دهید؟',
+    'start_yes': 'بله، شروع شد',
+    'rate_low': 'کم',
+    'rate_high': 'عالی',
+    'total': 'جمع',
+  },
+  'en': {
+    'start': 'Start appointment',
+    'start_q': 'The business will be told your appointment has started. Continue?',
+    'start_yes': 'Yes, start',
+    'rate_low': 'Poor',
+    'rate_high': 'Excellent',
+    'total': 'Total',
+  },
+  'ar': {
+    'start': 'بدء الموعد',
+    'start_q': 'سيتم إبلاغ النشاط التجاري بأن موعدك بدأ. هل تريد المتابعة؟',
+    'start_yes': 'نعم، ابدأ',
+    'rate_low': 'ضعيف',
+    'rate_high': 'ممتاز',
+    'total': 'المجموع',
+  },
+};
+
+String _c(String lang, String k) =>
+    (_cx[lang] ?? _cx['fa']!)[k] ?? _cx['fa']![k] ?? k;
+
 class MyBookingsTab extends StatefulWidget {
   const MyBookingsTab({super.key, required this.api, this.refresh});
   final CustomerApi api;
   final ValueListenable<int>? refresh;
+
   @override
   State<MyBookingsTab> createState() => _MyBookingsTabState();
 }
@@ -24,7 +56,9 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
   bool _busy = false;
   Object? _err;
   List<List<Map<String, dynamic>>> _groups = <List<Map<String, dynamic>>>[];
+
   T6 _tr() => T6(SettingsScope.read(context).lang);
+
   @override
   void initState() {
     super.initState();
@@ -33,26 +67,33 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       if (mounted) _load();
     });
   }
+
   @override
   void dispose() {
     widget.refresh?.removeListener(_onRefresh);
     super.dispose();
   }
+
   void _onRefresh() {
     if (mounted) _load();
   }
+
   bool _isActive(List<Map<String, dynamic>> g) => g.any((b) {
         final s = bStr(b['status']);
         return s == 'booked' || s == 'checked_in';
       });
+
   String _key(List<Map<String, dynamic>> g) =>
       '${bStr(g.first['date'])} ${bStr(g.first['start_time'])}';
+
   String _d10(String d) => d.length >= 10 ? d.substring(0, 10) : d;
+
   /// شناسه‌ی یادآوری: همان فرمولی که هنگام ثبت نوبت استفاده می‌شود
   String _rid(List<Map<String, dynamic>> g) {
     final f = g.first;
     return '${bStr(f['shop_name'])}|${_d10(bStr(f['date']))}|${bStr(f['start_time'])}';
   }
+
   /// نوبت‌های فعال یادآوری می‌گیرند؛ لغوشده/تمام‌شده‌ها یادآوری‌شان پاک می‌شود
   Future<void> _sync(List<List<Map<String, dynamic>>> groups) async {
     try {
@@ -81,6 +122,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       }
     } catch (_) {}
   }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -120,6 +162,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       });
     }
   }
+
   Future<void> _run(Future<void> Function() f, {String? okMsg}) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -135,10 +178,12 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
   String _gid(List<Map<String, dynamic>> g) =>
       bStr(g.first['group_id']).isNotEmpty
           ? bStr(g.first['group_id'])
           : bStr(g.first['booking_id']);
+
   Future<void> _cancel(List<Map<String, dynamic>> g) async {
     final t = _tr();
     final ok = await confirmDialog(
@@ -156,13 +201,14 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       await Reminders.cancelBooking(rid);
     }, okMsg: t.t('b_saved'));
   }
+
   Future<void> _checkin(List<Map<String, dynamic>> g) async {
     final t = _tr();
     final ok = await confirmDialog(
       context,
-      title: t.t('cu_checkin'),
-      message: t.t('cu_checkin_q'),
-      okLabel: t.t('cu_checkin_yes'),
+      title: _c(t.lang, 'start'),
+      message: _c(t.lang, 'start_q'),
+      okLabel: _c(t.lang, 'start_yes'),
       cancelLabel: t.t('c_cancel'),
       danger: false,
     );
@@ -171,6 +217,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       await widget.api.checkin(_gid(g));
     }, okMsg: t.t('b_saved'));
   }
+
   Future<void> _rate(List<Map<String, dynamic>> g) async {
     final t = _tr();
     final rows = g.where((b) => cFlag(b['needs_rating'])).toList();
@@ -184,6 +231,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       await widget.api.rate(res);
     }, okMsg: t.t('cu_rate_thanks'));
   }
+
   Color _stColor(String s) {
     switch (s) {
       case 'booked':
@@ -199,6 +247,7 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     }
     return muted(context);
   }
+
   @override
   Widget build(BuildContext context) {
     final t = T6(SettingsScope.of(context).lang);
@@ -274,22 +323,28 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
       ),
     );
   }
+
   Widget _title(String s) => Padding(
         padding: const EdgeInsets.only(top: 6, bottom: 10),
         child: Text(s,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
       );
+
   Widget _card(List<Map<String, dynamic>> g, T6 t) {
     final first = g.first;
     var endMin = 0;
     var endStr = '';
+    var total = 0;
     for (final b in g) {
       final m = bMin(bStr(b['end_time']));
       if (m >= endMin) {
         endMin = m;
         endStr = bStr(b['end_time']);
       }
+      final s = bStr(b['status']);
+      if (s != 'cancelled' && s != 'no_show') total += parsePrice(b['price']);
     }
+    final cur = bStr(first['currency']);
     final canCancel = g.any((b) => cFlag(b['can_cancel']));
     final canCheckin = g.any((b) => cFlag(b['can_checkin']));
     final needRate = g.any((b) => cFlag(b['needs_rating']));
@@ -376,7 +431,19 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
               ),
             ),
           const Divider(height: 22),
-          for (final b in g) _line(b, t),
+          for (final b in g) _line(b, t, cur),
+          if (g.length > 1 && total > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Text('${_c(t.lang, 'total')}: ',
+                      style: TextStyle(color: muted(context))),
+                  Text(fmtMoney(total, cur, t.lang),
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
           if (hasBooked && !canCancel)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -391,8 +458,8 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                 if (canCheckin)
                   GradientButton(
                     compact: true,
-                    icon: Icons.event_seat_rounded,
-                    label: t.t('cu_checkin'),
+                    icon: Icons.play_circle_rounded,
+                    label: _c(t.lang, 'start'),
                     onPressed: () {
                       if (!_busy) _checkin(g);
                     },
@@ -424,15 +491,15 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
     );
     return dead ? Opacity(opacity: 0.6, child: card) : card;
   }
-  Widget _line(Map<String, dynamic> b, T6 t) {
+
+  Widget _line(Map<String, dynamic> b, T6 t, String cur) {
     final status = bStr(b['status']);
     final rating = bInt(b['rating']);
-    final price = bInt(b['price']);
+    final price = parsePrice(b['price']);
     final dur = bInt(b['duration_min']);
     final sub = <String>[
       if (bStr(b['staff_name']).isNotEmpty) bStr(b['staff_name']),
       if (dur > 0) '${fmtNum(dur, t.lang)} ${t.t('b_min')}',
-      if (price > 0) fmtNum(price, t.lang),
     ].join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -451,6 +518,13 @@ class _MyBookingsTabState extends State<MyBookingsTab> {
                     child: Text(sub,
                         style:
                             TextStyle(color: muted(context), fontSize: 12.5)),
+                  ),
+                if (price > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(fmtMoney(price, cur, t.lang),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 13.5)),
                   ),
               ],
             ),
@@ -473,6 +547,7 @@ class _RateDialog extends StatefulWidget {
   const _RateDialog({required this.rows, required this.t});
   final List<Map<String, dynamic>> rows;
   final T6 t;
+
   @override
   State<_RateDialog> createState() => _RateDialogState();
 }
@@ -480,6 +555,7 @@ class _RateDialog extends StatefulWidget {
 class _RateDialogState extends State<_RateDialog> {
   final Map<String, int> _v = <String, int>{};
   bool _missing = false;
+
   void _send() {
     for (final r in widget.rows) {
       if ((_v[bStr(r['booking_id'])] ?? 0) < 1) {
@@ -495,6 +571,7 @@ class _RateDialogState extends State<_RateDialog> {
         },
     ]);
   }
+
   @override
   Widget build(BuildContext context) {
     final t = widget.t;
@@ -540,6 +617,22 @@ class _RateDialogState extends State<_RateDialog> {
                         ),
                       ),
                   ],
+                ),
+                Center(
+                  child: SizedBox(
+                    width: 210,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_c(t.lang, 'rate_low'),
+                            style: TextStyle(
+                                color: muted(context), fontSize: 12)),
+                        Text(_c(t.lang, 'rate_high'),
+                            style: TextStyle(
+                                color: muted(context), fontSize: 12)),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 8),
               ],

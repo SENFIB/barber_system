@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
@@ -102,9 +101,16 @@ class _PlansPageState extends State<PlansPage> {
     );
   }
 
-  Future<void> _haveCode() async {
+  /// «کد لایسنس دارم»: برای پلن ویژه/شخصی دو کادر (لایسنس + exec) نشان می‌دهد
+  Future<void> _haveCode(String planKey) async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => RenewPage(api: widget.ctx.api)),
+      MaterialPageRoute(
+        builder: (_) => RenewPage(
+          api: widget.ctx.api,
+          plan: planKey,
+          currentPlan: widget.ctx.session.shop.plan,
+        ),
+      ),
     );
     if (ok == true) {
       await widget.ctx.reload();
@@ -253,7 +259,7 @@ class _PlansPageState extends State<PlansPage> {
           icon: Icons.vpn_key_rounded,
           label: t.t('pl_have_code'),
           onPressed: () {
-            _haveCode();
+            _haveCode(p.key);
           },
         ),
       ],

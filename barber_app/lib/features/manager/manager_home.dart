@@ -13,6 +13,7 @@ import '../../app/widgets.dart';
 import 'ads_page.dart';
 import 'booking_rules_page.dart';
 import 'bookings_page.dart';
+import 'income_page.dart';
 import 'plans_page.dart';
 import 'renew_page.dart';
 import 'services_page.dart';
@@ -161,7 +162,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         ? _x(lang, 'مدیر', 'Owner', 'المدير')
         : _x(lang, 'نفر پرسنل', 'Staff member', 'موظف');
     final planText = s.has(planKey) ? s.t(planKey) : shop.plan;
-
     final pills = <Widget>[
       Pill(roleText),
     ];
@@ -240,7 +240,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         ],
       ),
     ];
-
     if (!sub.free) {
       subRows.add(const SizedBox(height: 12));
       subRows.add(
@@ -285,7 +284,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         );
       }
     }
-
     final subCard = Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,6 +315,30 @@ class _ManagerHomeState extends State<ManagerHome> {
       ),
       onTap: () => Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => BookingsPage(ctx))),
+    ));
+
+    // «درآمد» برای مدیر (همه‌ی پرسنل) و برای هر نفر پرسنل (فقط خودش)
+    items.add(tile(
+      icon: Icons.payments_rounded,
+      title: _x(lang, 'درآمد', 'Income', 'الإيرادات'),
+      desc: sess.isOwner
+          ? _x(
+              lang,
+              'جمع درآمد، مشتری‌های هر نفر پرسنل و مبلغ هرکدام',
+              'Total income, each staff member’s customers and amounts',
+              'إجمالي الإيرادات وزبائن كل موظف والمبالغ',
+            )
+          : _x(
+              lang,
+              'تعداد مشتری‌های من و مبلغ هرکدام',
+              'How many customers I had and the amount from each',
+              'عدد زبائني والمبلغ من كل واحد',
+            ),
+      gradient: const LinearGradient(
+        colors: [AppColors.green, AppColors.amber],
+      ),
+      onTap: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => IncomePage(ctx))),
     ));
 
     if (sess.isOwner) {

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import '../../app/brand.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/widgets.dart';
-import '../settings/settings_page.dart';
 import 'customer_api.dart';
 import 'customer_bookings.dart';
 import 'customer_shops.dart';
 
 class CustomerHome extends StatefulWidget {
   const CustomerHome({super.key});
+
   @override
   State<CustomerHome> createState() => _CustomerHomeState();
 }
@@ -33,20 +32,11 @@ class _CustomerHomeState extends State<CustomerHome> {
         ? 'کسب‌وکارها'
         : (st.lang == 'ar' ? 'الأنشطة التجارية' : 'Businesses');
     return GlassScaffold(
-      title: appNameFor(st.lang),
       maxWidth: 720,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => st.setRole(null),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.settings_rounded),
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SettingsPage()),
-          ),
-        ),
-      ],
       body: Column(
         children: [
           Padding(

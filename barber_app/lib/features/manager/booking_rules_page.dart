@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import '../../app/biz_words.dart';
 import '../../app/business_types.dart';
 import '../../app/cal_names.dart';
+import '../../app/currency.dart';
 import '../../app/extra_http.dart';
 import '../../app/settings.dart';
 import '../../app/widgets.dart';
 import 'closure_picker.dart';
 import 'suggested_services.dart';
+
 const Map<String, Map<String, String>> _tx = {
   'fa': {
     'title': 'نوبت‌دهی و تعطیلی',
@@ -27,6 +29,17 @@ const Map<String, Map<String, String>> _tx = {
     'men': 'مردانه',
     'women': 'زنانه',
     'both': 'هر دو',
+    'cancel_h': 'مشتری تا چه زمانی قبل از نوبت می‌تواند لغو کند؟',
+    'c0': 'تا لحظه‌ی شروع نوبت',
+    'custom_time': 'زمان دلخواه',
+    'num_label': 'عدد',
+    'cancel_note': 'مشتری فقط تا {x} قبل از شروع نوبت می‌تواند لغو کند.',
+    'c0_note': 'مشتری تا لحظه‌ی شروع نوبت می‌تواند لغو کند.',
+    'bad_cancel': 'زمان لغو را درست وارد کنید.',
+    'slot_h': 'فاصله‌ی زمانی نوبت‌ها',
+    'slot_note': 'مثلاً با ۵ دقیقه: 09:00 ، 09:05 ، 09:10',
+    'cur_h': 'واحد پول',
+    'cur_note': 'قیمت‌ها در همه‌جا با این واحد نمایش داده می‌شوند.',
     'save': 'ذخیره',
     'saved': 'ذخیره شد ✅',
     'closures_h': 'تعطیلی‌های برنامه‌ریزی‌شده',
@@ -61,6 +74,17 @@ const Map<String, Map<String, String>> _tx = {
     'men': 'Men',
     'women': 'Women',
     'both': 'Both',
+    'cancel_h': 'How long before the appointment can customers cancel?',
+    'c0': 'Until the appointment starts',
+    'custom_time': 'Custom time',
+    'num_label': 'Number',
+    'cancel_note': 'Customers can cancel only up to {x} before the appointment starts.',
+    'c0_note': 'Customers can cancel until the appointment starts.',
+    'bad_cancel': 'Enter a valid cancellation time.',
+    'slot_h': 'Time between slots',
+    'slot_note': 'For example with 5 minutes: 09:00, 09:05, 09:10',
+    'cur_h': 'Currency',
+    'cur_note': 'Prices are shown everywhere in this currency.',
     'save': 'Save',
     'saved': 'Saved ✅',
     'closures_h': 'Planned closures',
@@ -94,6 +118,17 @@ const Map<String, Map<String, String>> _tx = {
     'men': 'رجالي',
     'women': 'نسائي',
     'both': 'كلاهما',
+    'cancel_h': 'قبل كم من الوقت يمكن للزبون إلغاء الموعد؟',
+    'c0': 'حتى لحظة بدء الموعد',
+    'custom_time': 'وقت مخصص',
+    'num_label': 'الرقم',
+    'cancel_note': 'يستطيع الزبون الإلغاء فقط حتى {x} قبل بدء الموعد.',
+    'c0_note': 'يستطيع الزبون الإلغاء حتى لحظة بدء الموعد.',
+    'bad_cancel': 'أدخل وقت إلغاء صحيحًا.',
+    'slot_h': 'الفاصل بين المواعيد',
+    'slot_note': 'مثلًا مع ٥ دقائق: 09:00 ، 09:05 ، 09:10',
+    'cur_h': 'العملة',
+    'cur_note': 'تظهر الأسعار في كل مكان بهذه العملة.',
     'save': 'حفظ',
     'saved': 'تم الحفظ ✅',
     'closures_h': 'فترات الإغلاق المخططة',
@@ -110,12 +145,17 @@ const Map<String, Map<String, String>> _tx = {
     'to': 'إلى',
   },
 };
+
 const Map<String, List<String>> _wdFull = {
   // index 0 = Sunday
   'fa': ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'],
   'en': ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   'ar': ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
 };
+
+const List<int> _cancelPresets = [0, 10, 30, 60, 120, 360, 720, 1440];
+const List<int> _slotOptions = [5, 10, 15, 20, 30];
+
 class _Block {
   final String id;
   final String from;
@@ -123,12 +163,15 @@ class _Block {
   final String reason;
   _Block(this.id, this.from, this.to, this.reason);
 }
+
 class BookingRulesPage extends StatefulWidget {
   const BookingRulesPage({super.key, required this.settings});
   final AppSettings settings;
+
   @override
   State<BookingRulesPage> createState() => _BookingRulesPageState();
 }
+
 class _BookingRulesPageState extends State<BookingRulesPage> {
   bool _loading = true;
   bool _busy = false;
@@ -138,12 +181,19 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
   String _cal = 'jalali';
   String _preset = 'd30';
   int _weeklyOff = -1;
+  int _cPreset = 120; // -1 = زمان دلخواه
+  int _cUnit = 1;
+  int _slot = 5;
+  String _cur = 'toman';
   final _daysC = TextEditingController(text: '10');
+  final _cNumC = TextEditingController(text: '3');
   List<_Block> _blocks = <_Block>[];
   final Map<String, String> _lab = {};
+
   AppSettings get _st => widget.settings;
   String get _lang => _st.lang;
   bool get _beauty => bwBeauty(_type);
+
   String _t(String k) {
     var s = (_tx[_lang] ?? _tx['fa']!)[k] ?? _tx['fa']![k] ?? k;
     if (s.contains('{shop}') || s.contains('{staff')) {
@@ -155,16 +205,20 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     return s;
   }
+
   @override
   void initState() {
     super.initState();
     _load();
   }
+
   @override
   void dispose() {
     _daysC.dispose();
+    _cNumC.dispose();
     super.dispose();
   }
+
   void _applyLoaded(String mode, int n) {
     if (mode == 'week') {
       _preset = 'week';
@@ -185,6 +239,51 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       _preset = 'd30';
     }
   }
+
+  void _setCancel(int m) {
+    if (_cancelPresets.contains(m)) {
+      _cPreset = m;
+    } else {
+      _cPreset = -1;
+      _cUnit = spanIndexOf(m);
+      _cNumC.text = '${m ~/ kSpanMult[_cUnit]}';
+    }
+  }
+
+  /// مقدارهای سرور را در صفحه می‌گذارد (فقط کلیدهایی که سرور فرستاده)
+  void _applyShop(Map sh) {
+    final g = '${sh['gender'] ?? ''}';
+    _gender = (g == 'men' || g == 'women') ? g : 'both';
+    final b = '${sh['biz_type'] ?? ''}'.trim();
+    _type = bizTypeByKey(b) != null ? b : (g == 'women' ? 'salon' : 'barber');
+    final c = '${sh['calendar'] ?? ''}';
+    _cal = (c == 'gregorian' || c == 'hijri') ? c : 'jalali';
+    if (sh.containsKey('book_mode') || sh.containsKey('book_days')) {
+      final n = int.tryParse('${sh['book_days'] ?? ''}') ?? 30;
+      _applyLoaded('${sh['book_mode'] ?? ''}', n);
+    } else if (sh.containsKey('max_advance_days')) {
+      final n = int.tryParse('${sh['max_advance_days']}') ?? 30;
+      _applyLoaded('days', n);
+    }
+    if (sh.containsKey('weekly_off')) {
+      final first =
+          '${sh['weekly_off'] ?? ''}'.split(RegExp(r'[|,]')).first.trim();
+      final wo = int.tryParse(first);
+      _weeklyOff = (wo != null && wo >= 0 && wo <= 6) ? wo : -1;
+    }
+    if (sh.containsKey('cancel_before_min')) {
+      final m = int.tryParse('${sh['cancel_before_min']}');
+      if (m != null && m >= 0) _setCancel(m);
+    }
+    if (sh.containsKey('slot_step_min')) {
+      final s = int.tryParse('${sh['slot_step_min']}');
+      if (s != null && s >= 1) _slot = s;
+    }
+    if (sh.containsKey('currency')) {
+      _cur = currencyKeyOf('${sh['currency']}') ?? 'toman';
+    }
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -193,29 +292,19 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     try {
       final me = await extraManager(_st, 'me');
       final shop = me['shop'];
-      if (shop is Map) {
-        final Map sh = shop;
-        final g = '${sh['gender'] ?? ''}';
-        _gender = (g == 'men' || g == 'women') ? g : 'both';
-        final b = '${sh['biz_type'] ?? ''}'.trim();
-        _type = bizTypeByKey(b) != null ? b : (g == 'women' ? 'salon' : 'barber');
-        final c = '${sh['calendar'] ?? ''}';
-        _cal = (c == 'gregorian' || c == 'hijri') ? c : 'jalali';
-        final n = int.tryParse('${sh['book_days'] ?? ''}') ?? 30;
-        _applyLoaded('${sh['book_mode'] ?? ''}', n);
-        final wo = int.tryParse('${sh['weekly_off'] ?? ''}');
-        _weeklyOff = (wo != null && wo >= 0 && wo <= 6) ? wo : -1;
-      }
+      if (shop is Map) _applyShop(shop);
       await _loadBlocks();
     } on ExtraError catch (e) {
       _error = extraErrorText(e, _lang);
     }
     if (mounted) setState(() => _loading = false);
   }
+
   String _todayIso() {
     final n = DateTime.now();
     return '${n.year.toString().padLeft(4, '0')}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
   }
+
   Future<void> _loadBlocks() async {
     final r = await extraManager(_st, 'timeoff_list');
     final list = r['blocks'];
@@ -233,7 +322,6 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     out.sort((a, b) => a.from.compareTo(b.from));
     _blocks = out;
-    // برچسب تاریخ‌ها به تقویم کسب‌وکار (اگر نشد، همان تاریخ میلادی)
     _lab.clear();
     if (_cal != 'gregorian' && out.isNotEmpty) {
       try {
@@ -259,7 +347,18 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       } catch (_) {}
     }
   }
+
   String _labelOf(String iso) => _lab[iso] ?? iso;
+
+  /// دقیقه‌ی قانون لغو؛ اگر نامعتبر باشد -1
+  int _cancelMinutes() {
+    if (_cPreset >= 0) return _cPreset;
+    final n = int.tryParse(latinDigits(_cNumC.text.trim())) ?? 0;
+    final m = n * kSpanMult[_cUnit];
+    if (n < 1 || m > 525600) return -1;
+    return m;
+  }
+
   Future<void> _save() async {
     if (_busy) return;
     var mode = 'days';
@@ -289,28 +388,55 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       default:
         days = 30;
     }
+    final cancel = _cancelMinutes();
+    if (cancel < 0) {
+      toast(context, _t('bad_cancel'));
+      return;
+    }
     setState(() => _busy = true);
     try {
       final fields = <String, dynamic>{
         'book_mode': mode,
         'book_days': days,
         'weekly_off': _weeklyOff < 0 ? '' : _weeklyOff,
+        'cancel_before_min': cancel,
+        'slot_step_min': _slot,
+        'currency': _cur,
       };
-      // مردانه/زنانه فقط برای گروه زیبایی معنی دارد
       if (_beauty) fields['gender'] = _gender;
-      final r = await extraManager(_st, 'shop_update', fields);
-      final shop = r['shop'];
+      await extraManager(_st, 'shop_update', fields);
       if (!mounted) return;
-      if (shop is Map && shop.containsKey('gender')) {
-        toast(context, _t('saved'));
-      } else {
-        toast(context, _t('not_updated'));
-      }
+      // دوباره از سرور می‌خوانیم تا مطمئن شویم واقعاً ذخیره شده
+      var bad = false;
+      try {
+        final me = await extraManager(_st, 'me');
+        final back = me['shop'];
+        if (back is Map) {
+          if (back.containsKey('weekly_off')) {
+            final first =
+                '${back['weekly_off'] ?? ''}'.split(RegExp(r'[|,]')).first.trim();
+            final wo = int.tryParse(first) ?? -1;
+            if (wo != _weeklyOff) bad = true;
+          }
+          if (back.containsKey('cancel_before_min') &&
+              int.tryParse('${back['cancel_before_min']}') != cancel) {
+            bad = true;
+          }
+          if (back.containsKey('slot_step_min') &&
+              int.tryParse('${back['slot_step_min']}') != _slot) {
+            bad = true;
+          }
+          if (mounted) setState(() => _applyShop(back));
+        }
+      } catch (_) {}
+      if (!mounted) return;
+      toast(context, bad ? _t('not_updated') : _t('saved'));
     } on ExtraError catch (e) {
       if (mounted) toast(context, extraErrorText(e, _lang));
     }
     if (mounted) setState(() => _busy = false);
   }
+
   Future<void> _addClosure() async {
     if (_busy) return;
     final res = await Navigator.of(context).push<ClosureResult>(
@@ -339,6 +465,7 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     if (mounted) setState(() => _busy = false);
   }
+
   Future<void> _removeBlock(_Block b) async {
     if (_busy) return;
     final ok = await showDialog<bool>(
@@ -361,6 +488,7 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
     }
     if (mounted) setState(() => _busy = false);
   }
+
   Future<void> _openSuggested() async {
     await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
@@ -372,12 +500,14 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       ),
     );
   }
+
   Widget _head(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(text, style: Theme.of(context).textTheme.titleSmall),
     );
   }
+
   Widget _chip(String label, bool selected, VoidCallback onTap) {
     return ChoiceChip(
       label: Text(label),
@@ -385,6 +515,7 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       onSelected: _busy ? null : (_) => onTap(),
     );
   }
+
   Widget _card(List<Widget> children) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -394,6 +525,56 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       ),
     );
   }
+
+  Widget _cancelCard() {
+    final cm = _cancelMinutes();
+    String note;
+    if (cm == 0) {
+      note = _t('c0_note');
+    } else if (cm > 0) {
+      note = _t('cancel_note').replaceAll('{x}', fmtSpan(cm, _lang));
+    } else {
+      note = '';
+    }
+    return _card([
+      _head(_t('cancel_h')),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final m in _cancelPresets)
+            _chip(m == 0 ? _t('c0') : fmtSpan(m, _lang), _cPreset == m,
+                () => setState(() => _cPreset = m)),
+          _chip(_t('custom_time'), _cPreset == -1, () => setState(() => _cPreset = -1)),
+        ],
+      ),
+      if (_cPreset == -1) ...[
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var i = 0; i < 5; i++)
+              _chip(spanUnit(i, 2, _lang), _cUnit == i, () => setState(() => _cUnit = i)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GlassField(
+          controller: _cNumC,
+          label: _t('num_label'),
+          icon: Icons.timer_outlined,
+          ltr: true,
+          keyboard: TextInputType.number,
+          onSubmitted: (_) => setState(() {}),
+        ),
+      ],
+      if (note.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Text(note, style: TextStyle(color: muted(context), fontSize: 12)),
+      ],
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget body;
@@ -416,6 +597,11 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
       final order = _cal == 'gregorian'
           ? <int>[1, 2, 3, 4, 5, 6, 0]
           : <int>[6, 0, 1, 2, 3, 4, 5];
+      final slotOpts = <int>[..._slotOptions];
+      if (!slotOpts.contains(_slot)) {
+        slotOpts.add(_slot);
+        slotOpts.sort();
+      }
       body = ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
@@ -468,6 +654,34 @@ class _BookingRulesPageState extends State<BookingRulesPage> {
                 ],
               ),
             ]),
+          _cancelCard(),
+          _card([
+            _head(_t('slot_h')),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final s in slotOpts)
+                  _chip(fmtSpan(s, _lang), _slot == s, () => setState(() => _slot = s)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(lDigits(_t('slot_note'), _lang),
+                style: TextStyle(color: muted(context), fontSize: 12)),
+          ]),
+          _card([
+            _head(_t('cur_h')),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final c in kCurrencies)
+                  _chip(c.name(_lang), _cur == c.key, () => setState(() => _cur = c.key)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(_t('cur_note'), style: TextStyle(color: muted(context), fontSize: 12)),
+          ]),
           GradientButton(
             label: _t('save'),
             icon: Icons.check_rounded,

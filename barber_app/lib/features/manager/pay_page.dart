@@ -3,6 +3,7 @@ import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/currency.dart';
+import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
 import '../../app/strings_pay.dart';
@@ -13,17 +14,21 @@ import 'pay_api.dart';
 import 'plan_move.dart';
 import 'shop_api.dart';
 
-/// صفحه‌ی پرداخت با تتر. با فعال‌سازی موفق `true` برمی‌گرداند.
+/// صفحه‌ی پرداخت. method: 'usdt' یا 'card'.
+/// با فعال‌سازی موفق `true` برمی‌گرداند.
 class PayPage extends StatefulWidget {
   const PayPage({
     super.key,
     required this.ctx,
     required this.plan,
     required this.months,
+    this.method = 'usdt',
   });
+
   final ShopCtx ctx;
   final PlanDef plan;
   final int months;
+  final String method;
 
   @override
   State<PayPage> createState() => _PayPageState();
@@ -31,16 +36,26 @@ class PayPage extends StatefulWidget {
 
 class _PayPageState extends State<PayPage> {
   final _tx = TextEditingController();
+  final _last4 = TextEditingController();
+  final _name = TextEditingController();
+  final _ref = TextEditingController();
   late final PayApi _api = PayApi(widget.ctx.api.settings);
+
   PayOrder? _order;
   PayResult? _paid;
   String? _fatal;
   bool _loading = true;
   bool _busy = false;
+  bool _polling = false;
+  bool _waiting = false; // کارت‌به‌کارت: ثبت شد و منتظر تأیید است
+  bool _rejected = false;
   String _reviewId = '';
   Timer? _timer;
+  Timer? _poll;
   DateTime _deadline = DateTime.now();
   int _left = 0;
+
+  bool get _isCard => widget.method == 'card';
 
   @override
   void initState() {
@@ -51,7 +66,11 @@ class _PayPageState extends State<PayPage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _poll?.cancel();
     _tx.dispose();
+    _last4.dispose();
+    _name.dispose();
+    _ref.dispose();
     super.dispose();
   }
 
@@ -68,8 +87,38 @@ class _PayPageState extends State<PayPage> {
     });
   }
 
-  String _clock(int s) =>
-      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+  /// بررسی خودکار وضعیت هر ۴۵ ثانیه (در حالت انتظار تأیید)
+  void _startPoll() {
+    _poll?.cancel();
+    _poll = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (mounted) _status(silent: true);
+    });
+  }
+
+  String _clock(int s) {
+    final h = s ~/ 3600;
+    final m = ((s % 3600) ~/ 60).toString().padLeft(2, '0');
+    final sec = (s % 60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$sec' : '$m:$sec';
+  }
+
+  /// تبدیل ارقام فارسی/عربی به انگلیسی و حذف هر چیز غیر عدد
+  String _asciiDigits(String s) {
+    const fa = '۰۱۲۳۴۵۶۷۸۹';
+    const ar = '٠١٢٣٤٥٦٧٨٩';
+    final b = StringBuffer();
+    for (final r in s.runes) {
+      final c = String.fromCharCode(r);
+      var i = fa.indexOf(c);
+      if (i < 0) i = ar.indexOf(c);
+      if (i >= 0) {
+        b.write(i);
+      } else if (r >= 48 && r <= 57) {
+        b.write(c);
+      }
+    }
+    return b.toString();
+  }
 
   void _copy(String v) {
     Clipboard.setData(ClipboardData(text: v));
@@ -78,7 +127,12 @@ class _PayPageState extends State<PayPage> {
 
   Future<void> _create() async {
     try {
-      final o = await _api.create(widget.plan.key, widget.months);
+      final o = await _api.create(
+        widget.plan.key,
+        widget.months,
+        method: widget.method,
+        lang: _lang,
+      );
       if (!mounted) return;
       _order = o;
       _fatal = null;
@@ -93,16 +147,23 @@ class _PayPageState extends State<PayPage> {
   }
 
   void _newOrder() {
+    _poll?.cancel();
     setState(() {
       _loading = true;
       _fatal = null;
       _order = null;
       _reviewId = '';
+      _waiting = false;
+      _rejected = false;
       _tx.clear();
+      _last4.clear();
+      _name.clear();
+      _ref.clear();
     });
     _create();
   }
 
+  /// تتر: ثبت TXID
   Future<void> _submit() async {
     final o = _order;
     if (_busy || o == null) return;
@@ -117,6 +178,9 @@ class _PayPageState extends State<PayPage> {
     try {
       res = await _api.submit(widget.plan.key, o.payId, txid);
     } on ApiException catch (e) {
+      if (e.code == 'PAY_AMOUNT_MISMATCH' && mounted) {
+        setState(() => _reviewId = o.payId);
+      }
       if (mounted) toast(context, t.error(e));
     } catch (_) {
       if (mounted) toast(context, t.t('err_NETWORK'));
@@ -126,14 +190,39 @@ class _PayPageState extends State<PayPage> {
     if (res != null && mounted) await _handle(res, t);
   }
 
-  Future<void> _status() async {
+  /// کارت‌به‌کارت: ثبت اطلاعات واریز
+  Future<void> _submitCard() async {
     final o = _order;
     if (_busy || o == null) return;
     final t = PayT(_lang);
+    final last4 = _asciiDigits(_last4.text);
+    final name = _name.text.trim();
+    final ref = _ref.text.trim();
+    if (last4.length != 4) {
+      toast(context, t.t('card_need_last4'));
+      return;
+    }
+    if (name.length < 3) {
+      toast(context, t.t('card_need_name'));
+      return;
+    }
+    if (ref.isEmpty) {
+      toast(context, t.t('card_need_ref'));
+      return;
+    }
+    final shop = widget.ctx.session.shop;
     setState(() => _busy = true);
     PayResult? res;
     try {
-      res = await _api.status(widget.plan.key, o.payId);
+      res = await _api.card(
+        widget.plan.key,
+        o.payId,
+        last4: last4,
+        payerName: name,
+        refNo: ref,
+        shopName: shop.name,
+        phone: shop.phone,
+      );
     } on ApiException catch (e) {
       if (mounted) toast(context, t.error(e));
     } catch (_) {
@@ -141,16 +230,57 @@ class _PayPageState extends State<PayPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-    if (res != null && mounted) await _handle(res, t);
+    if (res == null || !mounted) return;
+    if (res.isPaid) {
+      await _handle(res, t);
+    } else {
+      setState(() => _waiting = true);
+      _startPoll();
+    }
   }
 
-  Future<void> _handle(PayResult r, PayT t) async {
+  Future<void> _status({bool silent = false}) async {
+    final o = _order;
+    if (o == null || _paid != null) return;
+    if (silent) {
+      if (_busy || _polling) return;
+      _polling = true;
+    } else {
+      if (_busy) return;
+      setState(() => _busy = true);
+    }
+    final t = PayT(_lang);
+    PayResult? res;
+    try {
+      res = await _api.status(widget.plan.key, o.payId);
+    } on ApiException catch (e) {
+      if (!silent && mounted) toast(context, t.error(e));
+    } catch (_) {
+      if (!silent && mounted) toast(context, t.t('err_NETWORK'));
+    } finally {
+      _polling = false;
+      if (!silent && mounted) setState(() => _busy = false);
+    }
+    if (res != null && mounted) await _handle(res, t, silent: silent);
+  }
+
+  Future<void> _handle(PayResult r, PayT t, {bool silent = false}) async {
     if (r.isPaid) {
+      _poll?.cancel();
       setState(() => _paid = r);
       await _activate();
+    } else if (r.status == 'rejected') {
+      _poll?.cancel();
+      setState(() => _rejected = true);
     } else if (r.status == 'review') {
-      setState(() => _reviewId = r.payId);
-    } else {
+      setState(() {
+        if (_isCard) {
+          _waiting = true;
+        } else {
+          _reviewId = r.payId;
+        }
+      });
+    } else if (!silent) {
       toast(context, t.t('still_pending'));
     }
   }
@@ -209,7 +339,8 @@ class _PayPageState extends State<PayPage> {
         ),
       );
 
-  Widget _copyRow(String label, String value, {bool big = false}) {
+  Widget _copyRow(String label, String value,
+      {bool big = false, String? copy}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -229,7 +360,7 @@ class _PayPageState extends State<PayPage> {
             ),
             IconButton(
               icon: const Icon(Icons.copy_rounded),
-              onPressed: () => _copy(value),
+              onPressed: () => _copy(copy ?? value),
             ),
           ],
         ),
@@ -244,7 +375,7 @@ class _PayPageState extends State<PayPage> {
     final t6 = T6(lang);
     final o = _order;
     return GlassScaffold(
-      title: t.t('title'),
+      title: t.t(_isCard ? 'title_card' : 'title_usdt'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
@@ -286,14 +417,141 @@ class _PayPageState extends State<PayPage> {
                 onPressed: _activate,
               ),
             ])
+          else if (_rejected)
+            _card([
+              Text(t.t('card_rejected', {'id': o?.payId ?? ''}),
+                  style: const TextStyle(height: 1.6)),
+              const SizedBox(height: 14),
+              GradientButton(
+                label: t.t('new_order'),
+                icon: Icons.refresh_rounded,
+                onPressed: _newOrder,
+              ),
+            ])
+          else if (_waiting && o != null)
+            _card([
+              const Center(
+                  child: GradientIcon(Icons.hourglass_top_rounded, size: 56)),
+              const SizedBox(height: 12),
+              Center(
+                child: Text(t.t('card_wait_title'),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800)),
+              ),
+              const SizedBox(height: 10),
+              Text(t.t('card_wait', {'id': o.payId}),
+                  style: TextStyle(color: muted(context), height: 1.6)),
+              const SizedBox(height: 14),
+              GradientButton(
+                label: t.t('status_btn'),
+                icon: Icons.sync_rounded,
+                loading: _busy,
+                onPressed: _status,
+              ),
+            ])
           else if (o != null)
-            ..._orderWidgets(t, t6, o, lang),
+            ...(_isCard
+                ? _cardWidgets(t, t6, o, lang)
+                : _usdtWidgets(t, t6, o, lang)),
         ],
       ),
     );
   }
 
-  List<Widget> _orderWidgets(PayT t, T6 t6, PayOrder o, String lang) {
+  Widget _timeLine(PayT t, String lang) {
+    final expired = _left <= 0;
+    return Text(
+      expired
+          ? t.t('expired_note')
+          : t.t('time_left', {'m': lDigits(_clock(_left), lang)}),
+      style: TextStyle(
+          color: expired ? Colors.orangeAccent : muted(context), height: 1.5),
+    );
+  }
+
+  /// ---------- کارت‌به‌کارت ----------
+  List<Widget> _cardWidgets(PayT t, T6 t6, PayOrder o, String lang) {
+    final amount = o.amountValue.round();
+    return [
+      _card([
+        Text(
+          '${t6.t('pl_name_${widget.plan.key}')} · ${t6.t('pl_months', {'n': widget.months})}',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 4),
+        Text(t.t('card_send'), style: TextStyle(color: muted(context))),
+        const SizedBox(height: 14),
+        _copyRow(
+          t.t('amount_toman'),
+          '${fmtNum(amount, lang)} ${t6.t('pl_toman')}',
+          big: true,
+          copy: '$amount',
+        ),
+        const Divider(height: 24),
+        _copyRow(t.t('card_number'), o.cardNumber, copy: o.cardDigits),
+        const SizedBox(height: 12),
+        Text(t.t('card_holder'),
+            style: TextStyle(color: muted(context), fontSize: 12.5)),
+        const SizedBox(height: 4),
+        Text(o.cardHolder,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 12),
+        _timeLine(t, lang),
+        const SizedBox(height: 10),
+        Text('${t.t('order_id')}: ${o.payId}',
+            style: TextStyle(color: muted(context), fontSize: 12)),
+      ]),
+      _card([
+        Text(t.t('card_form_title'),
+            style: const TextStyle(fontWeight: FontWeight.w800, height: 1.5)),
+        const SizedBox(height: 12),
+        GlassField(
+          controller: _last4,
+          label: t.t('card_last4'),
+          icon: Icons.credit_card_rounded,
+          ltr: true,
+        ),
+        const SizedBox(height: 10),
+        GlassField(
+          controller: _name,
+          label: t.t('payer_name'),
+          icon: Icons.person_rounded,
+        ),
+        const SizedBox(height: 10),
+        GlassField(
+          controller: _ref,
+          label: t.t('ref_no'),
+          icon: Icons.tag_rounded,
+          ltr: true,
+          onSubmitted: (_) => _submitCard(),
+        ),
+        const SizedBox(height: 6),
+        Text(t.t('card_note'),
+            style:
+                TextStyle(color: muted(context), fontSize: 12.5, height: 1.5)),
+        const SizedBox(height: 14),
+        GradientButton(
+          label: t.t('card_submit'),
+          icon: Icons.send_rounded,
+          loading: _busy,
+          onPressed: _submitCard,
+        ),
+        if (_left <= 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Center(
+              child: TextButton(
+                onPressed: _busy ? null : _newOrder,
+                child: Text(t.t('new_order')),
+              ),
+            ),
+          ),
+      ]),
+    ];
+  }
+
+  /// ---------- تتر ----------
+  List<Widget> _usdtWidgets(PayT t, T6 t6, PayOrder o, String lang) {
     final expired = _left <= 0;
     return [
       if (_reviewId.isNotEmpty)
@@ -321,14 +579,7 @@ class _PayPageState extends State<PayPage> {
           ],
         ),
         const SizedBox(height: 12),
-        Text(
-          expired
-              ? t.t('expired_note')
-              : t.t('time_left', {'m': lDigits(_clock(_left), lang)}),
-          style: TextStyle(
-              color: expired ? Colors.orangeAccent : muted(context),
-              height: 1.5),
-        ),
+        _timeLine(t, lang),
         const SizedBox(height: 10),
         Text('• ${t.t('warn_net')}',
             style: const TextStyle(
@@ -350,7 +601,8 @@ class _PayPageState extends State<PayPage> {
         ),
         const SizedBox(height: 6),
         Text(t.t('txid_hint'),
-            style: TextStyle(color: muted(context), fontSize: 12.5, height: 1.5)),
+            style:
+                TextStyle(color: muted(context), fontSize: 12.5, height: 1.5)),
         const SizedBox(height: 14),
         GradientButton(
           label: t.t('check_btn'),

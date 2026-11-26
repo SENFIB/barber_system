@@ -1,5 +1,11 @@
 import 'business_types.dart';
 
+/// true یعنی مدیر/پرسنل وارد شده‌اند (هدر مقدارش را به‌روز می‌کند)
+bool kUiManagerMode = false;
+
+/// نوع کسب‌وکار مدیرِ واردشده؛ فیلتر مرکزی متن‌ها از آن استفاده می‌کند
+String kUiBizType = '';
+
 String _w(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
 
@@ -105,8 +111,8 @@ String bwGroup(String? type) => bizTypeByKey(type ?? '')?.group ?? 'beauty';
 
 bool bwBeauty(String? type) => bwGroup(type) == 'beauty';
 
-/// شش واژه‌ی عنوان پرسنل برای این نوع
-List<String> bwRole(String? type) {
+/// شش واژه‌ی عنوان پرسنل (بدون هیچ اثر جانبی)
+List<String> bwRoleQuiet(String? type) {
   final k = type ?? '';
   if (k.isEmpty) return _roles['barber']!;
   final r = _roles[k];
@@ -117,8 +123,16 @@ List<String> bwRole(String? type) {
   return _staff;
 }
 
+/// شش واژه‌ی عنوان پرسنل برای این نوع.
+/// وقتی مدیر وارد شده، نوعِ فعلی برای فیلتر مرکزی متن‌ها هم ثبت می‌شود.
+List<String> bwRole(String? type) {
+  final k = type ?? '';
+  if (k.isNotEmpty && kUiManagerMode) kUiBizType = k;
+  return bwRoleQuiet(k);
+}
+
 /// true یعنی برای این نوع عنوان اختصاصی نداریم («نفر پرسنل»)
-bool bwGeneric(String? type) => identical(bwRole(type), _staff);
+bool bwGeneric(String? type) => identical(bwRoleQuiet(type), _staff);
 
 /// عنوان یک نفر از پرسنل
 String bwStaff(String? type, String l) {

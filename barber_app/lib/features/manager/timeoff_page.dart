@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/biz_words.dart';
 import '../../app/date_pick.dart';
 import '../../app/settings.dart';
 import '../../app/strings_s3.dart';
@@ -7,6 +8,27 @@ import '../../app/widgets.dart';
 import 'booking_common.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
+
+String _tw(String l, String fa, String en, String ar) =>
+    l == 'fa' ? fa : (l == 'ar' ? ar : en);
+
+/// «کل آرایشگاه» برای گروه زیبایی، «کل کسب‌وکار» برای بقیه
+String _wholeText(String type, String l) {
+  final shop = bwShop(type, l);
+  return _tw(l, 'کل $shop', 'Whole $shop', 'كامل $shop');
+}
+
+/// «برای چه کسی؟» با عنوان پرسنل همان کسب‌وکار
+String _whoText(String type, String l) {
+  final shop = bwShop(type, l);
+  final noun = bwStaff(type, l);
+  return _tw(
+    l,
+    'برای چه کسی؟ (کل $shop یا یک $noun)',
+    'For whom? (the whole $shop or one ${noun.toLowerCase()})',
+    'لمن؟ (كامل $shop أو ${noun})',
+  );
+}
 
 class TimeOffPage extends StatefulWidget {
   const TimeOffPage(this.ctx, {super.key});
@@ -20,14 +42,18 @@ class _TimeOffPageState extends State<TimeOffPage> {
   bool _loading = true;
   bool _busy = false;
   Object? _err;
+  String _type = '';
   List<Map<String, dynamic>> _blocks = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _staff = <Map<String, dynamic>>[];
 
   T3 _tr() => T3(SettingsScope.read(context).lang);
+  String get _lang => SettingsScope.read(context).lang;
 
   @override
   void initState() {
     super.initState();
+    _type = '${widget.ctx.session.shop.bizType}';
+    if (_type == 'null') _type = '';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _load();
     });
@@ -60,10 +86,19 @@ class _TimeOffPageState extends State<TimeOffPage> {
           staff = bFirstList(sr, ['staff', 'items', 'list']);
         } catch (_) {}
       }
+      var type = _type;
+      if (type.isEmpty) {
+        try {
+          final me = await raw.call('me');
+          final sh = me['shop'];
+          if (sh is Map) type = '${sh['biz_type'] ?? ''}';
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         _blocks = blocks;
         _staff = staff;
+        _type = type;
         _loading = false;
       });
     } catch (e) {
@@ -77,7 +112,7 @@ class _TimeOffPageState extends State<TimeOffPage> {
   }
 
   String _staffName(String id) {
-    if (id.isEmpty) return _tr().t('t_whole_shop');
+    if (id.isEmpty) return _wholeText(_type, _lang);
     for (final s in _staff) {
       if (bStr(s['staff_id']) == id) return bStr(s['name']);
     }
@@ -91,7 +126,8 @@ class _TimeOffPageState extends State<TimeOffPage> {
 
   Future<void> _add() async {
     final n = await Navigator.of(context).push<int>(
-      MaterialPageRoute(builder: (_) => _TimeOffAddPage(staff: _staff)),
+      MaterialPageRoute(
+          builder: (_) => _TimeOffAddPage(staff: _staff, bizType: _type)),
     );
     if (n == null || !mounted) return;
     final t = _tr();
@@ -274,8 +310,9 @@ class _TimeOffPageState extends State<TimeOffPage> {
 }
 
 class _TimeOffAddPage extends StatefulWidget {
-  const _TimeOffAddPage({required this.staff});
+  const _TimeOffAddPage({required this.staff, required this.bizType});
   final List<Map<String, dynamic>> staff;
+  final String bizType;
 
   @override
   State<_TimeOffAddPage> createState() => _TimeOffAddPageState();
@@ -409,20 +446,21 @@ class _TimeOffAddPageState extends State<_TimeOffAddPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = T3(SettingsScope.of(context).lang);
+    final lang = SettingsScope.of(context).lang;
+    final t = T3(lang);
     return GlassScaffold(
       title: t.t('t_add'),
       maxWidth: 600,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
         children: [
-          _label(t.t('t_who')),
+          _label(_whoText(widget.bizType, lang)),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
               ChoiceChip(
-                label: Text(t.t('t_whole_shop')),
+                label: Text(_wholeText(widget.bizType, lang)),
                 selected: _who.isEmpty,
                 onSelected: (_) => setState(() => _who = ''),
               ),

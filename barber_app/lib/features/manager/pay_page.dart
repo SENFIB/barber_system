@@ -15,20 +15,32 @@ import 'plan_move.dart';
 import 'shop_api.dart';
 
 /// صفحه‌ی پرداخت. method: 'usdt' یا 'card'.
-/// با فعال‌سازی موفق `true` برمی‌گرداند.
+///
+/// دو حالت دارد:
+/// - مدیر واردشده (`ctx` داده شود): بعد از پرداخت پلن را فعال می‌کند و `true` برمی‌گرداند.
+/// - ثبت‌نام (فقط `settings` داده شود): بعد از پرداخت، کد لایسنس را
+///   (یک `String`) برمی‌گرداند تا در فرم ثبت‌نام پر شود.
 class PayPage extends StatefulWidget {
   const PayPage({
     super.key,
-    required this.ctx,
+    this.ctx,
+    this.settings,
     required this.plan,
     required this.months,
     this.method = 'usdt',
-  });
+    this.shopName = '',
+    this.phone = '',
+  }) : assert(ctx != null || settings != null);
 
-  final ShopCtx ctx;
+  final ShopCtx? ctx;
+  final AppSettings? settings;
   final PlanDef plan;
   final int months;
   final String method;
+
+  /// فقط در حالت ثبت‌نام: نام و تلفنی که کاربر تا اینجا نوشته
+  final String shopName;
+  final String phone;
 
   @override
   State<PayPage> createState() => _PayPageState();
@@ -39,7 +51,7 @@ class _PayPageState extends State<PayPage> {
   final _last4 = TextEditingController();
   final _name = TextEditingController();
   final _ref = TextEditingController();
-  late final PayApi _api = PayApi(widget.ctx.api.settings);
+  late final PayApi _api = PayApi(_st);
 
   PayOrder? _order;
   PayResult? _paid;
@@ -56,6 +68,8 @@ class _PayPageState extends State<PayPage> {
   int _left = 0;
 
   bool get _isCard => widget.method == 'card';
+
+  AppSettings get _st => widget.ctx?.api.settings ?? widget.settings!;
 
   @override
   void initState() {
@@ -74,7 +88,7 @@ class _PayPageState extends State<PayPage> {
     super.dispose();
   }
 
-  String get _lang => widget.ctx.api.settings.lang;
+  String get _lang => _st.lang;
 
   void _startTimer(int secs) {
     _timer?.cancel();
@@ -210,7 +224,8 @@ class _PayPageState extends State<PayPage> {
       toast(context, t.t('card_need_ref'));
       return;
     }
-    final shop = widget.ctx.session.shop;
+    final shopName = widget.ctx?.session.shop.name ?? widget.shopName;
+    final phone = widget.ctx?.session.shop.phone ?? widget.phone;
     setState(() => _busy = true);
     PayResult? res;
     try {
@@ -220,8 +235,8 @@ class _PayPageState extends State<PayPage> {
         last4: last4,
         payerName: name,
         refNo: ref,
-        shopName: shop.name,
-        phone: shop.phone,
+        shopName: shopName,
+        phone: phone,
       );
     } on ApiException catch (e) {
       if (mounted) toast(context, t.error(e));
@@ -285,20 +300,40 @@ class _PayPageState extends State<PayPage> {
     }
   }
 
-  /// لایسنس صادرشده را با همان مسیر «کد لایسنس دارم» فعال می‌کند
+  String _filledMsg() {
+    switch (_lang) {
+      case 'en':
+        return 'Payment confirmed. The license code was filled in ✅';
+      case 'ar':
+        return 'تم تأكيد الدفع. تمت تعبئة رمز الترخيص ✅';
+    }
+    return 'پرداخت تأیید شد. کد لایسنس در فرم پر شد ✅';
+  }
+
+  /// مدیر واردشده: لایسنس را با همان مسیر «کد لایسنس دارم» فعال می‌کند.
+  /// ثبت‌نام: فقط کد لایسنس را به صفحه‌ی قبل برمی‌گرداند.
   Future<void> _activate() async {
     final r = _paid;
     if (r == null || r.licenseKey.isEmpty || _busy) return;
-    final st = widget.ctx.api.settings;
+    final ctx = widget.ctx;
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    // حالت ثبت‌نام
+    if (ctx == null) {
+      messenger.showSnackBar(SnackBar(content: Text(_filledMsg())));
+      nav.pop(r.licenseKey);
+      return;
+    }
+
+    final st = ctx.api.settings;
     final lang = st.lang;
     final t = PayT(lang);
     final plan = widget.plan.key;
-    final nav = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     setState(() => _busy = true);
     try {
-      if (plan == widget.ctx.session.shop.plan) {
-        await widget.ctx.api.renew(r.licenseKey);
+      if (plan == ctx.session.shop.plan) {
+        await ctx.api.renew(r.licenseKey);
         messenger.showSnackBar(SnackBar(content: Text(t.t('activated'))));
         if (mounted) nav.pop(true);
         return;

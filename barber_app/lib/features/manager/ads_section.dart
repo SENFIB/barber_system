@@ -19,20 +19,27 @@ String _codeOf(Object e) {
   }
 }
 
-/// بخش «معرفی شما در دیگر آرایشگاه‌ها و کسب‌وکارها» داخل تنظیمات آرایشگاه
+/// صفحه‌ی تبلیغات: سه کادر جدا
+/// ۱) کد تبلیغ  ۲) انتخاب دسته‌ها (بعد از فعال‌شدن)  ۳) بدون تبلیغ در پنل مشتری‌ها
 class AdsSection extends StatefulWidget {
   const AdsSection({super.key});
+
   @override
   State<AdsSection> createState() => _AdsSectionState();
 }
 
 class _AdsSectionState extends State<AdsSection> {
   final _text = TextEditingController();
-  final _code = TextEditingController();
+  final _promoCode = TextEditingController();
+  final _noAdsCode = TextEditingController();
   final Set<String> _cats = <String>{};
+
   bool _loading = true;
-  bool _busy = false;
+  bool _busyPromo = false;
+  bool _busyNo = false;
+  bool _busySave = false;
   String? _err;
+
   bool _free = false; // ویژه/شخصی: رایگان
   bool _adOn = false;
   bool _noAdsOn = false;
@@ -53,7 +60,8 @@ class _AdsSectionState extends State<AdsSection> {
   @override
   void dispose() {
     _text.dispose();
-    _code.dispose();
+    _promoCode.dispose();
+    _noAdsCode.dispose();
     super.dispose();
   }
 
@@ -99,15 +107,21 @@ class _AdsSectionState extends State<AdsSection> {
     }
   }
 
-  Future<void> _redeem() async {
+  Future<void> _redeem(TextEditingController ctl, bool promo) async {
     final bt = BT(_st.lang);
-    final code = normalizeDigits(_code.text).trim().toUpperCase();
+    final code = normalizeDigits(ctl.text).trim().toUpperCase();
     if (code.isEmpty) return;
-    setState(() => _busy = true);
+    setState(() {
+      if (promo) {
+        _busyPromo = true;
+      } else {
+        _busyNo = true;
+      }
+    });
     try {
       await ShopRaw(_st).call('ad_redeem', {'code': code});
       if (!mounted) return;
-      _code.clear();
+      ctl.clear();
       toast(context, bt.t('ad_code_ok'));
       await _load();
     } catch (e) {
@@ -122,15 +136,28 @@ class _AdsSectionState extends State<AdsSection> {
         toast(context, T2(_st.lang).error(e));
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busyPromo = false;
+          _busyNo = false;
+        });
+      }
     }
+  }
+
+  Future<void> _post() async {
+    await ShopRaw(_st).call('ad_save', {
+      'ad_text': _text.text.trim(),
+      'ad_cats': _cats.toList(),
+      'ad_on': _adOn,
+      'no_ads_on': _noAdsOn,
+    });
   }
 
   Future<void> _save() async {
     final bt = BT(_st.lang);
     final text = _text.text.trim();
-    final active = _adActive;
-    if (active && text.isEmpty) {
+    if (_adActive && text.isEmpty) {
       toast(context, bt.t('ad_need_text'));
       return;
     }
@@ -138,25 +165,42 @@ class _AdsSectionState extends State<AdsSection> {
       toast(context, bt.t('ad_text_long'));
       return;
     }
-    if (active && _cats.isEmpty) {
+    if (_adActive && _cats.isEmpty) {
       toast(context, bt.t('ad_need_cat'));
       return;
     }
-    setState(() => _busy = true);
+    setState(() => _busySave = true);
     try {
-      await ShopRaw(_st).call('ad_save', {
-        'ad_text': text,
-        'ad_cats': _cats.toList(),
-        'ad_on': _adOn,
-        'no_ads_on': _noAdsOn,
-      });
+      await _post();
       if (!mounted) return;
       toast(context, bt.t('ad_saved'));
     } catch (e) {
       if (!mounted) return;
       toast(context, T2(_st.lang).error(e));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _busySave = false);
+    }
+  }
+
+  /// کلید «بدون تبلیغ» برای پلن‌های رایگان (ویژه/شخصی): همان لحظه ذخیره می‌شود
+  Future<void> _toggleNoAds(bool v) async {
+    final bt = BT(_st.lang);
+    final old = _noAdsOn;
+    setState(() {
+      _noAdsOn = v;
+      _noAdsActive = v;
+    });
+    try {
+      await _post();
+      if (!mounted) return;
+      toast(context, bt.t('ad_saved'));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _noAdsOn = old;
+        _noAdsActive = old;
+      });
+      toast(context, T2(_st.lang).error(e));
     }
   }
 
@@ -171,7 +215,7 @@ class _AdsSectionState extends State<AdsSection> {
     );
   }
 
-  Widget _cats_(BT bt, String lang) {
+  Widget _catPicker(BT bt, String lang) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -190,6 +234,7 @@ class _AdsSectionState extends State<AdsSection> {
             children: [
               for (final t in bizTypesOf(g.key))
                 FilterChip(
+                  showCheckmark: true,
                   label: Text(bizNotRecommended(_own, t.key)
                       ? '${t.name(lang)} (${bt.t('ad_not_rec')})'
                       : t.name(lang)),
@@ -211,107 +256,180 @@ class _AdsSectionState extends State<AdsSection> {
     );
   }
 
+  Widget _box(String label, Widget child) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionLabel(label),
+        Glass(child: child),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
+
+  Widget _hint(String text) {
+    return Text(text,
+        style: TextStyle(color: muted(context), fontSize: 12.5, height: 1.6));
+  }
+
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
     final lang = st.lang;
     final bt = BT(lang);
-    Widget inner;
+
     if (_loading) {
-      inner = const Padding(
-        padding: EdgeInsets.all(12),
-        child: Center(child: CircularProgressIndicator()),
+      return const Glass(
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: Center(child: CircularProgressIndicator()),
+        ),
       );
-    } else if (_err != null) {
-      inner = Column(
+    }
+    if (_err != null) {
+      return Glass(
+        child: Column(
+          children: [
+            Text(_err!, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            GradientButton(
+              compact: true,
+              icon: Icons.refresh_rounded,
+              label: T2(lang).t('retry'),
+              onPressed: _load,
+            ),
+          ],
+        ),
+      );
+    }
+
+    String until(String iso) => CalFmt.date(iso, st.calendarKey, lang);
+
+    // ---------- کادر ۱: کد تبلیغ ----------
+    final Widget promoInner;
+    if (_free) {
+      promoInner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_err!, textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          GradientButton(
-            compact: true,
-            icon: Icons.refresh_rounded,
-            label: T2(lang).t('retry'),
-            onPressed: _load,
-          ),
+          _hint(bt.t('ad_hint')),
+          const SizedBox(height: 8),
+          _switchRow(bt.t('ad_free_on'), _adOn, (v) {
+            setState(() {
+              _adOn = v;
+              _adActive = v;
+            });
+          }),
         ],
       );
     } else {
-      String until(String iso) => CalFmt.date(iso, st.calendarKey, lang);
-      inner = Column(
+      promoInner = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(bt.t('ad_hint'),
-              style:
-                  TextStyle(color: muted(context), fontSize: 12.5, height: 1.6)),
+          _hint(bt.t('ad_promo_hint')),
           const SizedBox(height: 12),
-          if (_free) ...[
-            _switchRow(bt.t('ad_free_on'), _adOn, (v) => setState(() {
-                  _adOn = v;
-                  _adActive = v;
-                })),
-            _switchRow(bt.t('ad_free_none'), _noAdsOn,
-                (v) => setState(() => _noAdsOn = v)),
-          ] else ...[
-            Text(
-              _adActive && _adUntil.isNotEmpty
-                  ? bt.t('ad_on_until', {'d': until(_adUntil)})
-                  : bt.t('ad_off'),
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            if (_noAdsActive && _noAdsUntil.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(bt.t('ad_noads_until', {'d': until(_noAdsUntil)}),
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-            ],
-            const SizedBox(height: 12),
-            GlassField(
-              controller: _code,
-              label: bt.t('ad_code'),
-              icon: Icons.vpn_key_rounded,
-              ltr: true,
-            ),
-            const SizedBox(height: 4),
-            Text(bt.t('ad_code_hint'),
-                style: TextStyle(color: muted(context), fontSize: 12)),
-            const SizedBox(height: 10),
-            GradientButton(
-              outlined: true,
-              compact: true,
-              loading: _busy,
-              icon: Icons.check_rounded,
-              label: bt.t('ad_code_btn'),
-              onPressed: _redeem,
-            ),
-          ],
-          if (_adActive) ...[
-            const SizedBox(height: 16),
-            GlassField(
-              controller: _text,
-              label: '${bt.t('ad_text')} (${bt.t('ad_text_hint')})',
-              icon: Icons.campaign_rounded,
-            ),
-            const SizedBox(height: 14),
-            Text(bt.t('ad_cats'),
-                style: const TextStyle(fontWeight: FontWeight.w700)),
-            _cats_(bt, lang),
-          ],
-          if (_free || _adActive) ...[
-            const SizedBox(height: 16),
-            GradientButton(
-              loading: _busy,
-              icon: Icons.check_rounded,
-              label: bt.t('ad_save'),
-              onPressed: _save,
-            ),
-          ],
+          Text(
+            _adActive && _adUntil.isNotEmpty
+                ? bt.t('ad_on_until', {'d': until(_adUntil)})
+                : bt.t('ad_off'),
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          GlassField(
+            controller: _promoCode,
+            label: bt.t('ad_promo_code'),
+            icon: Icons.vpn_key_rounded,
+            ltr: true,
+          ),
+          const SizedBox(height: 10),
+          GradientButton(
+            outlined: true,
+            compact: true,
+            loading: _busyPromo,
+            icon: Icons.check_rounded,
+            label: bt.t('ad_code_btn'),
+            onPressed: () => _redeem(_promoCode, true),
+          ),
         ],
       );
     }
+
+    // ---------- کادر ۲: کجا نمایش داده شود ----------
+    Widget? whereBox;
+    if (_adActive) {
+      whereBox = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _hint(bt.t('ad_where_hint')),
+          const SizedBox(height: 12),
+          GlassField(
+            controller: _text,
+            label: '${bt.t('ad_text')} (${bt.t('ad_text_hint')})',
+            icon: Icons.campaign_rounded,
+          ),
+          const SizedBox(height: 14),
+          Text(bt.t('ad_cats'),
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          _catPicker(bt, lang),
+          const SizedBox(height: 16),
+          GradientButton(
+            loading: _busySave,
+            icon: Icons.check_rounded,
+            label: bt.t('ad_save'),
+            onPressed: _save,
+          ),
+        ],
+      );
+    }
+
+    // ---------- کادر ۳: بدون تبلیغ ----------
+    final Widget noAdsInner;
+    if (_free) {
+      noAdsInner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _hint(bt.t('ad_noads_hint')),
+          const SizedBox(height: 8),
+          _switchRow(bt.t('ad_free_none'), _noAdsOn, _toggleNoAds),
+        ],
+      );
+    } else {
+      noAdsInner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _hint(bt.t('ad_noads_hint')),
+          const SizedBox(height: 12),
+          Text(
+            _noAdsActive && _noAdsUntil.isNotEmpty
+                ? bt.t('ad_noads_until', {'d': until(_noAdsUntil)})
+                : bt.t('ad_noads_off'),
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          GlassField(
+            controller: _noAdsCode,
+            label: bt.t('ad_noads_code'),
+            icon: Icons.block_rounded,
+            ltr: true,
+          ),
+          const SizedBox(height: 10),
+          GradientButton(
+            outlined: true,
+            compact: true,
+            loading: _busyNo,
+            icon: Icons.check_rounded,
+            label: bt.t('ad_code_btn'),
+            onPressed: () => _redeem(_noAdsCode, false),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionLabel(bt.t('ad_title')),
-        Glass(child: inner),
+        _box(bt.t('ad_box_promo'), promoInner),
+        if (whereBox != null) _box(bt.t('ad_box_where'), whereBox),
+        _box(bt.t('ad_box_noads'), noAdsInner),
       ],
     );
   }

@@ -14,13 +14,11 @@ import 'manual_booking_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
 import 'timeoff_page.dart';
-
 const Map<String, String> _appCustomer = {
   'fa': 'مشتری (از برنامه)',
   'en': 'App customer',
   'ar': 'زبون من التطبيق',
 };
-
 const Map<String, Map<String, String>> _bx = {
   'fa': {
     'tab0': 'جاری',
@@ -50,13 +48,10 @@ const Map<String, Map<String, String>> _bx = {
     'total': 'المجموع',
   },
 };
-
 String _lx(String lang, String k) =>
     (_bx[lang] ?? _bx['fa']!)[k] ?? _bx['fa']![k] ?? k;
-
 /// تا چند دقیقه بعد از پایان نوبت، دکمه‌ها فعال می‌مانند
 const int _kGraceMin = 15;
-
 /// اگر «نام» در واقع یک شناسه‌ی فنی باشد (مثل c_83hd92kd01) نشان داده نمی‌شود
 String _niceName(String n, String lang) {
   final s = n.trim();
@@ -66,7 +61,6 @@ String _niceName(String n, String lang) {
   if (looksId) return _appCustomer[lang] ?? _appCustomer['fa']!;
   return s;
 }
-
 /// تاریخ + دقیقه → دقیقه‌ی مطلق (برای مقایسه)
 int _absOf(String date, int min) {
   final d = date.length >= 10 ? date.substring(0, 10) : date;
@@ -75,15 +69,12 @@ int _absOf(String date, int min) {
   return DateTime.utc(p.year, p.month, p.day).millisecondsSinceEpoch ~/ 60000 +
       min;
 }
-
 class BookingsPage extends StatefulWidget {
   const BookingsPage(this.ctx, {super.key});
   final ShopCtx ctx;
-
   @override
   State<BookingsPage> createState() => _BookingsPageState();
 }
-
 class _BookingsPageState extends State<BookingsPage> {
   bool _loading = true;
   bool _busy = false;
@@ -98,10 +89,8 @@ class _BookingsPageState extends State<BookingsPage> {
   int _baseAbs = -1;
   DateTime _fetchedAt = DateTime.now();
   Timer? _tick;
-
   bool get _owner => widget.ctx.session.isOwner;
   T6 _tr() => T6(SettingsScope.read(context).lang);
-
   @override
   void initState() {
     super.initState();
@@ -112,13 +101,11 @@ class _BookingsPageState extends State<BookingsPage> {
       if (mounted) _load();
     });
   }
-
   @override
   void dispose() {
     _tick?.cancel();
     super.dispose();
   }
-
   bool _lost(Object e) {
     if (isSessionLost(e)) {
       if (mounted) Navigator.of(context).pop();
@@ -127,7 +114,6 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     return false;
   }
-
   /// «الان» به دقیقه‌ی مطلق؛ از ساعت سرور و گذشت زمان از آخرین دریافت
   int _curAbs() {
     if (_baseAbs >= 0) {
@@ -136,7 +122,6 @@ class _BookingsPageState extends State<BookingsPage> {
     final n = DateTime.now();
     return _absOf(bIso(DateTime(n.year, n.month, n.day)), n.hour * 60 + n.minute);
   }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -207,7 +192,6 @@ class _BookingsPageState extends State<BookingsPage> {
       });
     }
   }
-
   Future<void> _act(String action, Map<String, dynamic> params) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -224,7 +208,6 @@ class _BookingsPageState extends State<BookingsPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
   Future<void> _confirmAct({
     required String message,
     required String yes,
@@ -244,30 +227,27 @@ class _BookingsPageState extends State<BookingsPage> {
     if (ok != true || !mounted) return;
     await _act(action, params);
   }
-
   void _shift(int n) {
     final d = bParse(_date ?? '');
     if (d == null) return;
     setState(() => _date = bIso(DateTime(d.year, d.month, d.day + n)));
     _load();
   }
-
   Future<void> _pick() async {
     final st = SettingsScope.read(context);
     final cur = bParse(_date ?? '') ?? DateTime.now();
     final d = await pickLocalDate(
       context,
-      cur,
-      DateTime(2020),
-      DateTime(2100),
-      st.calendarKey,
-      st.lang,
+      initial: cur,
+      first: DateTime(2020),
+      last: DateTime(2100),
+      calKey: st.calendarKey,
+      lang: st.lang,
     );
     if (d == null || !mounted) return;
     setState(() => _date = bIso(d));
     _load();
   }
-
   Future<void> _newManual() async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -276,7 +256,6 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     if (ok == true && mounted) _load();
   }
-
   /// گروه‌ها: تازه‌ترین نوبت بالا
   List<List<Map<String, dynamic>>> _groups() {
     final map = <String, List<Map<String, dynamic>>>{};
@@ -295,7 +274,6 @@ class _BookingsPageState extends State<BookingsPage> {
         .compareTo(bMin(bStr(a.first['start_time']))));
     return list;
   }
-
   /// 0 جاری، 1 انجام‌شده، 2 نیامده، 3 لغوشده
   int _cat(List<Map<String, dynamic>> g) {
     final ss = g.map((b) => bStr(b['status'])).toList();
@@ -304,7 +282,6 @@ class _BookingsPageState extends State<BookingsPage> {
     if (ss.any((s) => s == 'no_show')) return 2;
     return 3;
   }
-
   /// 0 = هنوز قفل ، 1 = فعال ، 2 = مهلت تمام شد
   int _win(String date, String start, String end) {
     final s = _absOf(date, bMin(start));
@@ -316,7 +293,6 @@ class _BookingsPageState extends State<BookingsPage> {
     if (now <= e + _kGraceMin) return 1;
     return 2;
   }
-
   Color _stColor(String s) {
     switch (s) {
       case 'booked':
@@ -332,7 +308,6 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     return muted(context);
   }
-
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
@@ -437,7 +412,6 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
-
   Widget _tabBar(T6 t, List<int> counts) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -456,7 +430,6 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
-
   Widget _dayBar(T6 t) {
     final st = SettingsScope.read(context);
     final day = _date;
@@ -512,7 +485,6 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
-
   Widget _filterBar(T6 t) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -545,7 +517,6 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
-
   Widget _groupCard(List<Map<String, dynamic>> g, T6 t) {
     final first = g.first;
     final name = _niceName(bStr(first['customer_name']), t.lang);
@@ -672,7 +643,6 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     return allDead ? Opacity(opacity: 0.6, child: card) : card;
   }
-
   Widget _line(Map<String, dynamic> b, T6 t, String cur) {
     final status = bStr(b['status']);
     final active = status == 'booked' || status == 'checked_in';

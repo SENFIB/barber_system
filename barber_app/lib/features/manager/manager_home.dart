@@ -19,10 +19,8 @@ import 'shop_raw.dart';
 import 'staff_page.dart';
 import 'timeoff_page.dart';
 import 'winback_page.dart';
-
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
-
 String _subLabel(String lang, String plan, String fallback) {
   switch (plan) {
     case 'basic':
@@ -36,24 +34,20 @@ String _subLabel(String lang, String plan, String fallback) {
       return fallback;
   }
 }
-
 class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key, required this.ctx});
   final ShopCtx ctx;
   @override
   State<ManagerHome> createState() => _ManagerHomeState();
 }
-
 class _ManagerHomeState extends State<ManagerHome> {
   String _synced = '';
   String _bizType = '';
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadType());
   }
-
   Future<void> _loadType() async {
     try {
       final me = await ShopRaw(SettingsScope.read(context)).call('me');
@@ -62,7 +56,6 @@ class _ManagerHomeState extends State<ManagerHome> {
       if (mounted && k != _bizType) setState(() => _bizType = k);
     } catch (_) {}
   }
-
   @override
   Widget build(BuildContext context) {
     final ctx = widget.ctx;
@@ -92,7 +85,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         });
       }
     }
-
     Widget tile({
       required IconData icon,
       required String title,
@@ -134,8 +126,9 @@ class _ManagerHomeState extends State<ManagerHome> {
         ),
       );
     }
-
-    final roleText = s.t(sess.isOwner ? 'role_owner' : 'role_staff');
+    final roleText = sess.isOwner
+        ? _x(lang, 'مدیر', 'Owner', 'المدير')
+        : _x(lang, 'نفر پرسنل', 'Staff member', 'موظف');
     final planText = s.has(planKey) ? s.t(planKey) : shop.plan;
     final pills = <Widget>[
       Pill(roleText),
@@ -168,8 +161,8 @@ class _ManagerHomeState extends State<ManagerHome> {
         ],
       ),
     );
-
     Widget warnCard() {
+      final n = fmtNum(sub.daysLeft ?? sub.warnDays, lang);
       return Padding(
         padding: const EdgeInsets.only(bottom: 14),
         child: Glass(
@@ -180,8 +173,12 @@ class _ManagerHomeState extends State<ManagerHome> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  s.t('expiring_warn',
-                      {'n': '${sub.daysLeft ?? sub.warnDays}'}),
+                  _x(
+                    lang,
+                    'اشتراک شما تا $n روز دیگر تمام می‌شود. لطفاً تمدید کنید.',
+                    'Your subscription ends in $n days. Please renew.',
+                    'ينتهي اشتراكك خلال $n أيام. يرجى التجديد.',
+                  ),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -190,7 +187,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         ),
       );
     }
-
     final subRows = <Widget>[
       Row(
         children: [
@@ -256,7 +252,6 @@ class _ManagerHomeState extends State<ManagerHome> {
         children: subRows,
       ),
     );
-
     final items = <Widget>[
       headerCard,
       const SizedBox(height: 14),
@@ -269,7 +264,12 @@ class _ManagerHomeState extends State<ManagerHome> {
     items.add(tile(
       icon: Icons.event_available_rounded,
       title: s.t('bookings'),
-      desc: s.t('bookings_desc'),
+      desc: _x(
+        lang,
+        'نوبت‌های مشتری‌ها را ببین، لغو کن یا تمام‌شده ثبت کن',
+        'See customer appointments, cancel them or mark them done',
+        'اعرض مواعيد الزبائن وألغِها أو سجّلها كمنتهية',
+      ),
       gradient: const LinearGradient(
         colors: [AppColors.pink, AppColors.amber],
       ),
@@ -306,7 +306,12 @@ class _ManagerHomeState extends State<ManagerHome> {
       items.add(tile(
         icon: Icons.design_services_rounded,
         title: s.t('services'),
-        desc: s.t('services_desc'),
+        desc: _x(
+          lang,
+          'خدمت‌ها، مدت و قیمت‌ها را اضافه و ویرایش کن',
+          'Add and edit your services, durations and prices',
+          'أضف وعدّل خدماتك ومددها وأسعارها',
+        ),
         gradient: const LinearGradient(
           colors: [AppColors.green, AppColors.blue],
         ),
@@ -318,9 +323,9 @@ class _ManagerHomeState extends State<ManagerHome> {
         title: _x(lang, 'قوانین و زمان رزرو', 'Booking rules', 'قواعد الحجز'),
         desc: _x(
           lang,
-          'بازهٔ رزرو، روز تعطیل، تعطیلی‌های آینده و خدمات پیشنهادی',
-          'Booking range, days off, planned closures and suggested services',
-          'فترة الحجز والعطل والإغلاقات المخطط لها والخدمات المقترحة',
+          'بازهٔ رزرو، روز تعطیل، لغو، واحد پول و تعطیلی‌های آینده',
+          'Booking range, day off, cancellation, currency and planned closures',
+          'فترة الحجز والعطلة والإلغاء والعملة والإغلاقات المخطط لها',
         ),
         gradient: const LinearGradient(
           colors: [AppColors.blue, AppColors.green],
@@ -334,7 +339,12 @@ class _ManagerHomeState extends State<ManagerHome> {
       items.add(tile(
         icon: Icons.event_busy_rounded,
         title: t3.t('b_timeoff'),
-        desc: t3.t('b_timeoff_desc'),
+        desc: _x(
+          lang,
+          'روزها و ساعت‌هایی که کار نمی‌کنید را ثبت کن',
+          'Record the days and hours you are not working',
+          'سجّل الأيام والساعات التي لا تعمل فيها',
+        ),
         gradient: const LinearGradient(
           colors: [AppColors.amber, AppColors.pink],
         ),
@@ -367,7 +377,6 @@ class _ManagerHomeState extends State<ManagerHome> {
             .push(MaterialPageRoute(builder: (_) => PlansPage(ctx))),
       ));
     }
-
     return GlassScaffold(
       title: s.t('app_name'),
       actions: [

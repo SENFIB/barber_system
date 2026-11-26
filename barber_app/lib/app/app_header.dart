@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../features/legal/privacy_gate.dart';
 import '../features/settings/settings_page.dart';
+import 'biz_words.dart';
 import 'brand.dart';
 import 'clock.dart';
 import 'settings.dart';
@@ -62,6 +63,9 @@ class AppHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
+    // فیلتر مرکزی متن‌ها: فقط وقتی مدیر وارد شده فعال است
+    kUiManagerMode = st.hasShopToken;
+    if (!st.hasShopToken) kUiBizType = '';
     final l = lk(context);
     final mq = MediaQuery.of(context);
     final lang = st.lang;

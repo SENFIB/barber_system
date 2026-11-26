@@ -80,7 +80,6 @@ class PlanMover {
     final oldUrl = st.apiUrl;
     final token = st.shopToken ?? '';
     final dev = st.deviceId;
-
     if (oldUrl == targetUrl) {
       await _post(oldUrl, {
         'action': 'renew',
@@ -90,7 +89,6 @@ class PlanMover {
       });
       return MoveResult(0, 0);
     }
-
     final bundle = await _post(oldUrl, {
       'action': 'transfer_export',
       'token': token,
@@ -266,7 +264,6 @@ class _PlanMovePageState extends State<PlanMovePage> {
   bool _busy = false;
 
   AppSettings get _st => widget.settings;
-
   String _t(String k) => moveMsg(_st.lang, k);
 
   @override
@@ -280,7 +277,7 @@ class _PlanMovePageState extends State<PlanMovePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s)));
   }
 
-  bool get _needsCode => _plan == 'special' || _plan == 'personal';
+  bool get _needsCode => _plan == 'special';
 
   Future<void> _go() async {
     if (_busy) return;
@@ -309,7 +306,6 @@ class _PlanMovePageState extends State<PlanMovePage> {
       }
       target = u;
     }
-
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -325,7 +321,6 @@ class _PlanMovePageState extends State<PlanMovePage> {
       ),
     );
     if (ok != true || !mounted) return;
-
     setState(() => _busy = true);
     final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -354,7 +349,7 @@ class _PlanMovePageState extends State<PlanMovePage> {
 
   @override
   Widget build(BuildContext context) {
-    final plans = ['basic', 'pro', 'special', 'personal'];
+    final plans = ['basic', 'pro', 'special'];
     return Scaffold(
       appBar: AppBar(title: Text(_t('title'))),
       body: SafeArea(

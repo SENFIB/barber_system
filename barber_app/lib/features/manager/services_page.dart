@@ -6,23 +6,18 @@ import '../../app/fmt.dart';
 import '../../app/settings.dart';
 import '../../app/strings_m.dart';
 import '../../app/theme.dart';
-import '../../app/util.dart';
 import '../../app/widgets.dart';
 import 'service_presets_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
-
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
-
 class ServicesPage extends StatefulWidget {
   const ServicesPage({super.key, required this.ctx});
   final ShopCtx ctx;
-
   @override
   State<ServicesPage> createState() => _ServicesPageState();
 }
-
 class _ServicesPageState extends State<ServicesPage> {
   bool _loading = true;
   bool _busy = false;
@@ -30,23 +25,31 @@ class _ServicesPageState extends State<ServicesPage> {
   List<Map<String, dynamic>> _list = [];
   late BizPanel _panel;
   String _cur = '';
-
   M get _m => M(SettingsScope.read(context).lang);
-
   @override
   void initState() {
     super.initState();
     _panel = BizPanel.of(widget.ctx.session.shop.bizType);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
-
   bool _lost(ApiException e) => const {
         'UNAUTHORIZED',
         'DEVICE_MISMATCH',
         'SUBSCRIPTION_EXPIRED',
         'SHOP_DEACTIVATED',
       }.contains(e.code);
-
+  Future<void> _loadMe(ShopRaw raw) async {
+    try {
+      final me = await raw.call('me');
+      final sh = me['shop'];
+      if (sh is Map) {
+        if ('${sh['biz_type'] ?? ''}'.isNotEmpty) {
+          _panel = BizPanel.of('${sh['biz_type']}');
+        }
+        _cur = '${sh['currency'] ?? ''}';
+      }
+    } catch (_) {}
+  }
   Future<void> _load() async {
     final raw = ShopRaw(SettingsScope.read(context));
     setState(() {
@@ -54,17 +57,9 @@ class _ServicesPageState extends State<ServicesPage> {
       _err = null;
     });
     try {
-      try {
-        final me = await raw.call('me');
-        final sh = me['shop'];
-        if (sh is Map) {
-          if ('${sh['biz_type'] ?? ''}'.isNotEmpty) {
-            _panel = BizPanel.of('${sh['biz_type']}');
-          }
-          _cur = '${sh['currency'] ?? ''}';
-        }
-      } catch (_) {}
+      final meF = _loadMe(raw);
       final l = await widget.ctx.api.serviceList();
+      await meF;
       if (!mounted) return;
       setState(() {
         _list = l;
@@ -83,7 +78,6 @@ class _ServicesPageState extends State<ServicesPage> {
       });
     }
   }
-
   Future<void> _act(Future<void> Function() fn, String okMsg) async {
     final m = _m;
     setState(() => _busy = true);
@@ -105,7 +99,6 @@ class _ServicesPageState extends State<ServicesPage> {
       await _load();
     }
   }
-
   Future<void> _presets() async {
     final st = SettingsScope.read(context);
     final ok = await Navigator.of(context).push<bool>(
@@ -113,7 +106,6 @@ class _ServicesPageState extends State<ServicesPage> {
     );
     if (ok == true && mounted) await _load();
   }
-
   Future<void> _edit([Map<String, dynamic>? ex]) async {
     final m = _m;
     final lang = SettingsScope.read(context).lang;
@@ -144,7 +136,6 @@ class _ServicesPageState extends State<ServicesPage> {
       m.t('svc_saved'),
     );
   }
-
   Future<void> _remove(String id) async {
     final m = _m;
     final ok = await confirmDialog(
@@ -158,12 +149,10 @@ class _ServicesPageState extends State<ServicesPage> {
     if (!ok) return;
     await _act(() => widget.ctx.api.serviceRemove(id), m.t('svc_removed'));
   }
-
   List<String> _ids(dynamic v) {
     if (v is List) return v.map((e) => '$e').toList();
     return const [];
   }
-
   Widget _card(Map<String, dynamic> sv, M m, String lang) {
     final id = '${sv['service_id'] ?? ''}';
     final name = '${sv['name'] ?? ''}';
@@ -223,7 +212,6 @@ class _ServicesPageState extends State<ServicesPage> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final lang = SettingsScope.of(context).lang;
@@ -299,7 +287,6 @@ class _ServicesPageState extends State<ServicesPage> {
     );
   }
 }
-
 class _SvcResult {
   const _SvcResult(this.name, this.duration, this.price, this.combinable);
   final String name;
@@ -307,7 +294,6 @@ class _SvcResult {
   final int price;
   final List<String> combinable;
 }
-
 class _ServiceDialog extends StatefulWidget {
   const _ServiceDialog({
     required this.m,
@@ -323,15 +309,14 @@ class _ServiceDialog extends StatefulWidget {
   final IconData icon;
   final List<Map<String, dynamic>> others;
   final Map<String, dynamic>? existing;
-
   @override
   State<_ServiceDialog> createState() => _ServiceDialogState();
 }
-
 class _ServiceDialogState extends State<_ServiceDialog> {
   late final TextEditingController _name =
       TextEditingController(text: '${widget.existing?['name'] ?? ''}');
-  late final TextEditingController _dur = TextEditingController(
+  late final DigitController _dur = DigitController(
+      lang: widget.lang,
       text: '${widget.existing?['duration_min'] ?? 30}');
   late final MoneyController _price = MoneyController(
     lang: widget.lang,
@@ -341,7 +326,6 @@ class _ServiceDialogState extends State<_ServiceDialog> {
         : '${parsePrice(widget.existing!['price'])}',
   );
   final Set<String> _comb = {};
-
   @override
   void initState() {
     super.initState();
@@ -353,7 +337,6 @@ class _ServiceDialogState extends State<_ServiceDialog> {
       }
     }
   }
-
   @override
   void dispose() {
     _name.dispose();
@@ -361,19 +344,13 @@ class _ServiceDialogState extends State<_ServiceDialog> {
     _price.dispose();
     super.dispose();
   }
-
-  int? _num(String t) {
-    final d = normalizeDigits(t).replaceAll(RegExp(r'[^0-9]'), '');
-    return d.isEmpty ? null : int.tryParse(d);
-  }
-
   void _ok() {
     final m = widget.m;
     if (_name.text.trim().length < 2) {
       toast(context, m.t('v_required'));
       return;
     }
-    final d = _num(_dur.text);
+    final d = _dur.number;
     if (d == null || d < 5 || d > 480) {
       toast(context, m.t('svc_bad_duration'));
       return;
@@ -383,7 +360,6 @@ class _ServiceDialogState extends State<_ServiceDialog> {
       _SvcResult(_name.text.trim(), d, _price.number ?? 0, _comb.toList()),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final m = widget.m;

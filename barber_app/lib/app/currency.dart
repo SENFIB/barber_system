@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'fmt.dart';
-
 /// رقم‌های لاتین → رقم‌های زبان (fa / ar)
 String lDigits(String s, String lang) {
   if (lang == 'en') return s;
@@ -16,7 +15,6 @@ String lDigits(String s, String lang) {
   }
   return b.toString();
 }
-
 /// رقم‌های فارسی/عربی → لاتین
 String latinDigits(String s) {
   final b = StringBuffer();
@@ -31,7 +29,6 @@ String latinDigits(String s) {
   }
   return b.toString();
 }
-
 class CurrencyDef {
   final String key;
   final String fa;
@@ -40,7 +37,6 @@ class CurrencyDef {
   const CurrencyDef(this.key, this.fa, this.en, this.ar);
   String name(String lang) => lang == 'en' ? en : (lang == 'ar' ? ar : fa);
 }
-
 const List<CurrencyDef> kCurrencies = [
   CurrencyDef('toman', 'تومان', 'Toman', 'تومان'),
   CurrencyDef('rial', 'ریال', 'Rial', 'ريال'),
@@ -51,7 +47,6 @@ const List<CurrencyDef> kCurrencies = [
   CurrencyDef('sar', 'ریال سعودی', 'SAR', 'ريال سعودي'),
   CurrencyDef('lira', 'لیر', 'TRY', 'ليرة'),
 ];
-
 /// کلید واحد پول از هر متنی که ذخیره شده؛ خالی = تومان؛ ناشناخته = null
 String? currencyKeyOf(String raw) {
   final r = raw.trim();
@@ -70,7 +65,6 @@ String? currencyKeyOf(String raw) {
   if (s == 'تومن') return 'toman';
   return null;
 }
-
 /// نام واحد پول به زبان برنامه
 String currencyName(String raw, String lang) {
   final k = currencyKeyOf(raw);
@@ -80,12 +74,10 @@ String currencyName(String raw, String lang) {
   }
   return raw.trim();
 }
-
 /// مبلغ با جداکننده‌ی هزارگان، رقم‌های زبان و واحد پول
 String fmtMoney(num n, String rawCur, String lang) {
   return '${fmtNum(n, lang)} ${currencyName(rawCur, lang)}'.trim();
 }
-
 /// هر مقداری (عدد، «1,250,000»، «۱٬۲۵۰٬۰۰۰») را به عدد صحیح تبدیل می‌کند
 int parsePrice(dynamic v) {
   if (v is num) return v.round();
@@ -94,7 +86,6 @@ int parsePrice(dynamic v) {
   if (s.split('.').length > 2) s = s.replaceAll('.', '');
   return (double.tryParse(s) ?? 0).round();
 }
-
 String _group(String s, String? lang) {
   final d = latinDigits(s).replaceAll(RegExp(r'[^0-9]'), '');
   if (d.isEmpty) return '';
@@ -105,19 +96,15 @@ String _group(String s, String? lang) {
   }
   return lDigits(b.toString(), lang ?? kDigitsLang);
 }
-
 /// کنترلری که هنگام تایپ، خودش جداکننده‌ی هزارگان می‌گذارد (۱,۲۵۰,۰۰۰)
 class MoneyController extends TextEditingController {
   MoneyController({String? text, this.lang})
       : super(text: text == null ? null : _group(text, lang));
-
   String? lang;
-
   int? get number {
     final d = latinDigits(text).replaceAll(RegExp(r'[^0-9]'), '');
     return d.isEmpty ? null : int.tryParse(d);
   }
-
   @override
   set value(TextEditingValue v) {
     final f = _group(v.text, lang);
@@ -132,16 +119,41 @@ class MoneyController extends TextEditingController {
     );
   }
 }
-
+/// کنترلری که هنگام تایپ، رقم‌ها را به رقم‌های زبان برنامه تبدیل می‌کند (بدون جداکننده)
+class DigitController extends TextEditingController {
+  DigitController({String? text, this.lang})
+      : super(
+            text: text == null
+                ? null
+                : lDigits(latinDigits(text), lang ?? kDigitsLang));
+  String? lang;
+  int? get number {
+    final d = latinDigits(text).replaceAll(RegExp(r'[^0-9]'), '');
+    return d.isEmpty ? null : int.tryParse(d);
+  }
+  @override
+  set value(TextEditingValue v) {
+    final f = lDigits(latinDigits(v.text), lang ?? kDigitsLang);
+    if (f == v.text) {
+      super.value = v;
+      return;
+    }
+    super.value = TextEditingValue(
+      text: f,
+      selection: v.selection.isValid
+          ? v.selection
+          : TextSelection.collapsed(offset: f.length),
+      composing: TextRange.empty,
+    );
+  }
+}
 // ---------- زمان به دقیقه / ساعت / روز / هفته / ماه ----------
 const List<int> kSpanMult = [1, 60, 1440, 10080, 43200];
-
 const Map<String, List<String>> _spanOne = {
   'fa': ['دقیقه', 'ساعت', 'روز', 'هفته', 'ماه'],
   'en': ['minute', 'hour', 'day', 'week', 'month'],
   'ar': ['دقيقة', 'ساعة', 'يوم', 'أسبوع', 'شهر'],
 };
-
 /// نام واحد زمان؛ برای انگلیسی با جمع
 String spanUnit(int idx, int n, String lang) {
   final l = _spanOne[lang] ?? _spanOne['fa']!;
@@ -149,7 +161,6 @@ String spanUnit(int idx, int n, String lang) {
   if (lang == 'en' && n != 1) return '${w}s';
   return w;
 }
-
 /// بزرگ‌ترین واحدی که دقیقاً مقسوم‌علیه است
 int spanIndexOf(int minutes) {
   if (minutes > 0) {
@@ -159,7 +170,6 @@ int spanIndexOf(int minutes) {
   }
   return 0;
 }
-
 /// ۱۲۰ → «۲ ساعت» ، ۱۰۰۸۰ → «۱ هفته»
 String fmtSpan(int minutes, String lang) {
   final i = spanIndexOf(minutes);

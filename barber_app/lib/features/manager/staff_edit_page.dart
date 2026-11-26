@@ -10,17 +10,22 @@ import '../../app/widgets.dart';
 import 'shifts_editor.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
+
 String _x(String l, String fa, String en, String ar) =>
     l == 'fa' ? fa : (l == 'ar' ? ar : en);
-/// ویرایش یک نفر از پرسنل: نام، تخصص/شرح کار، خدمات، شیفت‌ها، روز تعطیل، اضافه‌کار
+
+/// ویرایش یک نفر از پرسنل: نام، نقش، خدمات، شیفت‌ها، روز تعطیل، اضافه‌کار
 class StaffEditPage extends StatefulWidget {
   const StaffEditPage(this.ctx, this.staff, {super.key, required this.isOwner});
+
   final ShopCtx ctx;
   final Map<String, dynamic> staff;
   final bool isOwner;
+
   @override
   State<StaffEditPage> createState() => _StaffEditPageState();
 }
+
 class _StaffEditPageState extends State<StaffEditPage> {
   final _name = TextEditingController();
   final _spec = TextEditingController();
@@ -36,7 +41,9 @@ class _StaffEditPageState extends State<StaffEditPage> {
   String? _err;
   bool _busy = false;
   String _type = '';
+
   String get _lang => SettingsScope.read(context).lang;
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +86,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
       _loadServices();
     });
   }
+
   @override
   void dispose() {
     _name.dispose();
@@ -86,6 +94,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
     _ot.dispose();
     super.dispose();
   }
+
   bool _lost(Object e) {
     if (isSessionLost(e)) {
       Navigator.of(context).pop();
@@ -94,6 +103,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
     }
     return false;
   }
+
   /// نوع کسب‌وکار برای متن‌ها و آیکون (اگر نشد، همان مقدار نشست)
   Future<void> _loadType() async {
     try {
@@ -105,6 +115,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
       }
     } catch (_) {}
   }
+
   Future<void> _loadServices() async {
     setState(() {
       _loading = true;
@@ -138,6 +149,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
       });
     }
   }
+
   Future<void> _save() async {
     final x = T6(_lang);
     final name = _name.text.trim();
@@ -199,6 +211,7 @@ class _StaffEditPageState extends State<StaffEditPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
   Widget _unsetBox(T6 x) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -229,6 +242,30 @@ class _StaffEditPageState extends State<StaffEditPage> {
       ),
     );
   }
+
+  Widget _roleChips(BizPanel panel, String lang) {
+    final cur = supportRoleOf(_spec.text);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ChoiceChip(
+          label: Text(panel.noun(lang)),
+          selected: cur == null,
+          onSelected: (_) => setState(() {
+            if (cur != null) _spec.text = '';
+          }),
+        ),
+        for (final r in kSupportRoles)
+          ChoiceChip(
+            label: Text(r.name(lang)),
+            selected: cur?.key == r.key,
+            onSelected: (_) => setState(() => _spec.text = r.name(lang)),
+          ),
+      ],
+    );
+  }
+
   Widget _servicesBox(T6 x) {
     return Glass(
       child: Column(
@@ -290,14 +327,15 @@ class _StaffEditPageState extends State<StaffEditPage> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
     final x = T6(st.lang);
     final lang = st.lang;
-    final staffWord = bwStaff(_type, lang);
-    final beauty = bwBeauty(_type);
     final panel = BizPanel.of(_type);
+    final support = supportRoleOf(_spec.text);
+    final staffWord = support?.name(lang) ?? bwStaff(_type, lang);
     final days = st.lang == 'en'
         ? const [0, 1, 2, 3, 4, 5, 6]
         : const [6, 0, 1, 2, 3, 4, 5];
@@ -307,9 +345,10 @@ class _StaffEditPageState extends State<StaffEditPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
         children: [
-          if (_unset) _unsetBox(x),
+          if (_unset && support == null) _unsetBox(x),
           Glass(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GlassField(
                   controller: _name,
@@ -320,17 +359,20 @@ class _StaffEditPageState extends State<StaffEditPage> {
                 const SizedBox(height: 12),
                 GlassField(
                   controller: _spec,
-                  label: beauty
-                      ? x.t('ed_specialty')
-                      : _x(lang, 'شرح کار (اختیاری)', 'Role (optional)',
-                          'الوظيفة (اختياري)'),
-                  icon: panel.staffIcon,
+                  label: _x(lang, 'نقش / شرح کار (اختیاری)',
+                      'Role / description (optional)',
+                      'الدور / الوصف (اختياري)'),
+                  icon: support?.icon ?? panel.staffIcon,
                 ),
+                const SizedBox(height: 12),
+                _roleChips(panel, lang),
               ],
             ),
           ),
-          SectionLabel(x.t('ed_services')),
-          _servicesBox(x),
+          if (support == null) ...[
+            SectionLabel(x.t('ed_services')),
+            _servicesBox(x),
+          ],
           SectionLabel(x.t('sh_title')),
           ShiftsEditor(
             shifts: _shifts,

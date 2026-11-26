@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/biz_icons.dart';
 import '../../app/biz_panel.dart';
 import '../../app/business_types.dart';
-import '../../app/config.dart' show kDefaultApiUrl;
-import '../../app/extra_http.dart' show extraPost;
 import '../../app/fmt.dart';
 import '../../app/plans_config.dart';
-import '../../app/servers.dart' show kProApiUrl;
 import '../../app/settings.dart';
 import '../../app/strings_s6.dart';
 import '../../app/util.dart';
@@ -61,34 +58,9 @@ String _w(String lang, T6 s, String key) {
   return lang == 'fa' ? o[0] : (lang == 'ar' ? o[2] : o[1]);
 }
 
-/// نوع کسب‌وکار (و جنسیت، فقط برای آرایش و زیبایی) را بعد از ثبت‌نام ذخیره می‌کند
-Future<void> _saveBiz(AppSettings st, String bizType, String gender,
-    String plan, String? serverUrl) async {
-  try {
-    final String url;
-    if (plan == 'basic') {
-      url = kDefaultApiUrl;
-    } else if (plan == 'pro') {
-      url = kProApiUrl;
-    } else {
-      url = serverUrl ?? st.apiUrl;
-    }
-    final body = <String, dynamic>{
-      'action': 'shop_update',
-      'token': st.shopToken,
-      'device_id': st.deviceId,
-      'biz_type': bizType,
-    };
-    if (BizPanel.of(bizType).beauty &&
-        (gender == 'men' || gender == 'women')) {
-      body['gender'] = gender;
-    }
-    await extraPost(url, body).timeout(const Duration(seconds: 12));
-  } catch (_) {}
-}
-
 class ShopAuthPage extends StatefulWidget {
   const ShopAuthPage({super.key, required this.api, required this.onSession});
+
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -254,6 +226,7 @@ class _ShopAuthPageState extends State<ShopAuthPage> {
 class SignupChoicePage extends StatelessWidget {
   const SignupChoicePage(
       {super.key, required this.api, required this.onSession});
+
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -261,6 +234,7 @@ class SignupChoicePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final lang = SettingsScope.of(context).lang;
     final s = T6(lang);
+
     Widget card(IconData icon, String title, String desc, VoidCallback onTap) {
       return Glass(
         onTap: onTap,
@@ -447,6 +421,7 @@ List<String> _planFeatures(String lang, PlanDef p) {
 
 class OwnerPlanPage extends StatelessWidget {
   const OwnerPlanPage({super.key, required this.api, required this.onSession});
+
   final ShopApi api;
   final SessionCallback onSession;
 
@@ -493,6 +468,7 @@ class OwnerCategoryPage extends StatelessWidget {
       required this.api,
       required this.onSession,
       required this.plan});
+
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
@@ -567,6 +543,7 @@ class OwnerCategoryPage extends StatelessWidget {
 class _PlanCard extends StatelessWidget {
   const _PlanCard(
       {required this.plan, required this.lang, required this.onTap});
+
   final PlanDef plan;
   final String lang;
   final VoidCallback onTap;
@@ -630,6 +607,7 @@ class OwnerSignupPage extends StatefulWidget {
       required this.onSession,
       required this.plan,
       required this.bizType});
+
   final ShopApi api;
   final SessionCallback onSession;
   final PlanDef plan;
@@ -708,6 +686,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       toast(context, err);
       return;
     }
+
     var licenseText = _license.text.trim();
     String? serverUrl;
     if (_planNeedsCode) {
@@ -727,9 +706,10 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       licenseText = p.license;
       serverUrl = p.url;
     }
-    final gender = _gender;
-    final planKey = widget.plan.key;
+
     final bizType = widget.bizType;
+    final gender = BizPanel.of(bizType).beauty ? _gender : '';
+    final planKey = widget.plan.key;
     final onSession = widget.onSession;
     setState(() => _loading = true);
     try {
@@ -747,8 +727,9 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
         shifts: _barber ? shiftsToString(_shifts) : '',
         daysOff: _barber ? _daysOff : null,
         serverUrl: serverUrl,
+        bizType: bizType,
+        gender: gender,
       );
-      await _saveBiz(st, bizType, gender, planKey, serverUrl);
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
       await onSession(sess);
@@ -1101,6 +1082,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
 
 class StaffJoinPage extends StatefulWidget {
   const StaffJoinPage({super.key, required this.api, required this.onSession});
+
   final ShopApi api;
   final SessionCallback onSession;
 

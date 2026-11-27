@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../app/cal_fmt.dart';
 import '../../app/currency.dart';
 import '../../app/date_pick.dart';
@@ -10,15 +12,18 @@ import '../../app/strings_s6.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import 'booking_common.dart';
+import 'day_export.dart';
 import 'manual_booking_page.dart';
 import 'shop_api.dart';
 import 'shop_raw.dart';
 import 'timeoff_page.dart';
+
 const Map<String, String> _appCustomer = {
   'fa': 'مشتری (از برنامه)',
   'en': 'App customer',
   'ar': 'زبون من التطبيق',
 };
+
 const Map<String, Map<String, String>> _bx = {
   'fa': {
     'tab0': 'جاری',
@@ -57,10 +62,13 @@ const Map<String, Map<String, String>> _bx = {
     'view3': '3 أعمدة',
   },
 };
+
 String _lx(String lang, String k) =>
     (_bx[lang] ?? _bx['fa']!)[k] ?? _bx['fa']![k] ?? k;
+
 /// تا چند دقیقه بعد از پایان نوبت، دکمه‌ها فعال می‌مانند
 const int _kGraceMin = 15;
+
 /// اگر «نام» در واقع یک شناسه‌ی فنی باشد (مثل c_83hd92kd01) نشان داده نمی‌شود
 String _niceName(String n, String lang) {
   final s = n.trim();
@@ -70,6 +78,7 @@ String _niceName(String n, String lang) {
   if (looksId) return _appCustomer[lang] ?? _appCustomer['fa']!;
   return s;
 }
+
 /// تاریخ + دقیقه → دقیقه‌ی مطلق (برای مقایسه)
 int _absOf(String date, int min) {
   final d = date.length >= 10 ? date.substring(0, 10) : date;
@@ -78,12 +87,15 @@ int _absOf(String date, int min) {
   return DateTime.utc(p.year, p.month, p.day).millisecondsSinceEpoch ~/ 60000 +
       min;
 }
+
 class BookingsPage extends StatefulWidget {
   const BookingsPage(this.ctx, {super.key});
   final ShopCtx ctx;
+
   @override
   State<BookingsPage> createState() => _BookingsPageState();
 }
+
 class _BookingsPageState extends State<BookingsPage> {
   bool _loading = true;
   bool _busy = false;
@@ -99,8 +111,10 @@ class _BookingsPageState extends State<BookingsPage> {
   int _baseAbs = -1;
   DateTime _fetchedAt = DateTime.now();
   Timer? _tick;
+
   bool get _owner => widget.ctx.session.isOwner;
   T6 _tr() => T6(SettingsScope.read(context).lang);
+
   @override
   void initState() {
     super.initState();
@@ -111,11 +125,13 @@ class _BookingsPageState extends State<BookingsPage> {
       if (mounted) _load();
     });
   }
+
   @override
   void dispose() {
     _tick?.cancel();
     super.dispose();
   }
+
   bool _lost(Object e) {
     if (isSessionLost(e)) {
       if (mounted) Navigator.of(context).pop();
@@ -124,6 +140,7 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     return false;
   }
+
   /// «الان» به دقیقه‌ی مطلق؛ از ساعت سرور و گذشت زمان از آخرین دریافت
   int _curAbs() {
     if (_baseAbs >= 0) {
@@ -132,6 +149,7 @@ class _BookingsPageState extends State<BookingsPage> {
     final n = DateTime.now();
     return _absOf(bIso(DateTime(n.year, n.month, n.day)), n.hour * 60 + n.minute);
   }
+
   Future<List<Map<String, dynamic>>> _loadStaff(ShopRaw raw) async {
     if (!_owner || _staff.isNotEmpty) return _staff;
     try {
@@ -141,6 +159,7 @@ class _BookingsPageState extends State<BookingsPage> {
       return _staff;
     }
   }
+
   Future<void> _loadCur(ShopRaw raw) async {
     if (_shopCur != null) return;
     try {
@@ -149,6 +168,7 @@ class _BookingsPageState extends State<BookingsPage> {
       if (sh is Map) _shopCur = '${sh['currency'] ?? ''}';
     } catch (_) {}
   }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -168,6 +188,7 @@ class _BookingsPageState extends State<BookingsPage> {
       }
       final params = <String, dynamic>{'date_from': from, 'date_to': to};
       if (_owner && _staffFilter.isNotEmpty) params['staff_id'] = _staffFilter;
+
       // سه درخواست هم‌زمان (سریع‌تر)
       final staffF = _loadStaff(raw);
       final curF = _loadCur(raw);
@@ -175,6 +196,7 @@ class _BookingsPageState extends State<BookingsPage> {
       final staff = await staffF;
       await curF;
       if (!mounted) return;
+
       final nowRaw = r['now'];
       final now = nowRaw is Map
           ? Map<String, dynamic>.from(nowRaw)
@@ -209,6 +231,7 @@ class _BookingsPageState extends State<BookingsPage> {
       });
     }
   }
+
   Future<void> _act(String action, Map<String, dynamic> params) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -225,6 +248,7 @@ class _BookingsPageState extends State<BookingsPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
   Future<void> _confirmAct({
     required String message,
     required String yes,
@@ -244,12 +268,14 @@ class _BookingsPageState extends State<BookingsPage> {
     if (ok != true || !mounted) return;
     await _act(action, params);
   }
+
   void _shift(int n) {
     final d = bParse(_date ?? '');
     if (d == null) return;
     setState(() => _date = bIso(DateTime(d.year, d.month, d.day + n)));
     _load();
   }
+
   Future<void> _pick() async {
     final st = SettingsScope.read(context);
     final cur = bParse(_date ?? '') ?? DateTime.now();
@@ -265,6 +291,7 @@ class _BookingsPageState extends State<BookingsPage> {
     setState(() => _date = bIso(d));
     _load();
   }
+
   Future<void> _newManual() async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -273,10 +300,79 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     if (ok == true && mounted) _load();
   }
-  /// گروه‌ها: تازه‌ترین نوبت بالا
-  List<List<Map<String, dynamic>>> _groups() {
+
+  /// ذخیره‌ی نوبت‌های یک روز به‌صورت تصویر PNG (روز پیش‌فرض: امروز)
+  Future<void> _export() async {
+    if (_busy) return;
+    final st = SettingsScope.read(context);
+    final lang = st.lang;
+    final family = Theme.of(context).textTheme.bodyMedium?.fontFamily;
+    final initial = bParse(bStr(_now['date'])) ?? DateTime.now();
+    final d = await pickLocalDate(
+      context,
+      initial: initial,
+      first: DateTime(2020),
+      last: DateTime(2100),
+      calKey: st.calendarKey,
+      lang: lang,
+    );
+    if (d == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final day = bIso(d);
+      final r = await ShopRaw(st)
+          .call('bookings_list', {'date_from': day, 'date_to': day});
+      final rows = bFirstList(r, ['bookings']).where((b) {
+        final s = bStr(b['status']);
+        return bStr(b['date']).startsWith(day) &&
+            (s == 'booked' || s == 'checked_in' || s == 'finished');
+      }).toList();
+      if (!mounted) return;
+      if (rows.isEmpty) {
+        bSnack(context, exportTx(lang, 'none'));
+        return;
+      }
+      final groups = _groupRows(rows, newestFirst: false);
+      final cur = bStr(rows.first['currency']).isNotEmpty
+          ? bStr(rows.first['currency'])
+          : ((_shopCur ?? '').isNotEmpty
+              ? _shopCur!
+              : widget.ctx.session.shop.currency);
+      final t = T6(lang);
+      final pngs = await renderDayImages(DayExportData(
+        lang: lang,
+        shopName: widget.ctx.session.shop.name,
+        weekday: t.t('d_${d.weekday % 7}'),
+        dateText: CalFmt.date(day, st.calendarKey, lang),
+        currency: cur,
+        groups: groups,
+        nameOf: (n) => _niceName(n, lang),
+        fontFamily: family,
+      ));
+      final n = await saveDayImages(pngs, 'bookings-$day', lang);
+      if (!mounted) return;
+      if (n > 0) {
+        bSnack(
+          context,
+          exportTx(lang, n == 1 ? 'saved' : 'saved_n', {'n': fmtNum(n, lang)}),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      if (_lost(e)) return;
+      bSnack(context, exportTx(lang, 'fail'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// گروه‌بندی نوبت‌ها؛ پیش‌فرض تازه‌ترین بالا
+  List<List<Map<String, dynamic>>> _groupRows(
+    List<Map<String, dynamic>> rows, {
+    bool newestFirst = true,
+  }) {
     final map = <String, List<Map<String, dynamic>>>{};
-    for (final b in _rows) {
+    for (final b in rows) {
       final g = bStr(b['group_id']).isNotEmpty
           ? bStr(b['group_id'])
           : bStr(b['booking_id']);
@@ -287,10 +383,17 @@ class _BookingsPageState extends State<BookingsPage> {
       g.sort((a, b) => bMin(bStr(a['start_time']))
           .compareTo(bMin(bStr(b['start_time']))));
     }
-    list.sort((a, b) => bMin(bStr(b.first['start_time']))
-        .compareTo(bMin(bStr(a.first['start_time']))));
+    list.sort((a, b) {
+      final c = bMin(bStr(a.first['start_time']))
+          .compareTo(bMin(bStr(b.first['start_time'])));
+      return newestFirst ? -c : c;
+    });
     return list;
   }
+
+  /// گروه‌ها: تازه‌ترین نوبت بالا
+  List<List<Map<String, dynamic>>> _groups() => _groupRows(_rows);
+
   /// 0 جاری، 1 انجام‌شده، 2 نیامده، 3 لغوشده
   int _cat(List<Map<String, dynamic>> g) {
     final ss = g.map((b) => bStr(b['status'])).toList();
@@ -299,6 +402,7 @@ class _BookingsPageState extends State<BookingsPage> {
     if (ss.any((s) => s == 'no_show')) return 2;
     return 3;
   }
+
   /// 0 = هنوز قفل ، 1 = فعال ، 2 = مهلت تمام شد
   int _win(String date, String start, String end) {
     final s = _absOf(date, bMin(start));
@@ -310,6 +414,7 @@ class _BookingsPageState extends State<BookingsPage> {
     if (now <= e + _kGraceMin) return 1;
     return 2;
   }
+
   Color _stColor(String s) {
     switch (s) {
       case 'booked':
@@ -325,6 +430,7 @@ class _BookingsPageState extends State<BookingsPage> {
     }
     return muted(context);
   }
+
   @override
   Widget build(BuildContext context) {
     final st = SettingsScope.of(context);
@@ -335,8 +441,10 @@ class _BookingsPageState extends State<BookingsPage> {
       counts[_cat(g)]++;
     }
     final groups = all.where((g) => _cat(g) == _tab).toList();
+
     final wide = MediaQuery.of(context).size.width >= 900;
     final cols = wide ? (_cols == 0 ? 2 : _cols) : 1;
+
     final children = <Widget>[
       _dayBar(t),
       const SizedBox(height: 10),
@@ -351,6 +459,7 @@ class _BookingsPageState extends State<BookingsPage> {
       children.add(_filterBar(t));
       children.add(const SizedBox(height: 10));
     }
+
     if (_loading && _date == null) {
       children.add(const Padding(
         padding: EdgeInsets.only(top: 60),
@@ -424,11 +533,18 @@ class _BookingsPageState extends State<BookingsPage> {
       }
     }
     children.add(const SizedBox(height: 90));
+
     final double maxW = cols == 1 ? 720.0 : (cols == 2 ? 1100.0 : 1500.0);
+
     return GlassScaffold(
       title: t.t('b_title'),
       maxWidth: maxW,
       actions: [
+        IconButton(
+          tooltip: exportTx(st.lang, 'tip'),
+          icon: const Icon(Icons.download_rounded),
+          onPressed: _busy ? null : _export,
+        ),
         if (_owner)
           IconButton(
             tooltip: t.t('b_timeoff'),
@@ -455,6 +571,7 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
+
   Widget _viewBar(T6 t, int cols) {
     const icons = <IconData>[
       Icons.view_agenda_rounded,
@@ -479,6 +596,7 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
+
   Widget _tabBar(T6 t, List<int> counts) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -497,6 +615,7 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
+
   Widget _dayBar(T6 t) {
     final st = SettingsScope.read(context);
     final day = _date;
@@ -552,6 +671,7 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
+
   Widget _filterBar(T6 t) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -584,6 +704,7 @@ class _BookingsPageState extends State<BookingsPage> {
       ),
     );
   }
+
   Widget _groupCard(List<Map<String, dynamic>> g, T6 t) {
     final first = g.first;
     final name = _niceName(bStr(first['customer_name']), t.lang);
@@ -592,6 +713,7 @@ class _BookingsPageState extends State<BookingsPage> {
     final cur = bStr(first['currency']).isNotEmpty
         ? bStr(first['currency'])
         : (_shopCur ?? '');
+
     var endMin = 0;
     var endStr = '';
     var startMin = 24 * 60;
@@ -618,6 +740,7 @@ class _BookingsPageState extends State<BookingsPage> {
     final anyBooked = g.any((b) => bStr(b['status']) == 'booked');
     final gw = _win(bStr(first['date']), startStr, endStr);
     final gid = bStr(first['group_id']);
+
     final card = Glass(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -711,6 +834,7 @@ class _BookingsPageState extends State<BookingsPage> {
     );
     return allDead ? Opacity(opacity: 0.6, child: card) : card;
   }
+
   Widget _line(Map<String, dynamic> b, T6 t, String cur) {
     final status = bStr(b['status']);
     final active = status == 'booked' || status == 'checked_in';
@@ -727,6 +851,7 @@ class _BookingsPageState extends State<BookingsPage> {
       if (bStr(b['staff_name']).isNotEmpty) bStr(b['staff_name']),
       if (dur > 0) '${fmtNum(dur, t.lang)} ${t.t('b_min')}',
     ].join(' · ');
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(

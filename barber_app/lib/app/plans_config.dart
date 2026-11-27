@@ -13,7 +13,7 @@ class PlanDef {
     this.usdtMonthly = 0,
   });
 
-  /// basic | pro | special
+  /// free | basic | pro | special
   final String key;
 
   /// قیمت یک ماه به تومان (۰ یعنی رایگان)
@@ -28,7 +28,7 @@ class PlanDef {
   /// سقف شیفت کاری هر نفر در روز
   final int maxShifts;
 
-  /// کلید متن ویژگی‌ها (در strings_s5.dart)
+  /// کلید متن ویژگی‌ها (در strings_s5.dart). برای پلن رایگان کلیدها در free_plan.dart هستند
   final List<String> features;
 
   /// قیمت یک ماه به تتر (عدد صحیح). ۰ یعنی با تتر فروخته نمی‌شود
@@ -39,7 +39,30 @@ class PlanDef {
 
   /// پرداخت کارت‌به‌کارت (تومان) فعال است؟
   bool get cardPay => autoPay && monthly > 0;
+
+  /// پلن رایگان؟
+  bool get isFree => key == 'free';
 }
+
+/// مدت پلن رایگان (روز) و سقف نوبت روزانه. فقط نمایشی؛ سرور (Config) تعیین‌کننده است:
+/// free_days و free_max_bookings_per_day
+const int kFreeDays = 7;
+const int kFreeMaxBookingsPerDay = 5;
+
+const PlanDef _free = PlanDef(
+  key: 'free',
+  monthly: 0,
+  oneTime: 0,
+  maxBarbers: 1,
+  maxShifts: 1,
+  features: <String>[
+    'f_staff',
+    'f_shift',
+    'f_cap',
+    'f_book',
+    'f_cleanup',
+  ],
+);
 
 const PlanDef _basic = PlanDef(
   key: 'basic',
@@ -97,11 +120,17 @@ const PlanDef _special = PlanDef(
   ],
 );
 
-/// پلن‌هایی که به کاربر نشان داده می‌شود
+/// پلن‌های پولی که در صفحهٔ خرید نشان داده می‌شوند (رایگان در آن نیست)
 const List<PlanDef> kPlans = <PlanDef>[_basic, _pro, _special];
 
-/// همه‌ی پلن‌ها
-const List<PlanDef> kAllPlans = <PlanDef>[_basic, _pro, _special];
+/// پلن رایگان
+const PlanDef kFreePlan = _free;
+
+/// پلن‌هایی که هنگام ثبت‌نام نشان داده می‌شوند (رایگان اول)
+const List<PlanDef> kSignupPlans = <PlanDef>[_free, _basic, _pro, _special];
+
+/// همه‌ی پلن‌ها (برای جست‌وجو با کلید)
+const List<PlanDef> kAllPlans = <PlanDef>[_free, _basic, _pro, _special];
 
 /// سقفِ شیفتِ یک پلن (برای ویرایشگر شیفت‌ها)
 int shiftCapForPlan(String planKey) {

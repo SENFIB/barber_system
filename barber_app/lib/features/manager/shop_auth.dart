@@ -2,10 +2,12 @@ import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../app/biz_icons.dart';
 import '../../app/biz_panel.dart';
 import '../../app/business_types.dart';
 import '../../app/fmt.dart';
+import '../../app/free_plan.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
 import '../../app/strings_pay.dart';
@@ -37,9 +39,9 @@ const Map<String, List<String>> _ov = {
     'تسجيل نشاط تجاري'
   ],
   'signup_owner_desc': [
-    'با کد لایسنس، کسب‌وکار خودت را بساز',
-    'Create your business with a license code',
-    'أنشئ نشاطك التجاري برمز الترخيص'
+    'پلن را انتخاب کن و کسب‌وکار خودت را بساز',
+    'Pick a plan and create your business',
+    'اختر باقة وأنشئ نشاطك التجاري'
   ],
   'signup_staff': [
     'ثبت‌نام پرسنل',
@@ -285,6 +287,8 @@ class SignupChoicePage extends StatelessWidget {
 
 String _planName(String lang, String key) {
   switch (key) {
+    case 'free':
+      return freeTx(lang, 'name');
     case 'basic':
       return _x(lang, 'پایه', 'Basic', 'أساسية');
     case 'pro':
@@ -296,6 +300,8 @@ String _planName(String lang, String key) {
 
 IconData _planIcon(String key) {
   switch (key) {
+    case 'free':
+      return Icons.card_giftcard_rounded;
     case 'basic':
       return Icons.store_rounded;
     case 'pro':
@@ -306,6 +312,7 @@ IconData _planIcon(String key) {
 }
 
 String _planPrice(String lang, PlanDef p) {
+  if (p.isFree) return freeTx(lang, 'price');
   final toman = _x(lang, 'تومان', 'Toman', 'تومان');
   final perMonth = _x(lang, '/ ماه', '/ month', '/ شهر');
   if (p.autoPay) {
@@ -323,6 +330,9 @@ String _planPrice(String lang, PlanDef p) {
 }
 
 List<String> _planFeatures(String lang, PlanDef p) {
+  if (p.isFree) {
+    return [for (final f in p.features) freeTx(lang, f)];
+  }
   final booking = _x(lang, 'رزرو آنلاین مشتری', 'Online customer booking',
       'حجز العملاء عبر الإنترنت');
   final photo = _x(
@@ -332,9 +342,9 @@ List<String> _planFeatures(String lang, PlanDef p) {
       'وضع صورة نشاطك في صفحة الأنشطة التجارية');
   final winback = _x(
       lang,
-      'ارسال پیام اختصاصی آرایشگاه در بازه‌های مشخص',
-      'Custom shop messages to customers at set intervals',
-      'إرسال رسالة خاصة بالصالون للزبائن في فترات محددة');
+      'ارسال پیام اختصاصی به مشتریان در بازه‌های مشخص',
+      'Custom messages to your customers at set intervals',
+      'إرسال رسالة خاصة للزبائن في فترات محددة');
   final bizList = _x(
       lang,
       'نمایش در جستجوی مشتریان بر اساس نوع کسب‌وکار',
@@ -433,7 +443,7 @@ class OwnerPlanPage extends StatelessWidget {
               style: TextStyle(color: muted(context), height: 1.5),
             ),
           ),
-          for (final p in kPlans) ...[
+          for (final p in kSignupPlans) ...[
             _PlanCard(
               plan: p,
               lang: lang,
@@ -581,6 +591,10 @@ class _PlanCard extends StatelessWidget {
                 ],
               ),
             ),
+          if (plan.isFree) ...[
+            const SizedBox(height: 12),
+            FreeWarning(lang: lang),
+          ],
         ],
       ),
     );
@@ -622,6 +636,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   int _months = 1;
   bool _paidLicense = false;
 
+  bool get _isFree => widget.plan.isFree;
   bool get _planNeedsCode => widget.plan.key == 'special';
 
   @override
@@ -645,7 +660,8 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
   }
 
   String? _validate(T6 s, String lang) {
-    if (_license.text.trim().isEmpty &&
+    if (!_isFree &&
+        _license.text.trim().isEmpty &&
         widget.plan.autoPay &&
         _shop.text.trim().isNotEmpty) {
       return _x(
@@ -654,7 +670,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
           'Pay first, or enter a license code',
           'ادفع أولاً أو أدخل رمز الترخيص');
     }
-    if (_license.text.trim().isEmpty ||
+    if ((!_isFree && _license.text.trim().isEmpty) ||
         _shop.text.trim().isEmpty ||
         _phone.text.trim().isEmpty ||
         _user.text.trim().isEmpty ||
@@ -682,7 +698,7 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
       toast(context, err);
       return;
     }
-    var licenseText = _license.text.trim();
+    var licenseText = _isFree ? '' : _license.text.trim();
     String? serverUrl;
     if (_planNeedsCode) {
       final needLink = !st.hasCustomApiUrl;
@@ -979,6 +995,10 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               ],
             ),
           ),
+          if (_isFree) ...[
+            const SizedBox(height: 12),
+            FreeWarning(lang: lang),
+          ],
           const SizedBox(height: 12),
           Glass(
             padding: const EdgeInsets.all(14),
@@ -1042,72 +1062,77 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               ],
             ),
           ),
-          if (widget.plan.autoPay) ...[
+          if (!_isFree && widget.plan.autoPay) ...[
             const SizedBox(height: 16),
             _payBox(lang),
           ],
-          const SizedBox(height: 16),
-          Glass(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              children: [
-                GlassField(
-                  controller: _license,
-                  label: combined
-                      ? _x(lang, 'کد فعال‌سازی', 'Activation code',
-                          'رمز التفعيل')
-                      : s.t('license_key'),
-                  icon: Icons.vpn_key_rounded,
-                  ltr: true,
-                ),
-                if (combined) ...[
-                  const SizedBox(height: 12),
+          if (!_isFree) ...[
+            const SizedBox(height: 16),
+            Glass(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                children: [
                   GlassField(
-                    controller: _link,
-                    label: _x(lang, 'لینک فعال‌سازی', 'Activation link',
-                        'رابط التفعيل'),
-                    icon: Icons.link_rounded,
-                    keyboard: TextInputType.url,
+                    controller: _license,
+                    label: combined
+                        ? _x(lang, 'کد فعال‌سازی', 'Activation code',
+                            'رمز التفعيل')
+                        : s.t('license_key'),
+                    icon: Icons.vpn_key_rounded,
                     ltr: true,
                   ),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text(
-                        _x(
-                            lang,
-                            'کد و لینکی را که همراه هم به شما داده‌ایم در این دو کادر بنویسید. لینک با https شروع می‌شود. می‌توانید هر دو را کنار هم در کادر اول هم بنویسید.',
-                            'Enter the code and the link we gave you together in these two boxes. The link starts with https. You can also paste both side by side in the first box.',
-                            'اكتب الرمز والرابط اللذين أعطيناك إياهما في هذين الحقلين. يبدأ الرابط بـ https. يمكنك أيضًا لصق الاثنين معًا في الحقل الأول.'),
-                        style: TextStyle(
-                            color: muted(context), fontSize: 12, height: 1.5)),
-                  ),
+                  if (combined) ...[
+                    const SizedBox(height: 12),
+                    GlassField(
+                      controller: _link,
+                      label: _x(lang, 'لینک فعال‌سازی', 'Activation link',
+                          'رابط التفعيل'),
+                      icon: Icons.link_rounded,
+                      keyboard: TextInputType.url,
+                      ltr: true,
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                          _x(
+                              lang,
+                              'کد و لینکی را که همراه هم به شما داده‌ایم در این دو کادر بنویسید. لینک با https شروع می‌شود. می‌توانید هر دو را کنار هم در کادر اول هم بنویسید.',
+                              'Enter the code and the link we gave you together in these two boxes. The link starts with https. You can also paste both side by side in the first box.',
+                              'اكتب الرمز والرابط اللذين أعطيناك إياهما في هذين الحقلين. يبدأ الرابط بـ https. يمكنك أيضًا لصق الاثنين معًا في الحقل الأول.'),
+                          style: TextStyle(
+                              color: muted(context),
+                              fontSize: 12,
+                              height: 1.5)),
+                    ),
+                  ],
+                  if (!combined) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                          _x(
+                              lang,
+                              'کد لایسنس باید مخصوص همین پلن باشد',
+                              'The license code must be for this plan',
+                              'يجب أن يكون رمز الترخيص لهذه الباقة'),
+                          style:
+                              TextStyle(color: muted(context), fontSize: 12)),
+                    ),
+                  ],
+                  if (_planNeedsCode) ...[
+                    const SizedBox(height: 12),
+                    GradientButton(
+                      outlined: true,
+                      icon: Icons.mail_outline_rounded,
+                      label: PayT(lang).t('mail_btn'),
+                      onPressed: _mailDev,
+                    ),
+                  ],
                 ],
-                if (!combined) ...[
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text(
-                        _x(
-                            lang,
-                            'کد لایسنس باید مخصوص همین پلن باشد',
-                            'The license code must be for this plan',
-                            'يجب أن يكون رمز الترخيص لهذه الباقة'),
-                        style: TextStyle(color: muted(context), fontSize: 12)),
-                  ),
-                ],
-                if (_planNeedsCode) ...[
-                  const SizedBox(height: 12),
-                  GradientButton(
-                    outlined: true,
-                    icon: Icons.mail_outline_rounded,
-                    label: PayT(lang).t('mail_btn'),
-                    onPressed: _mailDev,
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
+          ],
           if (panel.beauty) ...[
             const SizedBox(height: 16),
             _genderBox(lang),
@@ -1215,6 +1240,10 @@ class _OwnerSignupPageState extends State<OwnerSignupPage> {
               ],
             ),
           ),
+          if (_isFree) ...[
+            const SizedBox(height: 16),
+            FreeWarning(lang: lang),
+          ],
           const SizedBox(height: 20),
           GradientButton(
             label: _w(lang, s, 'create_shop'),

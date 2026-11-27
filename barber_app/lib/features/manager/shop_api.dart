@@ -4,7 +4,7 @@ import '../../app/servers.dart';
 import '../../app/settings.dart';
 import '../../app/util.dart';
 
-/// هرچه صفحه‌های آرایشگاه لازم دارند در یک بسته
+/// هرچه صفحه‌های مدیریت کسب‌وکار لازم دارند در یک بسته
 class ShopCtx {
   ShopCtx({
     required this.api,
@@ -12,7 +12,6 @@ class ShopCtx {
     required this.reload,
     required this.logout,
   });
-
   final ShopApi api;
   final ManagerSession session;
   final Future<void> Function() reload;
@@ -21,7 +20,6 @@ class ShopCtx {
 
 class ShopApi {
   ShopApi(this.settings);
-
   final AppSettings settings;
 
   ApiClient get _client => ApiClient(settings.apiUrl);
@@ -57,10 +55,11 @@ class ShopApi {
   // ───────────── مسیریابی بین سرورها ─────────────
 
   /// سروری که ثبت‌نام باید روی آن انجام شود
+  /// (رایگان و پایه: سرور اصلی، پرو: سرور پرو، ویژه/شخصی: سرور ذخیره‌شده با کد)
   String _urlForPlan(String plan) {
-    if (plan == 'basic') return kDefaultApiUrl;
+    if (plan == 'free' || plan == 'basic') return kDefaultApiUrl;
     if (plan == 'pro' && kProApiUrl.isNotEmpty) return kProApiUrl;
-    return settings.apiUrl; // ویژه / شخصی: سروری که با کد ذخیره شده
+    return settings.apiUrl;
   }
 
   /// سرور موفق را ذخیره می‌کند تا بقیه‌ی درخواست‌ها به همان بروند
@@ -123,12 +122,13 @@ class ShopApi {
 
   // ───────────── بدون ورود ─────────────
 
-  /// plan = اشتراکی که مالک خودش انتخاب کرده (basic | pro | special | personal).
-  /// serverUrl = آدرس سرور اختصاصی (برای ویژه/شخصی)؛ اگر خالی باشد از روی پلن
+  /// plan = free | basic | pro | special | personal.
+  /// برای پلن رایگان licenseKey خالی است.
+  /// serverUrl = آدرس سرور اختصاصی (ویژه/شخصی)؛ اگر خالی باشد از روی پلن
   /// تشخیص داده می‌شود.
   /// shifts = «09:00-13:00|16:00-22:00» و daysOff = روزهای تعطیل (0 = یکشنبه)
-  /// برای مالکی که خودش هم آرایشگر است.
-  /// bizType = نوع کسب‌وکار (همراه ثبت‌نام ذخیره می‌شود)، gender = men|women|both
+  /// برای مالکی که خودش هم ارائه‌دهنده‌ی خدمت است.
+  /// bizType = نوع کسب‌وکار، gender = men|women|both
   Future<ManagerSession> register({
     required String licenseKey,
     required String shopName,
@@ -225,13 +225,13 @@ class ShopApi {
     await _auth('logout');
   }
 
-  /// فقط صاحب آرایشگاه. فیلدها: name, phone, address, city, description,
+  /// فقط مدیر. فیلدها: name, phone, address, city, description,
   /// currency, photo_url (فقط اشتراک ویژه/شخصی), buffer_min, overtime_min,
   /// cancel_before_min, slot_step_min, calendar, timezone
   Future<Map<String, dynamic>> shopUpdate(Map<String, dynamic> fields) async =>
       _map(await _auth('shop_update', fields));
 
-  // ───────────── آرایشگرها ─────────────
+  // ───────────── پرسنل ─────────────
 
   Future<Map<String, dynamic>> staffList() async =>
       _map(await _auth('staff_list'));
@@ -255,10 +255,10 @@ class ShopApi {
   }
 
   /// فقط فیلدهایی که null نیستند ارسال می‌شوند.
-  /// serviceIds خالی = این آرایشگر همه‌ی خدمات را انجام می‌دهد.
-  /// shifts = «09:00-13:00|16:00-22:00» (تا ۳ شیفت)؛ ذخیره‌ی آن یعنی
-  /// آرایشگر ساعتش را تنظیم کرده و مشتری می‌تواند وقت ببیند.
-  /// clearOvertime = اضافه‌کار اختصاصی پاک شود و تنظیم آرایشگاه اعمال شود.
+  /// serviceIds خالی = این نفر همه‌ی خدمات را انجام می‌دهد.
+  /// shifts = «09:00-13:00|16:00-22:00»؛ ذخیره‌ی آن یعنی ساعت تنظیم شده و
+  /// مشتری می‌تواند وقت ببیند.
+  /// clearOvertime = اضافه‌کار اختصاصی پاک شود و تنظیم کسب‌وکار اعمال شود.
   Future<void> staffUpdate({
     required String staffId,
     String? name,
@@ -411,7 +411,7 @@ class ShopApi {
     await _auth('booking_noshow', {'booking_id': bookingId});
   }
 
-  // ───────────── پیام اختصاصی آرایشگاه (ویژه/شخصی) ─────────────
+  // ───────────── پیام اختصاصی (ویژه/شخصی) ─────────────
 
   Future<List<Map<String, dynamic>>> winbackList() async =>
       _rows(await _auth('winback_list'), 'rules');

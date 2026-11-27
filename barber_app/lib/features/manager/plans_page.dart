@@ -2,7 +2,9 @@ import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../app/fmt.dart';
+import '../../app/free_plan.dart';
 import '../../app/plans_config.dart';
 import '../../app/settings.dart';
 import '../../app/strings_pay.dart';
@@ -27,6 +29,8 @@ class _PlansPageState extends State<PlansPage> {
 
   IconData _icon(String key) {
     switch (key) {
+      case 'free':
+        return Icons.card_giftcard_rounded;
       case 'pro':
         return Icons.workspace_premium_rounded;
       case 'special':
@@ -36,6 +40,7 @@ class _PlansPageState extends State<PlansPage> {
   }
 
   String _priceLine(PlanDef p, T6 t, String lang) {
+    if (p.isFree) return freeTx(lang, 'price');
     final c = t.t('pl_toman');
     if (p.autoPay) {
       final usdt = t.t('pl_per_month',
@@ -49,6 +54,15 @@ class _PlansPageState extends State<PlansPage> {
     }
     if (p.monthly == 0) return t.t('pl_free_now');
     return t.t('pl_per_month', {'p': fmtNum(p.monthly, lang), 'c': c});
+  }
+
+  String _planTitle(PlanDef p, T6 t, String lang) =>
+      p.isFree ? freeTx(lang, 'name') : t.t('pl_name_${p.key}');
+
+  String _featureText(PlanDef p, String f, T6 t, String lang,
+      Map<String, Object?> nArgs) {
+    if (p.isFree) return freeTx(lang, f);
+    return t.t(f, nArgs);
   }
 
   /// جمع به واحد اصلی پلن (تتر برای پایه و پرو، تومان برای ویژه)
@@ -127,35 +141,69 @@ class _PlansPageState extends State<PlansPage> {
     }
   }
 
+  Widget _freeHeader(T6 t, String lang) {
+    final dl = widget.ctx.session.subscription.daysLeft;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FreeWarning(lang: lang),
+          if (dl != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                freeTx(lang, 'days_left', {'n': fmtNum(dl, lang)}),
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(freeTx(lang, 'upgrade'),
+                style: TextStyle(color: muted(context))),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = SettingsScope.of(context).lang;
     final t = T6(lang);
     final cur = widget.ctx.session.shop.plan;
+    final isFreeShop = cur == 'free';
+    final List<PlanDef> list =
+        isFreeShop ? <PlanDef>[kFreePlan, ...kPlans] : kPlans;
     return GlassScaffold(
       title: t.t('pl_title'),
       maxWidth: 640,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(t.t('pl_desc'),
-                style: TextStyle(color: muted(context))),
-          ),
-          for (final p in kPlans) _card(p, t, lang, p.key == cur),
+          if (isFreeShop)
+            _freeHeader(t, lang)
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(t.t('pl_desc'),
+                  style: TextStyle(color: muted(context))),
+            ),
+          for (final p in list) _card(p, t, lang, p.key == cur),
         ],
       ),
     );
   }
 
   Widget _card(PlanDef p, T6 t, String lang, bool current) {
-    final sel = _sel == p.key;
+    final sel = _sel == p.key && !p.isFree;
     final nArgs = <String, Object?>{'n': p.maxBarbers, 's': p.maxShifts};
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Glass(
-        onTap: () => setState(() => _sel = p.key),
+        onTap: () {
+          if (!p.isFree) setState(() => _sel = p.key);
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -167,7 +215,7 @@ class _PlansPageState extends State<PlansPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(t.t('pl_name_${p.key}'),
+                      Text(_planTitle(p, t, lang),
                           style: const TextStyle(
                               fontSize: 17, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 2),
@@ -193,10 +241,14 @@ class _PlansPageState extends State<PlansPage> {
                     const Icon(Icons.check_rounded,
                         size: 18, color: AppColors.green),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(t.t(f, nArgs))),
+                    Expanded(child: Text(_featureText(p, f, t, lang, nArgs))),
                   ],
                 ),
               ),
+            if (p.isFree) ...[
+              const SizedBox(height: 6),
+              FreeWarning(lang: lang),
+            ],
             if (sel) ...[
               const Divider(height: 24),
               _panel(p, t, lang),

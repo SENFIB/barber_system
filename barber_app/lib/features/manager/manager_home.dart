@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../../app/app_header.dart';
 import '../../app/biz_panel.dart';
 import '../../app/cal_fmt.dart';
 import '../../app/fmt.dart';
+import '../../app/free_plan.dart';
 import '../../app/reminders.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
@@ -28,6 +30,8 @@ String _x(String l, String fa, String en, String ar) =>
 
 String _subLabel(String lang, String plan, String fallback) {
   switch (plan) {
+    case 'free':
+      return freeTx(lang, 'name');
     case 'basic':
       return _x(lang, 'اشتراک پایه', 'Basic subscription', 'الاشتراك الأساسي');
     case 'pro':
@@ -96,6 +100,7 @@ class _ManagerHomeState extends State<ManagerHome> {
     final sess = ctx.session;
     final sub = sess.subscription;
     final shop = sess.shop;
+    final isFree = shop.plan == 'free';
     final planKey = 'plan_${shop.plan}';
     final panel =
         BizPanel.of(_bizType.isNotEmpty ? _bizType : shop.bizType);
@@ -161,12 +166,15 @@ class _ManagerHomeState extends State<ManagerHome> {
     final roleText = sess.isOwner
         ? _x(lang, 'مدیر', 'Owner', 'المدير')
         : _x(lang, 'نفر پرسنل', 'Staff member', 'موظف');
-    final planText = s.has(planKey) ? s.t(planKey) : shop.plan;
+    final planText = isFree
+        ? freeTx(lang, 'name')
+        : (s.has(planKey) ? s.t(planKey) : shop.plan);
     final pills = <Widget>[
       Pill(roleText),
     ];
     if (sess.isOwner && shop.plan.isNotEmpty) {
-      pills.add(Pill(planText, color: AppColors.blue));
+      pills.add(Pill(planText,
+          color: isFree ? AppColors.amber : AppColors.blue));
     }
     final typeText = panel.typeName(lang);
     if (typeText.isNotEmpty) {
@@ -219,6 +227,49 @@ class _ManagerHomeState extends State<ManagerHome> {
               ),
             ],
           ),
+        ),
+      );
+    }
+
+    // کارت پلن رایگان: هشدار حذف داده‌ها + روزهای مانده + دکمه‌ی ارتقا
+    Widget freeCard() {
+      final dl = sub.daysLeft;
+      return Glass(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.card_giftcard_rounded,
+                    color: AppColors.amber),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    freeTx(lang, 'name'),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            FreeWarning(lang: lang),
+            if (dl != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                freeTx(lang, 'days_left', {'n': fmtNum(dl, lang)}),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ],
+            const SizedBox(height: 14),
+            GradientButton(
+              compact: true,
+              icon: Icons.workspace_premium_rounded,
+              label: freeTx(lang, 'upgrade_btn'),
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => PlansPage(ctx))),
+            ),
+          ],
         ),
       );
     }
@@ -296,8 +347,12 @@ class _ManagerHomeState extends State<ManagerHome> {
       const SizedBox(height: 14),
     ];
     if (sess.isOwner) {
-      if (sub.expiringSoon) items.add(warnCard());
-      items.add(subCard);
+      if (isFree) {
+        items.add(freeCard());
+      } else {
+        if (sub.expiringSoon) items.add(warnCard());
+        items.add(subCard);
+      }
     }
     items.add(const SizedBox(height: 18));
 

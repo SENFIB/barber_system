@@ -1,10 +1,13 @@
 import 'package:barber_core/barber_core.dart';
 import 'package:flutter/material.dart';
+
+import '../../app/free_plan.dart';
 import '../../app/settings.dart';
 import '../../app/strings.dart';
 import '../../app/theme.dart';
 import '../../app/widgets.dart';
 import 'manager_home.dart';
+import 'plans_page.dart';
 import 'renew_page.dart';
 import 'shop_api.dart';
 import 'shop_auth.dart';
@@ -156,15 +159,57 @@ class _BlockedView extends StatelessWidget {
     required this.onRenewed,
     required this.onLogout,
   });
+
   final ManagerSession session;
   final ShopApi api;
   final Future<void> Function() onRenewed;
   final Future<void> Function() onLogout;
 
+  bool get _special =>
+      session.shop.plan == 'special' || session.shop.plan == 'personal';
+
+  /// مستقیم به خرید / تمدید؛ بعد از موفقیت به صفحه‌ی اصلی برمی‌گردد
+  Future<void> _go(BuildContext context) async {
+    final nav = Navigator.of(context);
+    final route = ModalRoute.of(context);
+    if (_special) {
+      // پلن ویژه: همان جریان قبلی
+      final ok = await nav.push<bool>(
+        MaterialPageRoute(builder: (_) => RenewPage(api: api)),
+      );
+      if (ok == true) await onRenewed();
+      return;
+    }
+    final ctx = ShopCtx(
+      api: api,
+      session: session,
+      reload: () async {
+        await onRenewed();
+        if (route != null) nav.popUntil((r) => identical(r, route));
+      },
+      logout: onLogout,
+    );
+    await nav.push(MaterialPageRoute(builder: (_) => PlansPage(ctx)));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final s = S(SettingsScope.of(context).lang);
+    final lang = SettingsScope.of(context).lang;
+    final s = S(lang);
     final deactive = session.subscription.isDeactive;
+    final isFree = session.shop.plan == 'free';
+
+    String message;
+    if (deactive) {
+      message = s.t('deactive_msg');
+    } else if (!session.isOwner) {
+      message = s.t('expired_staff');
+    } else if (isFree) {
+      message = freeTx(lang, 'ended');
+    } else {
+      message = s.t('expired_owner');
+    }
+
     return GlassScaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -182,29 +227,24 @@ class _BlockedView extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   s.t(deactive ? 'deactive_title' : 'expired_title'),
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                       fontSize: 22, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  deactive
-                      ? s.t('deactive_msg')
-                      : s.t(session.isOwner ? 'expired_owner' : 'expired_staff'),
+                  message,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: muted(context), height: 1.6),
                 ),
                 const SizedBox(height: 22),
                 if (!deactive && session.isOwner) ...[
                   GradientButton(
-                    label: s.t('renew'),
-                    icon: Icons.autorenew_rounded,
-                    onPressed: () async {
-                      final ok = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                            builder: (_) => RenewPage(api: api)),
-                      );
-                      if (ok == true) await onRenewed();
-                    },
+                    label: isFree ? freeTx(lang, 'upgrade_btn') : s.t('renew'),
+                    icon: isFree
+                        ? Icons.workspace_premium_rounded
+                        : Icons.autorenew_rounded,
+                    onPressed: () => _go(context),
                   ),
                   const SizedBox(height: 12),
                 ],
